@@ -1,9 +1,9 @@
 const express = require("express");
 const app = express();
 
-// =======================
-// CORS FIX (OK)
-// =======================
+// =====================
+// CORS FIX
+// =====================
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -11,34 +11,54 @@ app.use((req, res, next) => {
   next();
 });
 
-// =======================
-// KEY LIST
-// =======================
+// handle preflight
+app.options("*", (req, res) => {
+  res.sendStatus(200);
+});
+
+// =====================
+// DATA
+// =====================
 const keys = ["PRO123", "VIP999"];
 
-// =======================
-// HEALTH CHECK (QUAN TRỌNG TRÊN RENDER)
-// =======================
+// =====================
+// HEALTH CHECK (RENDER REQUIRE)
+// =====================
+app.get("/healthz", (req, res) => {
+  res.status(200).send("OK");
+});
+
+// =====================
+// ROOT CHECK
+// =====================
 app.get("/", (req, res) => {
   res.send("Server OK");
 });
 
-// =======================
+// =====================
 // VERIFY API
-// =======================
+// =====================
 app.get("/verify", (req, res) => {
-  const key = (req.query.key || "").trim();
+  try {
+    const key = (req.query.key || "").trim();
 
-  res.json({
-    valid: keys.includes(key)
-  });
+    return res.json({
+      valid: keys.includes(key)
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      valid: false,
+      error: "server_error"
+    });
+  }
 });
 
-// =======================
-// PORT (RENDER REQUIRE)
-// =======================
+// =====================
+// START SERVER
+// =====================
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("Server running on port", PORT);
 });
