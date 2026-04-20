@@ -1,17 +1,18 @@
 const express = require("express");
 const app = express();
 
-// ✅ FIX CORS
+// ✅ FIX CORS (QUAN TRỌNG NHẤT)
 app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*"); 
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   next();
 });
 
-// 🔑 DANH SÁCH KEY
+// 🔑 KEY
 const keys = ["PRO123", "VIP999"];
 
+// API VERIFY
 app.get("/verify", (req, res) => {
   const key = req.query.key;
 
@@ -22,7 +23,7 @@ app.get("/verify", (req, res) => {
   }
 });
 
-// ⚠️ BẮT BUỘC PORT RENDER
+// PORT RENDER
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
