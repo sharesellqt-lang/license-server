@@ -2,19 +2,21 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// fake DB (sau nâng MongoDB)
+/* =========================
+   LICENSE DB (demo)
+========================= */
 let licenses = {
-  "ABC-123": {
-    valid: true,
-    deviceId: null,
-    lastActive: null
-  }
+  "ABC-123": { valid: true, deviceId: null },
+  "PRO-999": { valid: true, deviceId: null }
 };
 
-// verify license
+/* =========================
+   VERIFY
+========================= */
 app.get("/verify", (req, res) => {
 
   const { key, deviceId } = req.query;
@@ -25,25 +27,22 @@ app.get("/verify", (req, res) => {
     return res.json({ valid: false });
   }
 
-  // CHỐNG SHARE DEVICE
   if (lic.deviceId && lic.deviceId !== deviceId) {
     return res.json({ valid: false, reason: "DEVICE_LOCKED" });
   }
 
-  // bind device lần đầu
   if (!lic.deviceId) {
     lic.deviceId = deviceId;
   }
 
-  lic.lastActive = Date.now();
-
-  return res.json({
-    valid: true
-  });
+  return res.json({ valid: true });
 });
 
-// revoke realtime
+/* =========================
+   REVOKE
+========================= */
 app.post("/revoke", (req, res) => {
+
   const { key } = req.body;
 
   if (licenses[key]) {
@@ -53,6 +52,11 @@ app.post("/revoke", (req, res) => {
   res.json({ success: true });
 });
 
-app.listen(3000, () => {
-  console.log("License server running...");
+/* =========================
+   RENDER PORT FIX
+========================= */
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("License server running on port", PORT);
 });
