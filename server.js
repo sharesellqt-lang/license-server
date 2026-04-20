@@ -1,22 +1,29 @@
 const express = require("express");
-const cors = require("cors");
-
 const app = express();
-app.use(cors());
 
-const PORT = process.env.PORT || 3000;
+// ✅ FIX CORS
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*"); 
+  res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  next();
+});
 
-const VALID_KEYS = ["PRO123", "VIP999", "ADMIN"];
+// 🔑 DANH SÁCH KEY
+const keys = ["PRO123", "VIP999"];
 
 app.get("/verify", (req, res) => {
   const key = req.query.key;
 
-  if (VALID_KEYS.includes(key)) {
-    return res.json({ valid: true });
+  if (keys.includes(key)) {
+    res.json({ valid: true });
+  } else {
+    res.json({ valid: false });
   }
-
-  return res.json({ valid: false });
 });
+
+// ⚠️ BẮT BUỘC PORT RENDER
+const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {
   console.log("Server running on port " + PORT);
