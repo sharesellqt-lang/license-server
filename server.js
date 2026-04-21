@@ -7,6 +7,13 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
+   HEALTH CHECK (FIX RENDER)
+========================= */
+app.get("/healthz", (req, res) => {
+  res.status(200).send("ok");
+});
+
+/* =========================
    LICENSE DB (demo)
 ========================= */
 let licenses = {
@@ -21,17 +28,23 @@ app.get("/verify", (req, res) => {
 
   const { key, deviceId } = req.query;
 
+  if (!key) {
+    return res.json({ valid: false, reason: "NO_KEY" });
+  }
+
   const lic = licenses[key];
 
   if (!lic || !lic.valid) {
-    return res.json({ valid: false });
+    return res.json({ valid: false, reason: "INVALID_KEY" });
   }
 
-  if (lic.deviceId && lic.deviceId !== deviceId) {
+  // nếu có device lock
+  if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
     return res.json({ valid: false, reason: "DEVICE_LOCKED" });
   }
 
-  if (!lic.deviceId) {
+  // bind device lần đầu
+  if (!lic.deviceId && deviceId) {
     lic.deviceId = deviceId;
   }
 
@@ -53,9 +66,9 @@ app.post("/revoke", (req, res) => {
 });
 
 /* =========================
-   RENDER PORT FIX
+   RENDER PORT FIX (CHUẨN)
 ========================= */
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log("License server running on port", PORT);
