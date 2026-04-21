@@ -31,7 +31,7 @@ const adminRoutes = require("./admin");
 app.use("/admin", adminRoutes);
 
 /* =========================
-   MODELS
+   MODELS (FIX OVERWRITE ERROR)
 ========================= */
 
 // USER MODEL
@@ -41,18 +41,20 @@ const UserSchema = new mongoose.Schema({
   licenseKey: String
 });
 
-const User = mongoose.model("User", UserSchema);
+const User =
+  mongoose.models.User || mongoose.model("User", UserSchema);
 
-// LICENSE MODEL
+// LICENSE MODEL (FIXED)
 const LicenseSchema = new mongoose.Schema({
-  key: String,
+  key: { type: String, unique: true, index: true },
   valid: { type: Boolean, default: true },
   devices: { type: [String], default: [] },
   expireAt: Date,
   userId: mongoose.Schema.Types.ObjectId
 });
 
-const License = mongoose.model("License", LicenseSchema);
+const License =
+  mongoose.models.License || mongoose.model("License", LicenseSchema);
 
 /* =========================
    VERIFY (SAAS CORE)
