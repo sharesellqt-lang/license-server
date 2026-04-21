@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const LicenseSchema = new mongoose.Schema({
-  key: { type: String, unique: true, index: true }
+  key: { type: String, unique: true, index: true },  // Thêm dấu phẩy sau key
   valid: { type: Boolean, default: true },
   devices: { type: [String], default: [] },
   expireAt: Date,
