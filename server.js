@@ -10,10 +10,19 @@ app.use(express.json());
 /* =========================
    CONNECT MONGODB (FIX)
 ========================= */
-mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/license_db")
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch(err => console.log("❌ MongoDB error", err));
+mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@cluster.mongodb.net/license_db", {
+  serverSelectionTimeoutMS: 5000
+})
+.then(() => {
+  console.log("✅ MongoDB connected");
+})
+.catch(err => {
+  console.error("❌ MongoDB FAILED:", err.message);
+});
 
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("🚀 Server LIVE on port", PORT);
+});
 /* =========================
    HEALTH CHECK
 ========================= */
@@ -114,5 +123,5 @@ app.post("/revoke", async (req, res) => {
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log("License server running on port", PORT);
+  console.log("🚀 Server LIVE on port", PORT);
 });
