@@ -6,6 +6,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+const adminRoutes = require("./admin");
+app.use("/admin", adminRoutes);
 
 /* =========================
    HEALTH CHECK
@@ -17,64 +19,96 @@ app.get("/healthz", (req, res) => {
 /* =========================
    CONNECT MONGODB
 ========================= */
-
-mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster", {
-  serverSelectionTimeoutMS: 5000
-})
-.then(() => {
-  console.log("✅ MongoDB connected");
-})
-.catch(err => {
-  console.error("❌ MongoDB FAILED:", err.message);
-});
+mongoose.connect(
+  "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
+  { serverSelectionTimeoutMS: 5000 }
+)
+.then(() => console.log("✅ MongoDB connected"))
+.catch(err => console.error("❌ MongoDB FAILED:", err.message));
 
 /* =========================
-   SCHEMA
+   MODELS
 ========================= */
+
+// USER MODEL
+const UserSchema = new mongoose.Schema({
+  email: String,
+  password: String,
+  licenseKey: String
+});
+
+const User = mongoose.model("User", UserSchema);
+
+// LICENSE MODEL
 const LicenseSchema = new mongoose.Schema({
   key: String,
   valid: { type: Boolean, default: true },
-  deviceId: { type: String, default: null },
-  expireAt: Date
+  devices: { type: [String], default: [] },
+  expireAt: Date,
+  userId: mongoose.Schema.Types.ObjectId
 });
 
 const License = mongoose.model("License", LicenseSchema);
 
 /* =========================
-   VERIFY
+   VERIFY (SAAS CORE)
 ========================= */
 app.get("/verify", async (req, res) => {
 
   const { key, deviceId } = req.query;
 
-  if (!key) {
-    return res.json({ valid: false, reason: "NO_KEY" });
-  }
+  const license = await License.findOne({ key });
 
-  const lic = await License.findOne({ key });
-
-  if (!lic || !lic.valid) {
+  if (!license) {
     return res.json({ valid: false, reason: "INVALID_KEY" });
   }
 
-  if (lic.expireAt && new Date() > lic.expireAt) {
+  if (!license.valid) {
+    return res.json({ valid: false, reason: "DISABLED" });
+  }
+
+  if (license.expireAt && new Date() > license.expireAt) {
     return res.json({ valid: false, reason: "EXPIRED" });
   }
 
-  if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
-    return res.json({ valid: false, reason: "DEVICE_LOCKED" });
-  }
+  // DEVICE LOGIC (SAAS CORE)
+  if (!license.devices.includes(deviceId)) {
 
-  if (!lic.deviceId && deviceId) {
-    lic.deviceId = deviceId;
-    await lic.save();
+    if (license.devices.length >= 3) {
+      return res.json({ valid: false, reason: "DEVICE_LIMIT" });
+    }
+
+    license.devices.push(deviceId);
+    await license.save();
   }
 
   return res.json({ valid: true });
 });
 
 /* =========================
-   CREATE LICENSE
+   ADMIN CREATE USER + LICENSE
+========================= */
+app.post("/admin/create-user", async (req, res) => {
+
+  const { email, password, key } = req.body;
+
+  const user = await User.create({
+    email,
+    password,
+    licenseKey: key
+  });
+
+  await License.create({
+    key,
+    userId: user._id,
+    devices: []
+  });
+
+  res.json({ success: true });
+});
+
+/* =========================
+   CREATE LICENSE (SIMPLE)
 ========================= */
 app.post("/create", async (req, res) => {
 
@@ -92,7 +126,8 @@ app.post("/create", async (req, res) => {
 
   const newKey = new License({
     key,
-    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    devices: []
   });
 
   await newKey.save();
@@ -101,7 +136,7 @@ app.post("/create", async (req, res) => {
 });
 
 /* =========================
-   REVOKE
+   REVOKE LICENSE
 ========================= */
 app.post("/revoke", async (req, res) => {
 
@@ -113,7 +148,7 @@ app.post("/revoke", async (req, res) => {
 });
 
 /* =========================
-   START SERVER (PHẢI Ở CUỐI)
+   START SERVER
 ========================= */
 const PORT = process.env.PORT || 10000;
 
