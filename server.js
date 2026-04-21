@@ -6,19 +6,23 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster
-.then(() => console.log("✅ MongoDB connected"))
-.catch(err => console.log("❌ MongoDB error", err));
 
 /* =========================
-   HEALTH CHECK (FIX RENDER)
+   CONNECT MONGODB (FIX)
+========================= */
+mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/license_db")
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => console.log("❌ MongoDB error", err));
+
+/* =========================
+   HEALTH CHECK
 ========================= */
 app.get("/healthz", (req, res) => {
   res.status(200).send("ok");
 });
 
 /* =========================
-   LICENSE DB (demo)
+   SCHEMA
 ========================= */
 const LicenseSchema = new mongoose.Schema({
   key: String,
@@ -28,6 +32,7 @@ const LicenseSchema = new mongoose.Schema({
 });
 
 const License = mongoose.model("License", LicenseSchema);
+
 /* =========================
    VERIFY
 ========================= */
@@ -35,10 +40,14 @@ app.get("/verify", async (req, res) => {
 
   const { key, deviceId } = req.query;
 
+  if (!key) {
+    return res.json({ valid: false, reason: "NO_KEY" });
+  }
+
   const lic = await License.findOne({ key });
 
   if (!lic || !lic.valid) {
-    return res.json({ valid: false });
+    return res.json({ valid: false, reason: "INVALID_KEY" });
   }
 
   // check expire
@@ -47,25 +56,39 @@ app.get("/verify", async (req, res) => {
   }
 
   // device lock
-  if (lic.deviceId && lic.deviceId !== deviceId) {
+  if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
     return res.json({ valid: false, reason: "DEVICE_LOCKED" });
   }
 
   // bind device lần đầu
-  if (!lic.deviceId) {
+  if (!lic.deviceId && deviceId) {
     lic.deviceId = deviceId;
     await lic.save();
   }
 
   return res.json({ valid: true });
 });
+
+/* =========================
+   CREATE LICENSE
+========================= */
 app.post("/create", async (req, res) => {
 
   const { key } = req.body;
 
+  if (!key) {
+    return res.json({ success: false, error: "NO_KEY" });
+  }
+
+  const exist = await License.findOne({ key });
+
+  if (exist) {
+    return res.json({ success: false, error: "EXISTS" });
+  }
+
   const newKey = new License({
     key,
-    expireAt: new Date(Date.now() + 30*24*60*60*1000) // 30 ngày
+    expireAt: new Date(Date.now() + 30*24*60*60*1000)
   });
 
   await newKey.save();
@@ -74,21 +97,19 @@ app.post("/create", async (req, res) => {
 });
 
 /* =========================
-   REVOKE
+   REVOKE (FIX)
 ========================= */
-app.post("/revoke", (req, res) => {
+app.post("/revoke", async (req, res) => {
 
   const { key } = req.body;
 
-  if (licenses[key]) {
-    licenses[key].valid = false;
-  }
+  await License.updateOne({ key }, { valid: false });
 
   res.json({ success: true });
 });
 
 /* =========================
-   RENDER PORT FIX (CHUẨN)
+   START SERVER
 ========================= */
 const PORT = process.env.PORT || 10000;
 
