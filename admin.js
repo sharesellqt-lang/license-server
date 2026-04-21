@@ -1,21 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const mongoose = require("mongoose");
+const License = require("./models/License");
 
 /* =========================
-   LICENSE MODEL (IMPORT LẠI)
+   ADMIN AUTH MIDDLEWARE
 ========================= */
-const License = mongoose.model("License");
+function adminAuth(req, res, next) {
+  const { token } = req.headers;
 
-/* =========================
-   SIMPLE ADMIN AUTH (TEMP)
-========================= */
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "123456";
+  if (token !== "admin-token") {
+    return res.status(401).json({ error: "UNAUTHORIZED" });
+  }
+
+  next();
+}
 
 /* =========================
    LOGIN ADMIN
 ========================= */
+const ADMIN_USER = "admin";
+const ADMIN_PASS = "123456";
+
 router.post("/login", (req, res) => {
   const { user, pass } = req.body;
 
@@ -29,7 +34,7 @@ router.post("/login", (req, res) => {
 /* =========================
    LIST LICENSES
 ========================= */
-router.get("/licenses", async (req, res) => {
+router.get("/licenses", adminAuth, async (req, res) => {
   const list = await License.find();
   res.json(list);
 });
@@ -37,7 +42,7 @@ router.get("/licenses", async (req, res) => {
 /* =========================
    CREATE LICENSE
 ========================= */
-router.post("/create", async (req, res) => {
+router.post("/create", adminAuth, async (req, res) => {
   const { key } = req.body;
 
   const exist = await License.findOne({ key });
@@ -47,7 +52,7 @@ router.post("/create", async (req, res) => {
     key,
     valid: true,
     devices: [],
-    expireAt: new Date(Date.now() + 30*24*60*60*1000)
+    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   });
 
   await license.save();
@@ -58,7 +63,7 @@ router.post("/create", async (req, res) => {
 /* =========================
    RESET DEVICE
 ========================= */
-router.post("/reset-device", async (req, res) => {
+router.post("/reset-device", adminAuth, async (req, res) => {
   const { key } = req.body;
 
   await License.updateOne(
@@ -72,7 +77,7 @@ router.post("/reset-device", async (req, res) => {
 /* =========================
    REVOKE KEY
 ========================= */
-router.post("/revoke", async (req, res) => {
+router.post("/revoke", adminAuth, async (req, res) => {
   const { key } = req.body;
 
   await License.updateOne(

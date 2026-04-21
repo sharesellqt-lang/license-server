@@ -6,8 +6,6 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-const adminRoutes = require("./admin");
-app.use("/admin", adminRoutes);
 
 /* =========================
    HEALTH CHECK
@@ -25,6 +23,12 @@ mongoose.connect(
 )
 .then(() => console.log("✅ MongoDB connected"))
 .catch(err => console.error("❌ MongoDB FAILED:", err.message));
+
+/* =========================
+   ADMIN ROUTES (CHỈ 1 LẦN)
+========================= */
+const adminRoutes = require("./admin");
+app.use("/admin", adminRoutes);
 
 /* =========================
    MODELS
@@ -71,7 +75,6 @@ app.get("/verify", async (req, res) => {
     return res.json({ valid: false, reason: "EXPIRED" });
   }
 
-  // DEVICE LOGIC (SAAS CORE)
   if (!license.devices.includes(deviceId)) {
 
     if (license.devices.length >= 3) {
@@ -108,7 +111,7 @@ app.post("/admin/create-user", async (req, res) => {
 });
 
 /* =========================
-   CREATE LICENSE (SIMPLE)
+   CREATE LICENSE
 ========================= */
 app.post("/create", async (req, res) => {
 
