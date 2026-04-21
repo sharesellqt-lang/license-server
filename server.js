@@ -8,7 +8,14 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
-   CONNECT MONGODB (FIX)
+   HEALTH CHECK
+========================= */
+app.get("/healthz", (req, res) => {
+  res.status(200).send("ok");
+});
+
+/* =========================
+   CONNECT MONGODB
 ========================= */
 mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@cluster.mongodb.net/license_db", {
   serverSelectionTimeoutMS: 5000
@@ -18,16 +25,6 @@ mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@cluster.mon
 })
 .catch(err => {
   console.error("❌ MongoDB FAILED:", err.message);
-});
-
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("🚀 Server LIVE on port", PORT);
-});
-/* =========================
-   HEALTH CHECK
-========================= */
-app.get("/healthz", (req, res) => {
-  res.status(200).send("ok");
 });
 
 /* =========================
@@ -59,17 +56,14 @@ app.get("/verify", async (req, res) => {
     return res.json({ valid: false, reason: "INVALID_KEY" });
   }
 
-  // check expire
   if (lic.expireAt && new Date() > lic.expireAt) {
     return res.json({ valid: false, reason: "EXPIRED" });
   }
 
-  // device lock
   if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
     return res.json({ valid: false, reason: "DEVICE_LOCKED" });
   }
 
-  // bind device lần đầu
   if (!lic.deviceId && deviceId) {
     lic.deviceId = deviceId;
     await lic.save();
@@ -97,7 +91,7 @@ app.post("/create", async (req, res) => {
 
   const newKey = new License({
     key,
-    expireAt: new Date(Date.now() + 30*24*60*60*1000)
+    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   });
 
   await newKey.save();
@@ -106,7 +100,7 @@ app.post("/create", async (req, res) => {
 });
 
 /* =========================
-   REVOKE (FIX)
+   REVOKE
 ========================= */
 app.post("/revoke", async (req, res) => {
 
@@ -118,7 +112,7 @@ app.post("/revoke", async (req, res) => {
 });
 
 /* =========================
-   START SERVER
+   START SERVER (PHẢI Ở CUỐI)
 ========================= */
 const PORT = process.env.PORT || 10000;
 
