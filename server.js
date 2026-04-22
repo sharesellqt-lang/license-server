@@ -1,11 +1,17 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+/* =========================
+   TOKEN STORE (NEW)
+========================= */
+let tokens = {};
 
 /* =========================
    HEALTH CHECK
@@ -18,23 +24,21 @@ app.get("/healthz", (req, res) => {
    CONNECT MONGODB
 ========================= */
 mongoose.connect(
-  "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
+  "mongodb+srv://sharest_db_user:1RMEJ@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
   { serverSelectionTimeoutMS: 5000 }
 )
 .then(() => console.log("✅ MongoDB connected"))
 .catch(err => console.error("❌ MongoDB FAILED:", err.message));
 
 /* =========================
-   ADMIN ROUTES (CHỈ 1 LẦN)
+   ADMIN ROUTES
 ========================= */
 const adminRoutes = require("./admin");
 app.use("/admin", adminRoutes);
 
 /* =========================
-   MODELS (FIX OVERWRITE ERROR)
+   MODELS
 ========================= */
-
-// USER MODEL
 const UserSchema = new mongoose.Schema({
   email: String,
   password: String,
@@ -44,7 +48,6 @@ const UserSchema = new mongoose.Schema({
 const User =
   mongoose.models.User || mongoose.model("User", UserSchema);
 
-// LICENSE MODEL (FIXED)
 const LicenseSchema = new mongoose.Schema({
   key: { type: String, unique: true, index: true },
   valid: { type: Boolean, default: true },
@@ -57,7 +60,7 @@ const License =
   mongoose.models.License || mongoose.model("License", LicenseSchema);
 
 /* =========================
-   VERIFY (SAAS CORE)
+   VERIFY (UPDATED - ADD TOKEN)
 ========================= */
 app.get("/verify", async (req, res) => {
 
@@ -87,7 +90,44 @@ app.get("/verify", async (req, res) => {
     await license.save();
   }
 
-  return res.json({ valid: true });
+  // 🔥 NEW: tạo token
+  const token = crypto.randomBytes(16).toString("hex");
+
+  tokens[token] = {
+    createdAt: Date.now(),
+    deviceId
+  };
+
+  return res.json({ valid: true, token });
+});
+
+/* =========================
+   SECURE VIEW (NEW - CHỐNG BYPASS)
+========================= */
+app.get("/secure-view", async (req, res) => {
+
+  const { token, url } = req.query;
+
+  if (!token || !tokens[token]) {
+    return res.send("❌ Unauthorized");
+  }
+
+  // hết hạn sau 5 phút
+  if (Date.now() - tokens[token].createdAt > 5 * 60 * 1000) {
+    delete tokens[token];
+    return res.send("❌ Token expired");
+  }
+
+  try {
+    const fetch = (await import("node-fetch")).default;
+    const r = await fetch(url);
+    const html = await r.text();
+
+    res.send(html);
+
+  } catch (err) {
+    res.send("❌ Load fail");
+  }
 });
 
 /* =========================
@@ -150,6 +190,13 @@ app.post("/revoke", async (req, res) => {
   await License.updateOne({ key }, { valid: false });
 
   res.json({ success: true });
+});
+
+/* =========================
+   ROOT (OPTIONAL)
+========================= */
+app.get("/", (req, res) => {
+  res.send("🚀 License Server Running");
 });
 
 /* =========================
