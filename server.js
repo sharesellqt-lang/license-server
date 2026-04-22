@@ -24,7 +24,7 @@ app.get("/healthz", (req, res) => {
    CONNECT MONGODB
 ========================= */
 mongoose.connect(
-  "mongodb+srv://sharest_db_user:1RMEJ@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
+  "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
   { serverSelectionTimeoutMS: 5000 }
 )
 .then(() => console.log("✅ MongoDB connected"))
