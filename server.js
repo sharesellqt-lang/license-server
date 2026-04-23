@@ -1,17 +1,11 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
-const crypto = require("crypto");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-
-/* =========================
-   TOKEN STORE (NEW)
-========================= */
-let tokens = {};
 
 /* =========================
    HEALTH CHECK
@@ -23,133 +17,60 @@ app.get("/healthz", (req, res) => {
 /* =========================
    CONNECT MONGODB
 ========================= */
-mongoose.connect(
-  "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
-  { serverSelectionTimeoutMS: 5000 }
-)
-.then(() => console.log("✅ MongoDB connected"))
-.catch(err => console.error("❌ MongoDB FAILED:", err.message));
 
-/* =========================
-   ADMIN ROUTES
-========================= */
-const adminRoutes = require("./admin");
-app.use("/admin", adminRoutes);
-
-/* =========================
-   MODELS
-========================= */
-const UserSchema = new mongoose.Schema({
-  email: String,
-  password: String,
-  licenseKey: String
+mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster", {
+  serverSelectionTimeoutMS: 5000
+})
+.then(() => {
+  console.log("✅ MongoDB connected");
+})
+.catch(err => {
+  console.error("❌ MongoDB FAILED:", err.message);
 });
 
-const User =
-  mongoose.models.User || mongoose.model("User", UserSchema);
-
+/* =========================
+   SCHEMA
+========================= */
 const LicenseSchema = new mongoose.Schema({
-  key: { type: String, unique: true, index: true },
+  key: String,
   valid: { type: Boolean, default: true },
-  devices: { type: [String], default: [] },
-  expireAt: Date,
-  userId: mongoose.Schema.Types.ObjectId
+  deviceId: { type: String, default: null },
+  expireAt: Date
 });
 
-const License =
-  mongoose.models.License || mongoose.model("License", LicenseSchema);
+const License = mongoose.model("License", LicenseSchema);
 
 /* =========================
-   VERIFY (UPDATED - ADD TOKEN)
+   VERIFY
 ========================= */
 app.get("/verify", async (req, res) => {
 
   const { key, deviceId } = req.query;
 
-  const license = await License.findOne({ key });
+  if (!key) {
+    return res.json({ valid: false, reason: "NO_KEY" });
+  }
 
-  if (!license) {
+  const lic = await License.findOne({ key });
+
+  if (!lic || !lic.valid) {
     return res.json({ valid: false, reason: "INVALID_KEY" });
   }
 
-  if (!license.valid) {
-    return res.json({ valid: false, reason: "DISABLED" });
-  }
-
-  if (license.expireAt && new Date() > license.expireAt) {
+  if (lic.expireAt && new Date() > lic.expireAt) {
     return res.json({ valid: false, reason: "EXPIRED" });
   }
 
-  if (!license.devices.includes(deviceId)) {
-
-    if (license.devices.length >= 3) {
-      return res.json({ valid: false, reason: "DEVICE_LIMIT" });
-    }
-
-    license.devices.push(deviceId);
-    await license.save();
+  if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
+    return res.json({ valid: false, reason: "DEVICE_LOCKED" });
   }
 
-  // 🔥 NEW: tạo token
-  const token = crypto.randomBytes(16).toString("hex");
-
-  tokens[token] = {
-    createdAt: Date.now(),
-    deviceId
-  };
-
-  return res.json({ valid: true, token });
-});
-
-/* =========================
-   SECURE VIEW (NEW - CHỐNG BYPASS)
-========================= */
-app.get("/secure-view", async (req, res) => {
-
-  const { token, url } = req.query;
-
-  if (!token || !tokens[token]) {
-    return res.send("❌ Unauthorized");
+  if (!lic.deviceId && deviceId) {
+    lic.deviceId = deviceId;
+    await lic.save();
   }
 
-  // hết hạn sau 5 phút
-  if (Date.now() - tokens[token].createdAt > 5 * 60 * 1000) {
-    delete tokens[token];
-    return res.send("❌ Token expired");
-  }
-
-  try {
-    const fetch = (await import("node-fetch")).default;
-    const r = await fetch(url);
-    const html = await r.text();
-
-    res.send(html);
-
-  } catch (err) {
-    res.send("❌ Load fail");
-  }
-});
-
-/* =========================
-   ADMIN CREATE USER + LICENSE
-========================= */
-app.post("/admin/create-user", async (req, res) => {
-
-  const { email, password, key } = req.body;
-
-  const user = await User.create({
-    email,
-    password,
-    licenseKey: key
-  });
-
-  await License.create({
-    key,
-    userId: user._id,
-    devices: []
-  });
-
-  res.json({ success: true });
+  return res.json({ valid: true });
 });
 
 /* =========================
@@ -171,8 +92,7 @@ app.post("/create", async (req, res) => {
 
   const newKey = new License({
     key,
-    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    devices: []
+    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   });
 
   await newKey.save();
@@ -181,7 +101,7 @@ app.post("/create", async (req, res) => {
 });
 
 /* =========================
-   REVOKE LICENSE
+   REVOKE
 ========================= */
 app.post("/revoke", async (req, res) => {
 
@@ -193,14 +113,7 @@ app.post("/revoke", async (req, res) => {
 });
 
 /* =========================
-   ROOT (OPTIONAL)
-========================= */
-app.get("/", (req, res) => {
-  res.send("🚀 License Server Running");
-});
-
-/* =========================
-   START SERVER
+   START SERVER (PHẢI Ở CUỐI)
 ========================= */
 const PORT = process.env.PORT || 10000;
 
