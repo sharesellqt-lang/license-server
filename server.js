@@ -3,6 +3,11 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+app.get("/ip", (req, res) => {
+  console.log("IP ROUTE HIT");
+  console.log("IP:", req.ip);
+  res.send(req.ip);
+});
 
 // ✅ FIX: dùng fetch ổn định cho Node (Render)
 const fetch = (...args) =>
@@ -214,21 +219,32 @@ app.get("/secure-post", async (req, res) => {
 
   try {
     // ✅ fetch từ WP
-    let wpRes = await fetch(`${WP_API}/${postId}`);
-    let post = await wpRes.json();
+  // ✅ code mới (an toàn)
+let wpRes = await fetch(`${WP_API}/${postId}`);
 
-    let content = post.content.rendered;
+if (!wpRes.ok) {
+  console.log("WP STATUS:", wpRes.status);
+  return res.json({ error: "WP_BLOCKED" });
+}
 
-    // ✅ watermark
-    content = addWatermark(content, key);
+let post = await wpRes.json();
 
-    // ✅ encode
-    content = encodeContent(content);
+if (!post || !post.content) {
+  return res.json({ error: "POST_NOT_FOUND" });
+}
 
-    res.json({
-      title: post.title.rendered,
-      content
-    });
+let content = post.content.rendered;
+
+// watermark
+content = addWatermark(content, key);
+
+// encode
+content = encodeContent(content);
+
+res.json({
+  title: post.title.rendered,
+  content
+});
 
   } catch (err) {
     console.log("FETCH ERROR:", err);
