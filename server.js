@@ -17,8 +17,12 @@ const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
    MIDDLEWARE
 ========================= */
 app.use(cors({
-  origin: "https://sharesell.net"
+  origin: "*",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"]
 }));
+
+app.options("*", cors()); // 🔥 QUAN TRỌNG (fix preflight)
 
 app.use(express.json());
 
