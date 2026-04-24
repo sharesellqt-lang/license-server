@@ -66,9 +66,11 @@ app.get("/verify", async (req, res) => {
   }
 
   if (!lic.deviceId && deviceId) {
-    lic.deviceId = deviceId;
-    await lic.save();
-  }
+  lic.deviceId = deviceId;
+  await lic.save();
+} else if (lic.deviceId !== deviceId) {
+  console.log("⚠️ Device mismatch:", lic.deviceId, deviceId);
+}
 
   return res.json({ valid: true });
 });
