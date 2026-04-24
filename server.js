@@ -3,6 +3,45 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
+const fetch = require("node-fetch");
+
+const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
+
+const rateLimit = {};
+function encodeContent(str) {
+  return Buffer.from(str, "utf-8").toString("base64");
+}
+
+function addWatermark(html, key) {
+  const mark = `<span style="
+    position:absolute;
+    opacity:0.05;
+    font-size:12px;
+    transform:rotate(-20deg);
+    pointer-events:none;
+  ">${key}</span>`;
+
+  return html + mark;
+}
+
+function checkRate(key) {
+  const now = Date.now();
+
+  if (!rateLimit[key]) {
+    rateLimit[key] = { count: 1, time: now };
+    return true;
+  }
+
+  if (now - rateLimit[key].time > 60000) {
+    rateLimit[key] = { count: 1, time: now };
+    return true;
+  }
+
+  rateLimit[key].count++;
+
+  return rateLimit[key].count <= 30;
+  const id = key + "_" + req.ip;
+}
 
 app.use(cors());
 app.use(express.json());
@@ -62,19 +101,15 @@ app.get("/verify", async (req, res) => {
   }
 
   if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
-    return res.json({ valid: false, reason: "DEVICE_LOCKED" });
-  }
-
-  if (!lic.deviceId && deviceId) {
-  lic.deviceId = deviceId;
-  await lic.save();
-} else if (lic.deviceId !== deviceId) {
-  console.log("⚠️ Device mismatch:", lic.deviceId, deviceId);
+  return res.json({ valid: false, reason: "DEVICE_LOCKED" });
 }
 
-  return res.json({ valid: true });
-});
+if (!lic.deviceId && deviceId) {
+  lic.deviceId = deviceId;
+  await lic.save();
+}
 
+return res.json({ valid: true });
 /* =========================
    CREATE LICENSE
 ========================= */
@@ -113,7 +148,60 @@ app.post("/revoke", async (req, res) => {
 
   res.json({ success: true });
 });
+app.get("/secure-post", async (req, res) => {
 
+  const { key, deviceId, postId } = req.query;
+
+  if (!key || !postId) {
+    return res.json({ error: "MISSING_PARAMS" });
+  }
+
+  // ✅ rate limit
+  if (!checkRate(key)) {
+    return res.json({ error: "RATE_LIMIT" });
+  }
+
+  // ✅ verify license
+  const lic = await License.findOne({ key });
+
+  if (!lic || !lic.valid) {
+    return res.json({ error: "INVALID_KEY" });
+  }
+
+  if (lic.deviceId && lic.deviceId !== deviceId) {
+    return res.json({ error: "DEVICE_LOCKED" });
+  }
+
+  if (!lic.deviceId && deviceId) {
+    lic.deviceId = deviceId;
+    await lic.save();
+  }
+
+  // ✅ log (trace leak)
+  console.log({
+    key,
+    deviceId,
+    postId,
+    ip: req.ip
+  });
+
+  // ✅ fetch từ WP
+  let wpRes = await fetch(`${WP_API}/${postId}`);
+  let post = await wpRes.json();
+
+  let content = post.content.rendered;
+
+  // ✅ watermark
+  content = addWatermark(content, key);
+
+  // ✅ encode
+  content = encodeContent(content);
+
+  res.json({
+    title: post.title.rendered,
+    content
+  });
+});
 /* =========================
    START SERVER (PHẢI Ở CUỐI)
 ========================= */
