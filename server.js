@@ -4,9 +4,13 @@ const cors = require("cors");
 
 const app = express();
 app.get("/ip", (req, res) => {
-  console.log("IP ROUTE HIT");
-  console.log("IP:", req.ip);
-  res.send(req.ip);
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress;
+
+  console.log("REAL IP:", ip);
+
+  res.send(ip);
 });
 
 // ✅ FIX: dùng fetch ổn định cho Node (Render)
