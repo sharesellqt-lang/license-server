@@ -3,14 +3,10 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-app.get("/ip", (req, res) => {
-  const ip =
-    req.headers["x-forwarded-for"]?.split(",")[0] ||
-    req.socket.remoteAddress;
-
-  console.log("REAL IP:", ip);
-
-  res.send(ip);
+app.get("/ip", async (req, res) => {
+  const r = await fetch("https://api.ipify.org?format=json");
+  const data = await r.json();
+  res.send(data.ip);
 });
 
 // ✅ FIX: dùng fetch ổn định cho Node (Render)
