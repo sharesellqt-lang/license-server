@@ -1,31 +1,31 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
 
-// ✅ FIX: dùng fetch ổn định cho Node (Render)
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
-/* =========================
-   CONFIG
-========================= */
-const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
-
-/* =========================
-   MIDDLEWARE
-========================= */
 app.use(cors({
   origin: "https://sharesell.net"
 }));
+let wpRes = await fetch(`${WP_API}/${postId}`);
 
-app.use(express.json());
+const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
-/* =========================
-   RATE LIMIT
-========================= */
 const rateLimit = {};
+function encodeContent(str) {
+  return Buffer.from(str, "utf-8").toString("base64");
+}
+
+function addWatermark(html, key) {
+  const mark = `<span style="
+    position:absolute;
+    opacity:0.05;
+    font-size:12px;
+    transform:rotate(-20deg);
+    pointer-events:none;
+  ">${key}</span>`;
+
+  return html + mark;
+}
 
 function checkRate(key) {
   const now = Date.now();
@@ -45,23 +45,8 @@ function checkRate(key) {
   return rateLimit[key].count <= 30;
 }
 
-/* =========================
-   ENCODE + WATERMARK
-========================= */
-function encodeContent(str) {
-  return Buffer.from(str, "utf-8").toString("base64");
-}
-
-function addWatermark(html, key) {
-  return html.replace(/<\/p>/g, `
-    <span style="
-      opacity:0.1;
-      font-size:10px;
-      display:block;
-      text-align:right;
-    ">${key}</span></p>
-  `);
-}
+app.use(cors());
+app.use(express.json());
 
 /* =========================
    HEALTH CHECK
@@ -73,10 +58,10 @@ app.get("/healthz", (req, res) => {
 /* =========================
    CONNECT MONGODB
 ========================= */
-mongoose.connect(
-  "mongodb+srv://shares_db_user:1RMvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
-  { serverSelectionTimeoutMS: 5000 }
-)
+
+mongoose.connect("mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster", {
+  serverSelectionTimeoutMS: 5000
+})
 .then(() => {
   console.log("✅ MongoDB connected");
 })
@@ -118,17 +103,16 @@ app.get("/verify", async (req, res) => {
   }
 
   if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
-    return res.json({ valid: false, reason: "DEVICE_LOCKED" });
-  }
+  return res.json({ valid: false, reason: "DEVICE_LOCKED" });
+}
 
-  if (!lic.deviceId && deviceId) {
-    lic.deviceId = deviceId;
-    await lic.save();
-  }
+if (!lic.deviceId && deviceId) {
+  lic.deviceId = deviceId;
+  await lic.save();
+}
 
-  return res.json({ valid: true });
+return res.json({ valid: true });
 });
-
 /* =========================
    CREATE LICENSE
 ========================= */
@@ -167,10 +151,6 @@ app.post("/revoke", async (req, res) => {
 
   res.json({ success: true });
 });
-
-/* =========================
-   SECURE POST
-========================= */
 app.get("/secure-post", async (req, res) => {
 
   const { key, deviceId, postId } = req.query;
@@ -208,32 +188,25 @@ app.get("/secure-post", async (req, res) => {
     ip: req.ip
   });
 
-  try {
-    // ✅ fetch từ WP
-    let wpRes = await fetch(`${WP_API}/${postId}`);
-    let post = await wpRes.json();
+  // ✅ fetch từ WP
+  let wpRes = await fetch(`${WP_API}/${postId}`);
+  let post = await wpRes.json();
 
-    let content = post.content.rendered;
+  let content = post.content.rendered;
 
-    // ✅ watermark
-    content = addWatermark(content, key);
+  // ✅ watermark
+  content = addWatermark(content, key);
 
-    // ✅ encode
-    content = encodeContent(content);
+  // ✅ encode
+  content = encodeContent(content);
 
-    res.json({
-      title: post.title.rendered,
-      content
-    });
-
-  } catch (err) {
-    console.log("FETCH ERROR:", err);
-    res.json({ error: "FETCH_FAILED" });
-  }
+  res.json({
+    title: post.title.rendered,
+    content
+  });
 });
-
 /* =========================
-   START SERVER
+   START SERVER (PHẢI Ở CUỐI)
 ========================= */
 const PORT = process.env.PORT || 10000;
 
