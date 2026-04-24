@@ -1,8 +1,11 @@
 const mongoose = require("mongoose");
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
+
+app.use(cors({
+  origin: "https://sharesell.net"
+}));
 const fetch = require("node-fetch");
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
