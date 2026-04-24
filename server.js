@@ -40,7 +40,6 @@ function checkRate(key) {
   rateLimit[key].count++;
 
   return rateLimit[key].count <= 30;
-  const id = key + "_" + req.ip;
 }
 
 app.use(cors());
@@ -110,6 +109,7 @@ if (!lic.deviceId && deviceId) {
 }
 
 return res.json({ valid: true });
+});
 /* =========================
    CREATE LICENSE
 ========================= */
