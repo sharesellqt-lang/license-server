@@ -91,8 +91,7 @@ function addWatermark(html, key) {
 // HEALTH
 // =========================
 app.get("/", (req, res) => {
-  console.log("🔥 HIT ROOT");
-  res.send("OK");
+  res.status(200).send("ok");
 });
 
 // =========================
