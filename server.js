@@ -5,18 +5,16 @@ const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
 
-// fetch (Render compatible)
-let res = await fetch("https://example.com");
-
 const app = express();
 
 // =========================
 // CONFIG
 // =========================
-const PORT = process.env.PORT;
+const PORT = process.env.PORT; // 🔥 bắt buộc dùng cái này
 
 const ADMIN_PASS = "123456";
-const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster"; // 🔥 DÁN URI VÀO ĐÂY
+
+const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
@@ -29,9 +27,11 @@ app.use(express.json());
 // =========================
 // CONNECT MONGO
 // =========================
-mongoose.connect(MONGO_URI)
+mongoose.connect(MONGO_URI, {
+  serverSelectionTimeoutMS: 5000
+})
 .then(() => console.log("✅ Mongo connected"))
-.catch(err => console.log("❌ Mongo error:", err));
+.catch(err => console.log("❌ Mongo error:", err.message));
 
 // =========================
 // SCHEMA
@@ -87,12 +87,14 @@ function addWatermark(html, key) {
 }
 
 // =========================
-// HEALTH
+// HEALTH CHECK (QUAN TRỌNG)
 // =========================
-const PORT = process.env.PORT;
+app.get("/", (req, res) => {
+  res.send("ok");
+});
 
-app.listen(PORT, () => {
-  console.log("🚀 Server chạy port", PORT);
+app.get("/healthz", (req, res) => {
+  res.send("ok");
 });
 
 // =========================
@@ -166,6 +168,10 @@ app.get("/secure-post", async (req, res) => {
 
   try {
     let wpRes = await fetch(`${WP_API}/${postId}`);
+
+    if (!wpRes.ok)
+      return res.json({ error: "WP_FAIL" });
+
     let post = await wpRes.json();
 
     let content = addWatermark(post.content.rendered, key);
@@ -176,7 +182,8 @@ app.get("/secure-post", async (req, res) => {
       content
     });
 
-  } catch {
+  } catch (err) {
+    console.log(err);
     res.json({ error: "FETCH_FAIL" });
   }
 });
@@ -207,6 +214,12 @@ app.post("/api/save", async (req, res) => {
   if (!question || !answer)
     return res.json({ success: false, msg: "Thiếu dữ liệu" });
 
+  if (question.length > 200)
+    return res.json({ success: false, msg: "Q max 200 ký tự" });
+
+  if (answer.length > 500)
+    return res.json({ success: false, msg: "A max 500 ký tự" });
+
   if (password !== ADMIN_PASS)
     return res.json({ success: false, msg: "Sai mật khẩu" });
 
@@ -216,8 +229,8 @@ app.post("/api/save", async (req, res) => {
 });
 
 // =========================
-// START
+// START SERVER
 // =========================
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log("🚀 Server chạy port", PORT);
 });
