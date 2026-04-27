@@ -12,12 +12,6 @@ const app = express();
 // =========================
 const PORT = process.env.PORT || 10000;
 
-const ADMIN_KEYS = {
-  "pass300": 300,
-  "pass500": 500,
-  "pass1000": 1000
-};
-
 const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
@@ -34,7 +28,22 @@ app.use(express.json());
 mongoose.connect(MONGO_URI, {
   serverSelectionTimeoutMS: 5000
 })
-.then(() => console.log("✅ Mongo connected"))
+//.then(() => console.log("✅ Mongo connected"))
+//.catch(err => console.log("❌ Mongo error:", err.message));
+//themtam
+.then(async () => {
+
+  console.log("✅ Mongo connected");
+
+  // 🔥 CHẠY 1 LẦN
+  await AdminKey.create({
+    key: "vip500",
+    maxLength: 500
+  });
+
+  console.log("🔥 Đã tạo key admin");
+
+})
 .catch(err => console.log("❌ Mongo error:", err.message));
 
 // =========================
@@ -52,7 +61,14 @@ const License = mongoose.model("License", new mongoose.Schema({
 // Q&A
 const QA = mongoose.model("QA", new mongoose.Schema({
   question: String,
-  answer: String
+  answer: String,
+  searchText: String // 🔥 thêm dòng này
+}));
+
+// Admin Keys (🔥 THÊM MỚI)
+const AdminKey = mongoose.model("AdminKey", new mongoose.Schema({
+  key: String,
+  maxLength: Number
 }));
 
 // =========================
@@ -61,7 +77,14 @@ const QA = mongoose.model("QA", new mongoose.Schema({
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
+function normalize(str) {
+  return str
+    .toLowerCase()
+    .normalize("NFD") // bỏ dấu tiếng Việt
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 function encodeContent(str) {
   return Buffer.from(str, "utf-8").toString("base64");
 }
@@ -207,11 +230,35 @@ app.get("/api/search", async (req, res) => {
 
   if (!q) return res.json([]);
 
-  let safe = escapeRegex(q);
+  // 🔥 chuẩn hóa input
+  let normalized = normalize(q);
+
+  // 🔥 tránh lỗi regex
+  let safe = escapeRegex(normalized);
 
   let data = await QA.find({
-    question: { $regex: safe, $options: "i" }
+    $or: [
+      { searchText: { $regex: safe, $options: "i" } }, // 🔥 search chuẩn hóa
+      { answer: { $regex: safe, $options: "i" } }      // 🔥 search cả answer
+    ]
   }).limit(20);
+
+  res.json(data);
+});
+
+app.get("/api/suggest", async (req, res) => {
+
+  let q = (req.query.q || "").trim();
+
+  if (!q) return res.json([]);
+
+  let safe = escapeRegex(normalize(q));
+
+  let data = await QA.find({
+    searchText: { $regex: safe, $options: "i" }
+  })
+  .limit(5)
+  .select("question"); // chỉ lấy question
 
   res.json(data);
 });
@@ -227,20 +274,26 @@ app.post("/api/save", async (req, res) => {
   if (question.length > 200)
     return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-  const maxLength = ADMIN_KEYS[password];
+  // 🔥 THAY ĐOẠN NÀY
+  const admin = await AdminKey.findOne({ key: password });
 
-  if (!maxLength) {
-    return res.json({ success: false, msg: "Sai mật khẩu" });
+  if (!admin) {
+    return res.json({ success:false, msg:"Sai mật khẩu" });
   }
 
-  if (answer.length > maxLength) {
+  // 🔥 dùng maxLength từ DB
+  if (answer.length > admin.maxLength) {
     return res.json({
       success: false,
-      msg: `Tối đa ${maxLength} ký tự`
+      msg: `Tối đa ${admin.maxLength} ký tự`
     });
   }
 
-  await QA.create({ question, answer });
+  await QA.create({
+    question,
+    answer,
+    searchText: normalize(question)
+  });
 
   res.json({ success: true });
 });
