@@ -12,13 +12,7 @@ const app = express();
 // =========================
 const PORT = process.env.PORT || 10000;
 
-const ADMIN_KEYS = {
-  "pass300": 300,
-  "pass500": 500,
-  "pass1000": 1000
-};
-
-const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
+const MONGO_URI = "mongodb://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster-shard-00-00.y92xgoq.mongodb.net:27017,license-cluster-shard-00-01.y92xgoq.mongodb.net:27017,license-cluster-shard-00-02.y92xgoq.mongodb.net:27017/?ssl=true&replicaSet=atlas-y92xgoq-shard-0&authSource=admin";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
@@ -34,7 +28,16 @@ app.use(express.json());
 mongoose.connect(MONGO_URI, {
   serverSelectionTimeoutMS: 5000
 })
-.then(() => console.log("✅ Mongo connected"))
+.then(async () => {
+  console.log("✅ Mongo connected");
+
+  await AdminKey.create({
+    key: "vip500",
+    maxLength: 500
+  });
+
+  console.log("🔥 Đã tạo key admin");
+})
 .catch(err => console.log("❌ Mongo error:", err.message));
 
 // =========================
@@ -54,6 +57,12 @@ const QA = mongoose.model("QA", new mongoose.Schema({
   question: String,
   answer: String,
   searchText: String // 🔥 thêm dòng này
+}));
+
+// Admin Keys (🔥 THÊM MỚI)
+const AdminKey = mongoose.model("AdminKey", new mongoose.Schema({
+  key: String,
+  maxLength: Number
 }));
 
 // =========================
@@ -231,6 +240,23 @@ app.get("/api/search", async (req, res) => {
   res.json(data);
 });
 
+app.get("/api/suggest", async (req, res) => {
+
+  let q = (req.query.q || "").trim();
+
+  if (!q) return res.json([]);
+
+  let safe = escapeRegex(normalize(q));
+
+  let data = await QA.find({
+    searchText: { $regex: safe, $options: "i" }
+  })
+  .limit(5)
+  .select("question"); // chỉ lấy question
+
+  res.json(data);
+});
+
 // SAVE
 app.post("/api/save", async (req, res) => {
 
@@ -242,20 +268,26 @@ app.post("/api/save", async (req, res) => {
   if (question.length > 200)
     return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-  const maxLength = ADMIN_KEYS[password];
+  // 🔥 THAY ĐOẠN NÀY
+  const admin = await AdminKey.findOne({ key: password });
 
-  if (!maxLength) {
-    return res.json({ success: false, msg: "Sai mật khẩu" });
+  if (!admin) {
+    return res.json({ success:false, msg:"Sai mật khẩu" });
   }
 
-  if (answer.length > maxLength) {
+  // 🔥 dùng maxLength từ DB
+  if (answer.length > admin.maxLength) {
     return res.json({
       success: false,
-      msg: `Tối đa ${maxLength} ký tự`
+      msg: `Tối đa ${admin.maxLength} ký tự`
     });
   }
 
-  await QA.create({ question, answer,searchText: normalize(question) });
+  await QA.create({
+    question,
+    answer,
+    searchText: normalize(question)
+  });
 
   res.json({ success: true });
 });
