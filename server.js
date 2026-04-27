@@ -1,3 +1,6 @@
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 // =========================
 // IMPORT
 // =========================
@@ -199,9 +202,11 @@ app.get("/api/search", async (req, res) => {
 
   if (!q) return res.json([]);
 
-  let data = await QA.find({
-    question: { $regex: q, $options: "i" }
-  }).limit(20);
+  let safe = escapeRegex(q);
+
+let data = await QA.find({
+  question: { $regex: safe, $options: "i" }
+}).limit(20);
 
   res.json(data);
 });
