@@ -12,7 +12,7 @@ const app = express();
 // =========================
 const PORT = process.env.PORT || 10000;
 
-const MONGO_URI = "mongodb://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster-shard-00-00.y92xgoq.mongodb.net:27017,license-cluster-shard-00-01.y92xgoq.mongodb.net:27017,license-cluster-shard-00-02.y92xgoq.mongodb.net:27017/?ssl=true&replicaSet=atlas-y92xgoq-shard-0&authSource=admin";
+const MONGO_URI = "mongodb://sharesellqt_db_user:Thadfdfdsfe109a09adefar@license-cluster-shard-00-00.y92xgoq.mongodb.net:27017,license-cluster-shard-00-01.y92xgoq.mongodb.net:27017,license-cluster-shard-00-02.y92xgoq.mongodb.net:27017/?ssl=true&replicaSet=atlas-y92xgoq-shard-0&authSource=admin";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
@@ -21,6 +21,31 @@ const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 // =========================
 app.use(cors());
 app.use(express.json());
+
+// =========================
+// SCHEMA
+// =========================
+
+// License
+const License = mongoose.model("License", new mongoose.Schema({
+  key: String,
+  valid: { type: Boolean, default: true },
+  deviceId: String,
+  expireAt: Date
+}));
+
+// Q&A
+const QA = mongoose.model("QA", new mongoose.Schema({
+  question: String,
+  answer: String,
+  searchText: String // 🔥 thêm dòng này
+}));
+
+// Admin Keys (🔥 THÊM MỚI)
+const AdminKey = mongoose.model("AdminKey", new mongoose.Schema({
+  key: String,
+  maxLength: Number
+}));
 
 // =========================
 // CONNECT MONGO
@@ -72,31 +97,6 @@ mongoose.connect(MONGO_URI, {
 
 })
 .catch(err => console.log("❌ Mongo error:", err.message));
-
-// =========================
-// SCHEMA
-// =========================
-
-// License
-const License = mongoose.model("License", new mongoose.Schema({
-  key: String,
-  valid: { type: Boolean, default: true },
-  deviceId: String,
-  expireAt: Date
-}));
-
-// Q&A
-const QA = mongoose.model("QA", new mongoose.Schema({
-  question: String,
-  answer: String,
-  searchText: String // 🔥 thêm dòng này
-}));
-
-// Admin Keys (🔥 THÊM MỚI)
-const AdminKey = mongoose.model("AdminKey", new mongoose.Schema({
-  key: String,
-  maxLength: Number
-}));
 
 // =========================
 // HELPER
