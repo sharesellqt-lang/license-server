@@ -31,29 +31,28 @@ mongoose.connect(MONGO_URI, {
 .then(async () => {
   console.log("✅ Mongo connected");
 
+  // =========================
+  // 🔥 CREATE ADMIN KEY
+  // =========================
   const exist = await AdminKey.findOne({ key: "vip500" });
 
-if (!exist) {
-  await AdminKey.create({
-    key: "vip500",
-    maxLength: 500
-  });
-}
+  if (!exist) {
+    await AdminKey.create({
+      key: "vip500",
+      maxLength: 500
+    });
+    console.log("🔥 Đã tạo key admin");
+  }
 
-  console.log("🔥 Đã tạo key admin");
-})
-// =========================
-  // 🔥 MIGRATE DATA CŨ (chỉ chạy khi chưa có searchText)
   // =========================
-  async function fixData() {
-  const count = await QA.countDocuments({ searchText: { $exists: false } });
-  console.log("Count:", count);
-}
-
-fixData();
+  // 🔥 MIGRATE DATA
+  // =========================
+  const count = await QA.countDocuments({
+    searchText: { $exists: false }
+  });
 
   if (count > 0) {
-    console.log("⚡ Đang migrate searchText cho data cũ...");
+    console.log("⚡ Đang migrate...");
 
     await QA.updateMany(
       { searchText: { $exists: false } },
@@ -68,9 +67,7 @@ fixData();
       ]
     );
 
-    console.log("✅ Migrate hoàn tất");
-  } else {
-    console.log("✔ Data đã có searchText, bỏ qua migrate");
+    console.log("✅ Migrate xong");
   }
 
 })
