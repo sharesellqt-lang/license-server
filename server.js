@@ -30,21 +30,15 @@ app.use(express.json());
 mongoose.connect(MONGO_URI, {
   serverSelectionTimeoutMS: 5000
 })
-//.then(() => console.log("✅ Mongo connected"))
-//.catch(err => console.log("❌ Mongo error:", err.message));
-//themtam
 .then(async () => {
-
   console.log("✅ Mongo connected");
 
-  // 🔥 CHẠY 1 LẦN
   await AdminKey.create({
     key: "vip500",
     maxLength: 500
   });
 
   console.log("🔥 Đã tạo key admin");
-
 })
 .catch(err => console.log("❌ Mongo error:", err.message));
 
