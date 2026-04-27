@@ -1,39 +1,63 @@
-const mongoose = require("mongoose");
+// =========================
+// IMPORT
+// =========================
 const express = require("express");
 const cors = require("cors");
+const mysql = require("mysql2");
 
-const app = express();
-app.get("/ip", async (req, res) => {
-  const r = await fetch("https://api.ipify.org?format=json");
-  const data = await r.json();
-  res.send(data.ip);
-});
-
-// ✅ FIX: dùng fetch ổn định cho Node (Render)
+// fetch (Render compatible)
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
-/* =========================
-   CONFIG
-========================= */
+const app = express();
+
+// =========================
+// CONFIG
+// =========================
+const PORT = process.env.PORT || 10000;
+
+// 🔐 password cho search bot
+const ADMIN_PASS = "123456";
+
+// WP API
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
-/* =========================
-   MIDDLEWARE
-========================= */
+// =========================
+// MIDDLEWARE
+// =========================
 app.use(cors({
   origin: "*",
   methods: ["GET", "POST"],
   allowedHeaders: ["Content-Type"]
 }));
 
-app.options("*", cors()); // 🔥 QUAN TRỌNG (fix preflight)
-
+app.options("*", cors());
 app.use(express.json());
 
-/* =========================
-   RATE LIMIT
-========================= */
+// =========================
+// MYSQL (ALL SYSTEM)
+// =========================
+const db = mysql.createPool({
+  host: "localhost",
+  user: "root",
+  password: "Chuanday@79",
+  database: "igoiiqkjhosting_licensesbot",
+  charset: "utf8mb4",
+  connectionLimit: 5
+});
+
+db.getConnection((err, conn) => {
+  if (err) {
+    console.log("❌ MySQL lỗi:", err);
+  } else {
+    console.log("✅ MySQL connected");
+    conn.release();
+  }
+});
+
+// =========================
+// RATE LIMIT
+// =========================
 const rateLimit = {};
 
 function checkRate(key) {
@@ -50,213 +74,253 @@ function checkRate(key) {
   }
 
   rateLimit[key].count++;
-
   return rateLimit[key].count <= 30;
 }
 
-/* =========================
-   ENCODE + WATERMARK
-========================= */
+// =========================
+// HELPER
+// =========================
 function encodeContent(str) {
   return Buffer.from(str, "utf-8").toString("base64");
 }
 
 function addWatermark(html, key) {
   return html.replace(/<\/p>/g, `
-    <span style="
-      opacity:0.1;
-      font-size:10px;
-      display:block;
-      text-align:right;
-    ">${key}</span></p>
+    <span style="opacity:0.1;font-size:10px;display:block;text-align:right;">
+      ${key}
+    </span></p>
   `);
 }
 
-/* =========================
-   HEALTH CHECK
-========================= */
+// =========================
+// HEALTH
+// =========================
+app.get("/", (req, res) => {
+  res.send("🚀 API running");
+});
+
 app.get("/healthz", (req, res) => {
-  res.status(200).send("ok");
+  res.send("ok");
 });
 
-/* =========================
-   CONNECT MONGODB
-========================= */
-mongoose.connect(
-  "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster",
-  { serverSelectionTimeoutMS: 5000 }
-)
-.then(() => {
-  console.log("✅ MongoDB connected");
-})
-.catch(err => {
-  console.error("❌ MongoDB FAILED:", err.message);
-});
+// =========================
+// LICENSE (MYSQL)
+// =========================
 
-/* =========================
-   SCHEMA
-========================= */
-const LicenseSchema = new mongoose.Schema({
-  key: String,
-  valid: { type: Boolean, default: true },
-  deviceId: { type: String, default: null },
-  expireAt: Date
-});
-
-const License = mongoose.model("License", LicenseSchema);
-
-/* =========================
-   VERIFY
-========================= */
-app.get("/verify", async (req, res) => {
+// VERIFY
+app.get("/verify", (req, res) => {
 
   const { key, deviceId } = req.query;
 
-  if (!key) {
+  if (!key)
     return res.json({ valid: false, reason: "NO_KEY" });
-  }
 
-  const lic = await License.findOne({ key });
+  db.query(
+    "SELECT * FROM licenses WHERE license_key = ? LIMIT 1",
+    [key],
+    (err, results) => {
 
-  if (!lic || !lic.valid) {
-    return res.json({ valid: false, reason: "INVALID_KEY" });
-  }
+      if (err || results.length === 0)
+        return res.json({ valid: false, reason: "INVALID_KEY" });
 
-  if (lic.expireAt && new Date() > lic.expireAt) {
-    return res.json({ valid: false, reason: "EXPIRED" });
-  }
+      let lic = results[0];
 
-  if (lic.deviceId && deviceId && lic.deviceId !== deviceId) {
-    return res.json({ valid: false, reason: "DEVICE_LOCKED" });
-  }
+      if (!lic.valid)
+        return res.json({ valid: false, reason: "INVALID_KEY" });
 
-  if (!lic.deviceId && deviceId) {
-    lic.deviceId = deviceId;
-    await lic.save();
-  }
+      if (lic.expire_at && new Date() > new Date(lic.expire_at))
+        return res.json({ valid: false, reason: "EXPIRED" });
 
-  return res.json({ valid: true });
+      if (lic.device_id && deviceId && lic.device_id !== deviceId)
+        return res.json({ valid: false, reason: "DEVICE_LOCKED" });
+
+      // bind device
+      if (!lic.device_id && deviceId) {
+        db.query(
+          "UPDATE licenses SET device_id=? WHERE id=?",
+          [deviceId, lic.id]
+        );
+      }
+
+      res.json({ valid: true });
+    }
+  );
 });
 
-/* =========================
-   CREATE LICENSE
-========================= */
-app.post("/create", async (req, res) => {
+// CREATE LICENSE
+app.post("/create", (req, res) => {
 
   const { key } = req.body;
 
-  if (!key) {
+  if (!key)
     return res.json({ success: false, error: "NO_KEY" });
-  }
 
-  const exist = await License.findOne({ key });
+  db.query(
+    "SELECT id FROM licenses WHERE license_key=? LIMIT 1",
+    [key],
+    (err, results) => {
 
-  if (exist) {
-    return res.json({ success: false, error: "EXISTS" });
-  }
+      if (results.length > 0)
+        return res.json({ success: false, error: "EXISTS" });
 
-  const newKey = new License({
-    key,
-    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-  });
+      db.query(
+        "INSERT INTO licenses (license_key, expire_at) VALUES (?, ?)",
+        [key, new Date(Date.now() + 30*24*60*60*1000)],
+        (err2) => {
 
-  await newKey.save();
+          if (err2)
+            return res.json({ success: false });
 
-  res.json({ success: true });
+          res.json({ success: true });
+        }
+      );
+    }
+  );
 });
 
-/* =========================
-   REVOKE
-========================= */
-app.post("/revoke", async (req, res) => {
+// REVOKE
+app.post("/revoke", (req, res) => {
 
   const { key } = req.body;
 
-  await License.updateOne({ key }, { valid: false });
-
-  res.json({ success: true });
+  db.query(
+    "UPDATE licenses SET valid=0 WHERE license_key=?",
+    [key],
+    () => {
+      res.json({ success: true });
+    }
+  );
 });
 
-/* =========================
-   SECURE POST
-========================= */
+// =========================
+// SECURE POST
+// =========================
 app.get("/secure-post", async (req, res) => {
 
   const { key, deviceId, postId } = req.query;
 
-  if (!key || !postId) {
+  if (!key || !postId)
     return res.json({ error: "MISSING_PARAMS" });
-  }
 
-  // ✅ rate limit
-  if (!checkRate(key)) {
+  if (!checkRate(key))
     return res.json({ error: "RATE_LIMIT" });
-  }
 
-  // ✅ verify license
-  const lic = await License.findOne({ key });
+  db.query(
+    "SELECT * FROM licenses WHERE license_key=? LIMIT 1",
+    [key],
+    async (err, results) => {
 
-  if (!lic || !lic.valid) {
-    return res.json({ error: "INVALID_KEY" });
-  }
+      if (err || results.length === 0)
+        return res.json({ error: "INVALID_KEY" });
 
-  if (lic.deviceId && lic.deviceId !== deviceId) {
-    return res.json({ error: "DEVICE_LOCKED" });
-  }
+      let lic = results[0];
 
-  if (!lic.deviceId && deviceId) {
-    lic.deviceId = deviceId;
-    await lic.save();
-  }
+      if (!lic.valid)
+        return res.json({ error: "INVALID_KEY" });
 
-  // ✅ log (trace leak)
-  console.log({
-    key,
-    deviceId,
-    postId,
-    ip: req.ip
-  });
+      if (lic.device_id && lic.device_id !== deviceId)
+        return res.json({ error: "DEVICE_LOCKED" });
 
-  try {
-    // ✅ fetch từ WP
-  // ✅ code mới (an toàn)
-let wpRes = await fetch(`${WP_API}/${postId}`);
+      if (!lic.device_id && deviceId) {
+        db.query(
+          "UPDATE licenses SET device_id=? WHERE id=?",
+          [deviceId, lic.id]
+        );
+      }
 
-if (!wpRes.ok) {
-  console.log("WP STATUS:", wpRes.status);
-  return res.json({ error: "WP_BLOCKED" });
-}
+      try {
+        let wpRes = await fetch(`${WP_API}/${postId}`);
 
-let post = await wpRes.json();
+        if (!wpRes.ok)
+          return res.json({ error: "WP_BLOCKED" });
 
-if (!post || !post.content) {
-  return res.json({ error: "POST_NOT_FOUND" });
-}
+        let post = await wpRes.json();
 
-let content = post.content.rendered;
+        if (!post || !post.content)
+          return res.json({ error: "POST_NOT_FOUND" });
 
-// watermark
-content = addWatermark(content, key);
+        let content = post.content.rendered;
 
-// encode
-content = encodeContent(content);
+        content = addWatermark(content, key);
+        content = encodeContent(content);
 
-res.json({
-  title: post.title.rendered,
-  content
+        res.json({
+          title: post.title.rendered,
+          content
+        });
+
+      } catch (err) {
+        console.log("FETCH ERROR:", err);
+        res.json({ error: "FETCH_FAILED" });
+      }
+    }
+  );
 });
 
-  } catch (err) {
-    console.log("FETCH ERROR:", err);
-    res.json({ error: "FETCH_FAILED" });
-  }
+// =========================
+// 🔍 SEARCH BOT
+// =========================
+
+// SEARCH
+app.get("/api/search", (req, res) => {
+
+  let q = (req.query.q || "").trim();
+
+  if (!q) return res.json([]);
+
+  db.query(
+    "SELECT id, question, answer FROM qa_data WHERE question LIKE ? LIMIT 20",
+    [`%${q}%`],
+    (err, results) => {
+
+      if (err) {
+        console.log("SEARCH ERROR:", err);
+        return res.json([]);
+      }
+
+      res.json(results);
+    }
+  );
 });
 
-/* =========================
-   START SERVER
-========================= */
-const PORT = process.env.PORT || 10000;
+// SAVE
+app.post("/api/save", (req, res) => {
 
+  const { question, answer, password } = req.body;
+
+  if (!question || !answer)
+    return res.json({ success: false, msg: "Thiếu dữ liệu" });
+
+  if (question.length > 200)
+    return res.json({ success: false, msg: "Q max 200 ký tự" });
+
+  if (answer.length > 500)
+    return res.json({ success: false, msg: "A max 500 ký tự" });
+
+  if (password !== ADMIN_PASS)
+    return res.json({ success: false, msg: "Sai mật khẩu" });
+
+  db.query(
+    "INSERT INTO qa_data (question, answer) VALUES (?, ?)",
+    [question, answer],
+    (err, result) => {
+
+      if (err) {
+        console.log("SAVE ERROR:", err);
+        return res.json({ success: false });
+      }
+
+      res.json({
+        success: true,
+        id: result.insertId
+      });
+    }
+  );
+});
+
+// =========================
+// START
+// =========================
 app.listen(PORT, "0.0.0.0", () => {
   console.log("🚀 Server LIVE on port", PORT);
 });
