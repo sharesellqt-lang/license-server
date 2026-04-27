@@ -12,7 +12,9 @@ const app = express();
 // =========================
 const PORT = process.env.PORT || 10000;
 
-const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
+const MONGO_URI = "mongodb://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster-shard-00-00.y92xgoq.mongodb.net:27017,license-cluster-shard-00-01.y92xgoq.mongodb.net:27017,license-cluster-shard-00-02.y92xgoq.mongodb.net:27017/?ssl=true&replicaSet=atlas-y92xgoq-shard-0&authSource=admin";
+
+.catch(err => console.log(err));
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
