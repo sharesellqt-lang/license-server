@@ -45,7 +45,12 @@ if (!exist) {
 // =========================
   // 🔥 MIGRATE DATA CŨ (chỉ chạy khi chưa có searchText)
   // =========================
+  async function fixData() {
   const count = await QA.countDocuments({ searchText: { $exists: false } });
+  console.log("Count:", count);
+}
+
+fixData();
 
   if (count > 0) {
     console.log("⚡ Đang migrate searchText cho data cũ...");
