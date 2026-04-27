@@ -1,6 +1,7 @@
 // =========================
 // IMPORT
 // =========================
+const fetch = require("node-fetch");
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -11,6 +12,8 @@ const app = express();
 // CONFIG
 // =========================
 const PORT = process.env.PORT || 10000;
+const ADMIN_SECRET = "123456"; // 🔥 thêm dòng này
+
 
 const MONGO_URI = "mongodb+srv://sharesellqt_db_user:Thadfdfdsfe109a09adefar@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
 
@@ -19,7 +22,13 @@ const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 // =========================
 // MIDDLEWARE
 // =========================
-app.use(cors());
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type", "x-admin"]
+}));
+
+app.options("*", cors());
 app.use(express.json());
 
 // =========================
@@ -274,6 +283,34 @@ app.get("/api/search", async (req, res) => {
     res.json([]);
   }
 });
+
+// =========================
+// ADMIN API (CREATE KEY)
+// =========================
+app.post("/admin/create-key", async (req, res) => {
+
+  // 🔥 check secret
+  if (req.headers["x-admin"] !== ADMIN_SECRET) {
+    return res.json({ success:false, msg:"Unauthorized" });
+  }
+
+  const { key, maxLength } = req.body;
+
+  if (!key || !maxLength) {
+    return res.json({ success:false, msg:"Thiếu dữ liệu" });
+  }
+
+  const exist = await AdminKey.findOne({ key });
+
+  if (exist) {
+    return res.json({ success:false, msg:"Key đã tồn tại" });
+  }
+
+  await AdminKey.create({ key, maxLength });
+
+  res.json({ success:true });
+});
+
 // SAVE
 app.post("/api/save", async (req, res) => {
 
