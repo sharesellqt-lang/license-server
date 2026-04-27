@@ -18,7 +18,7 @@ const ADMIN_KEYS = {
   "pass1000": 1000
 };
 
-const MONGO_URI = "mongodb+srv://shat_db_user:1RvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
+const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
