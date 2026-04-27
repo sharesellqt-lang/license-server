@@ -31,12 +31,43 @@ mongoose.connect(MONGO_URI, {
 .then(async () => {
   console.log("✅ Mongo connected");
 
+  const exist = await AdminKey.findOne({ key: "vip500" });
+
+if (!exist) {
   await AdminKey.create({
     key: "vip500",
     maxLength: 500
   });
+}
 
   console.log("🔥 Đã tạo key admin");
+})
+// =========================
+  // 🔥 MIGRATE DATA CŨ (chỉ chạy khi chưa có searchText)
+  // =========================
+  const count = await QA.countDocuments({ searchText: { $exists: false } });
+
+  if (count > 0) {
+    console.log("⚡ Đang migrate searchText cho data cũ...");
+
+    await QA.updateMany(
+      { searchText: { $exists: false } },
+      [
+        {
+          $set: {
+            searchText: {
+              $toLower: "$question"
+            }
+          }
+        }
+      ]
+    );
+
+    console.log("✅ Migrate hoàn tất");
+  } else {
+    console.log("✔ Data đã có searchText, bỏ qua migrate");
+  }
+
 })
 .catch(err => console.log("❌ Mongo error:", err.message));
 
@@ -219,44 +250,28 @@ app.get("/secure-post", async (req, res) => {
 
 // SEARCH
 app.get("/api/search", async (req, res) => {
+  try {
+    let q = (req.query.q || "").trim();
+    if (!q) return res.json([]);
 
-  let q = (req.query.q || "").trim();
+    let normalized = normalize(q);
+    let safe = escapeRegex(normalized);
 
-  if (!q) return res.json([]);
+    let data = await QA.find({
+      $or: [
+        { searchText: { $regex: safe, $options: "i" } },
+        { question: { $regex: q, $options: "i" } },
+        { answer: { $regex: q, $options: "i" } }
+      ]
+    }).limit(20);
 
-  // 🔥 chuẩn hóa input
-  let normalized = normalize(q);
+    res.json(data);
 
-  // 🔥 tránh lỗi regex
-  let safe = escapeRegex(normalized);
-
-  let data = await QA.find({
-    $or: [
-      { searchText: { $regex: safe, $options: "i" } }, // 🔥 search chuẩn hóa
-      { answer: { $regex: safe, $options: "i" } }      // 🔥 search cả answer
-    ]
-  }).limit(20);
-
-  res.json(data);
+  } catch (err) {
+    console.log(err);
+    res.json([]);
+  }
 });
-
-app.get("/api/suggest", async (req, res) => {
-
-  let q = (req.query.q || "").trim();
-
-  if (!q) return res.json([]);
-
-  let safe = escapeRegex(normalize(q));
-
-  let data = await QA.find({
-    searchText: { $regex: safe, $options: "i" }
-  })
-  .limit(5)
-  .select("question"); // chỉ lấy question
-
-  res.json(data);
-});
-
 // SAVE
 app.post("/api/save", async (req, res) => {
 
