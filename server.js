@@ -6,15 +6,14 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 
 // fetch (Render compatible)
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+let res = await fetch("https://example.com");
 
 const app = express();
 
 // =========================
 // CONFIG
 // =========================
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT;
 
 const ADMIN_PASS = "123456";
 const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster"; // 🔥 DÁN URI VÀO ĐÂY
@@ -90,8 +89,10 @@ function addWatermark(html, key) {
 // =========================
 // HEALTH
 // =========================
-app.get("/", (req, res) => {
-  res.status(200).send("ok");
+const PORT = process.env.PORT;
+
+app.listen(PORT, () => {
+  console.log("🚀 Server chạy port", PORT);
 });
 
 // =========================
