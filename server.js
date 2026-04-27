@@ -1,6 +1,3 @@
-function escapeRegex(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 // =========================
 // IMPORT
 // =========================
@@ -13,11 +10,15 @@ const app = express();
 // =========================
 // CONFIG
 // =========================
-const PORT = process.env.PORT; // 🔥 bắt buộc dùng cái này
+const PORT = process.env.PORT || 10000;
 
-const ADMIN_PASS = "123456";
+const ADMIN_KEYS = {
+  "pass300": 300,
+  "pass500": 500,
+  "pass1000": 1000
+};
 
-const MONGO_URI = "mongodb+srv://sharesellqt_db_user:1RMEJMvtsQvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
+const MONGO_URI = "mongodb+srv://shat_db_user:1RvDL4pL@license-cluster.y92xgoq.mongodb.net/?appName=license-cluster";
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
@@ -55,6 +56,23 @@ const QA = mongoose.model("QA", new mongoose.Schema({
 }));
 
 // =========================
+// HELPER
+// =========================
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function encodeContent(str) {
+  return Buffer.from(str, "utf-8").toString("base64");
+}
+
+function addWatermark(html, key) {
+  return html.replace(/<\/p>/g,
+    `<span style="opacity:0.1;font-size:10px;display:block;text-align:right;">${key}</span></p>`
+  );
+}
+
+// =========================
 // RATE LIMIT
 // =========================
 const rateLimit = {};
@@ -74,19 +92,6 @@ function checkRate(key) {
 
   rateLimit[key].count++;
   return rateLimit[key].count <= 30;
-}
-
-// =========================
-// HELPER
-// =========================
-function encodeContent(str) {
-  return Buffer.from(str, "utf-8").toString("base64");
-}
-
-function addWatermark(html, key) {
-  return html.replace(/<\/p>/g,
-    `<span style="opacity:0.1;font-size:10px;display:block;text-align:right;">${key}</span></p>`
-  );
 }
 
 // =========================
@@ -130,7 +135,7 @@ app.get("/verify", async (req, res) => {
   res.json({ valid: true });
 });
 
-// CREATE
+// CREATE LICENSE
 app.post("/create", async (req, res) => {
 
   const { key } = req.body;
@@ -204,9 +209,9 @@ app.get("/api/search", async (req, res) => {
 
   let safe = escapeRegex(q);
 
-let data = await QA.find({
-  question: { $regex: safe, $options: "i" }
-}).limit(20);
+  let data = await QA.find({
+    question: { $regex: safe, $options: "i" }
+  }).limit(20);
 
   res.json(data);
 });
@@ -222,11 +227,18 @@ app.post("/api/save", async (req, res) => {
   if (question.length > 200)
     return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-  if (answer.length > 500)
-    return res.json({ success: false, msg: "A max 500 ký tự" });
+  const maxLength = ADMIN_KEYS[password];
 
-  if (password !== ADMIN_PASS)
+  if (!maxLength) {
     return res.json({ success: false, msg: "Sai mật khẩu" });
+  }
+
+  if (answer.length > maxLength) {
+    return res.json({
+      success: false,
+      msg: `Tối đa ${maxLength} ký tự`
+    });
+  }
 
   await QA.create({ question, answer });
 
