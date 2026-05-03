@@ -14,10 +14,32 @@ const app = express();
 // =========================
 const PORT = process.env.PORT || 10000;
 // 🔥 THÊM
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-const JWT_SECRET = "abc123";
-console.log("🔥 GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID);
-const ADMIN_SECRET = "123456";
+require("dotenv").config();
+
+const { OAuth2Client } = require("google-auth-library");
+
+// 🔐 ENV
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// ❗ CHECK
+if (!GOOGLE_CLIENT_ID) {
+  throw new Error("❌ GOOGLE_CLIENT_ID missing");
+}
+
+if (!JWT_SECRET) {
+  throw new Error("❌ JWT_SECRET missing");
+}
+
+// ✅ INIT
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+// 🔐 ADMIN
+const ADMIN_SECRET = process.env.ADMIN_SECRET || "123456";
+
+// 🔍 DEBUG
+console.log("🔥 GOOGLE_CLIENT_ID:", GOOGLE_CLIENT_ID);
+console.log("🔥 JWT_SECRET:", JWT_SECRET ? "OK" : "MISSING");
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
