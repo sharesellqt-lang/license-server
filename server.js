@@ -491,11 +491,11 @@ app.get("/api/search", async (req, res) => {
 // =========================
 // SAVE
 // =========================
-app.post("/api/save", async (req, res) => {
+app.post("/api/save", authMiddleware, async (req, res) => {
   try {
-    console.log("🔥 SAVING TO MYSQL");
 
-    const { question, answer, password } = req.body;
+    const { question, answer } = req.body;
+    const userId = req.user.userId;
 
     if (!question || !answer)
       return res.json({ success: false, msg: "Thiếu dữ liệu" });
@@ -503,28 +503,27 @@ app.post("/api/save", async (req, res) => {
     if (question.length > 200)
       return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-    let [rows] = await db.execute(
-      "SELECT * FROM admin_keys WHERE `key`=?",
-      [password]
+    // 🔥 CHECK LICENSE
+    const [rows] = await db.execute(
+      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      [userId]
     );
 
-    if (rows.length === 0)
-      return res.json({ success: false, msg: "Sai mật khẩu" });
+    if (rows.length === 0) {
+      return res.json({ success: false, msg: "Bạn chưa kích hoạt key" });
+    }
 
-    let admin = rows[0];
+    const lic = rows[0];
 
-    if (answer.length > admin.maxLength)
-      return res.json({
-        success: false,
-        msg: `Tối đa ${admin.maxLength} ký tự`
-      });
+    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
+      return res.json({ success: false, msg: "Key đã hết hạn" });
+    }
 
+    // ✅ SAVE
     await db.execute(
-      "INSERT INTO qa_data (question, answer, searchText) VALUES (?, ?, ?)",
-      [question, answer, normalize(question)]
+      "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
+      [question, answer, normalize(question), userId]
     );
-
-    console.log("✅ INSERT DONE");
 
     res.json({ success: true });
 
