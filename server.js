@@ -291,6 +291,7 @@ app.get("/healthz", (req, res) => res.send("ok"));
 // =========================
 app.get("/verify", async (req, res) => {
   try {
+
     const { key, deviceId } = req.query;
 
     let [rows] = await db.execute(
@@ -317,10 +318,15 @@ app.get("/verify", async (req, res) => {
     res.json({ valid: true });
 
   } catch (err) {
-    catch (err) {
-    console.log("SAVE ERROR:", err);
-    res.json({ success: false, msg: err.message || "Server lỗi" });
-}
+
+    console.log("VERIFY ERROR:", err);
+
+    res.json({
+      valid: false,
+      msg: err.message || "Server lỗi"
+    });
+
+  }
 });
 
 // =========================
@@ -504,9 +510,9 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     if (question.length > 200)
       return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-    // 🔥 CHECK LICENSE (search-bot)
+    // 🔥 CHECK LICENSE
     const [rows] = await db.execute(
-      "SELECT * FROM licenses WHERE user_id=? AND valid=1 AND type='searchbot'",
+      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
       [userId]
     );
 
@@ -520,12 +526,7 @@ app.post("/api/save", authMiddleware, async (req, res) => {
       return res.json({ success: false, msg: "Key đã hết hạn" });
     }
 
-    // 🔥 RATE LIMIT
-    const rateKey = "save_" + userId;
-    if (!checkRate(rateKey)) {
-      return res.json({ success: false, msg: "Too many requests" });
-    }
-
+    // ✅ SAVE
     await db.execute(
       "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
       [question, answer, normalize(question), userId]
@@ -534,11 +535,16 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     res.json({ success: true });
 
   } catch (err) {
-    console.log(err);
-    res.json({ success: false });
+
+    console.log("SAVE ERROR:", err);
+
+    res.json({
+      success: false,
+      msg: err.message || "Lỗi server"
+    });
+
   }
 });
-
 // =========================
 // START SERVER
 // =========================
