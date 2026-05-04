@@ -403,6 +403,51 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
     res.json({ error: "SERVER_ERROR" });
   }
 });
+
+// =========================
+// ME (USER INFO)
+// =========================
+app.get("/me", authMiddleware, async (req, res) => {
+  try {
+
+    const userId = req.user.userId;
+
+    // 🔍 tìm license của user
+    const [rows] = await db.execute(
+      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.json({
+        userId,
+        licensed: false
+      });
+    }
+
+    const lic = rows[0];
+
+    // ⏰ check expire
+    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
+      return res.json({
+        userId,
+        licensed: false,
+        expireAt: lic.expireAt
+      });
+    }
+
+    res.json({
+      userId,
+      licensed: true,
+      expireAt: lic.expireAt || null
+    });
+
+  } catch (err) {
+    console.log("ME ERROR:", err);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
 // =========================
 // SEARCH
 // =========================
