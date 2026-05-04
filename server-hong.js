@@ -115,6 +115,24 @@ function authMiddleware(req, res, next) {
   }
 }
 
+app.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.query(
+      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      [userId]
+    );
+
+    res.json({
+      hasLicense: rows.length > 0
+    });
+
+  } catch (err) {
+    console.log("ME ERROR:", err);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
 // =========================
 // REDEEM KEY
 // =========================
