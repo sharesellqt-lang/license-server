@@ -503,9 +503,9 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     if (question.length > 200)
       return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-    // 🔥 CHECK LICENSE
+    // 🔥 CHECK LICENSE (search-bot)
     const [rows] = await db.execute(
-      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      "SELECT * FROM licenses WHERE user_id=? AND valid=1 AND type='searchbot'",
       [userId]
     );
 
@@ -519,7 +519,12 @@ app.post("/api/save", authMiddleware, async (req, res) => {
       return res.json({ success: false, msg: "Key đã hết hạn" });
     }
 
-    // ✅ SAVE
+    // 🔥 RATE LIMIT
+    const rateKey = "save_" + userId;
+    if (!checkRate(rateKey)) {
+      return res.json({ success: false, msg: "Too many requests" });
+    }
+
     await db.execute(
       "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
       [question, answer, normalize(question), userId]
