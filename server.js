@@ -317,9 +317,10 @@ app.get("/verify", async (req, res) => {
     res.json({ valid: true });
 
   } catch (err) {
-    console.log(err);
-    res.json({ valid: false });
-  }
+    catch (err) {
+    console.log("SAVE ERROR:", err);
+    res.json({ success: false, msg: err.message || "Server lỗi" });
+}
 });
 
 // =========================
