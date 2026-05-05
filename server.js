@@ -419,33 +419,53 @@ app.get("/me", authMiddleware, async (req, res) => {
 
     const userId = req.user.userId;
 
-    // 🔍 tìm license của user
+    // 🔍 lấy license mới nhất của user
     const [rows] = await db.execute(
-      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      `SELECT plan, expireAt, valid 
+       FROM licenses 
+       WHERE user_id=? 
+       ORDER BY id DESC 
+       LIMIT 1`,
       [userId]
     );
 
+    // ❌ chưa có license
     if (rows.length === 0) {
       return res.json({
         userId,
-        licensed: false
+        licensed: false,
+        plan: "free",
+        expireAt: null
       });
     }
 
     const lic = rows[0];
 
-    // ⏰ check expire
+    // ❌ license không hợp lệ
+    if (lic.valid !== 1) {
+      return res.json({
+        userId,
+        licensed: false,
+        plan: "free",
+        expireAt: lic.expireAt || null
+      });
+    }
+
+    // ❌ hết hạn
     if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
       return res.json({
         userId,
         licensed: false,
+        plan: "free",
         expireAt: lic.expireAt
       });
     }
 
-    res.json({
+    // ✅ hợp lệ
+    return res.json({
       userId,
       licensed: true,
+      plan: lic.plan || "free",
       expireAt: lic.expireAt || null
     });
 
@@ -543,6 +563,27 @@ app.post("/api/save", authMiddleware, async (req, res) => {
       msg: err.message || "Lỗi server"
     });
 
+  }
+});
+// ===============================
+// 🔥 TOOL SYSTEM - LOG USER USAGE
+// thêm dưới /api/save để dễ quản lý
+// ===============================
+app.post("/api/log-tool", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { tool } = req.body;
+
+    await db.execute(
+      "INSERT INTO tool_logs (user_id, tool, created_at) VALUES (?, ?, NOW())",
+      [userId, tool]
+    );
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.log(err);
+    res.json({ success: false });
   }
 });
 // =========================
