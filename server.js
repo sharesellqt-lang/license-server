@@ -476,6 +476,67 @@ app.get("/me", authMiddleware, async (req, res) => {
 });
 
 // =========================
+// CHECK (LIMIT)
+// =========================
+app.post("/check-limit", authMiddleware, async (req, res) => {
+  try {
+
+    const userId = req.user.userId;
+    const { tool } = req.body;
+
+    // 🔥 lấy plan
+    const [rows] = await db.execute(
+      `SELECT plan FROM licenses 
+       WHERE user_id=? AND valid=1 
+       ORDER BY id DESC LIMIT 1`,
+      [userId]
+    );
+
+    const plan = rows.length ? (rows[0].plan || "free") : "free";
+
+    // 🔥 định mức
+    const limits = {
+      free: 5,
+      pro: 100,
+      vip: 999999
+    };
+
+    const limit = limits[plan] || 5;
+
+    // 🔥 đếm số lần hôm nay
+    const [countRows] = await db.execute(
+      `SELECT COUNT(*) as total 
+       FROM tool_usage 
+       WHERE user_id=? 
+       AND DATE(created_at) = CURDATE()`,
+      [userId]
+    );
+
+    const used = countRows[0].total;
+
+    if (used >= limit) {
+      return res.json({
+        allowed: false,
+        used,
+        limit,
+        plan
+      });
+    }
+
+    res.json({
+      allowed: true,
+      used,
+      limit,
+      plan
+    });
+
+  } catch (err) {
+    console.log("LIMIT ERROR:", err);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
+});
+
+// =========================
 // SEARCH
 // =========================
 app.get("/api/search", async (req, res) => {
