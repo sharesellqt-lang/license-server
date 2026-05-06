@@ -130,8 +130,6 @@ function authMiddleware(req, res, next) {
 // =========================
 // THANH TOAN
 // =========================
-const paymentRoutes = require("./routes/payment");
-
 // route
 app.use("/api", paymentRoutes);
 
