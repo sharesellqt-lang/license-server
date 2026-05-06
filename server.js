@@ -18,7 +18,11 @@ app.use(cors({
 // 🔥 ROUTES
 const paymentRoutes = require("./routes/payment");
 const userRoutes = require("./routes/user");
+const upgradeRoutes = require("./routes/upgrade");
+
+app.use("/api", paymentRoutes);
 app.use("/api", userRoutes);
+app.use("/api", upgradeRoutes);
 
 // =========================
 // CONFIG

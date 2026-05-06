@@ -8,4 +8,4 @@ const pool = mysql.createPool({
   database: "igoiiqkjhosting_bot-license"
 });
 
-module.exports = pool;
+module.exports = db;
