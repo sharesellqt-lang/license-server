@@ -18,6 +18,7 @@ app.use(cors({
 // 🔥 ROUTES
 const paymentRoutes = require("./routes/payment");
 const userRoutes = require("./routes/user");
+app.use("/api", userRoutes);
 
 // =========================
 // CONFIG
