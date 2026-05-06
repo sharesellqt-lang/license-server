@@ -65,8 +65,6 @@ app.use(cors({
 app.options("*", cors());
 app.use(express.json());
 
-const jwt = require("jsonwebtoken");
-
 // 🔥 LOGIN TEST (tạo token luôn)
 app.post("/api/login", (req, res) => {
 
