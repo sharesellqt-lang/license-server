@@ -14,6 +14,11 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+// 🔥 ROUTES
+const paymentRoutes = require("./routes/payment");
+const userRoutes = require("./routes/user");
+
 // =========================
 // CONFIG
 // =========================
@@ -666,6 +671,14 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
     res.json({ success: false });
   }
 });
+
+app.get("/api/me", (req, res) => {
+  res.json({
+    plan: "free",
+    licensed: false
+  });
+});
+
 // =========================
 // START SERVER
 // =========================
