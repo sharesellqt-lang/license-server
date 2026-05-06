@@ -65,6 +65,23 @@ app.use(cors({
 app.options("*", cors());
 app.use(express.json());
 
+const jwt = require("jsonwebtoken");
+
+// 🔥 LOGIN TEST (tạo token luôn)
+app.post("/api/login", (req, res) => {
+
+  // giả lập user
+  const user = {
+    id: 1,
+    plan: "pro"
+  };
+
+  const token = jwt.sign(user, process.env.JWT_SECRET);
+
+  res.json({ token });
+
+});
+
 // =========================
 // AUTH GOOGLE (🔥 đặt ở đây)
 // =========================
