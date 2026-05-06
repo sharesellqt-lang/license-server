@@ -1,12 +1,19 @@
+require("dotenv").config();
 
 // =========================
 // IMPORT
 // =========================
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken");
+
+const db = require("./db");
+
 const app = express();
+
+// =========================
+// MIDDLEWARE
+// =========================
 app.use(cors({
   origin: [
     "https://sharesell.net",
@@ -14,6 +21,8 @@ app.use(cors({
   ],
   credentials: true
 }));
+
+app.use(express.json());
 
 // 🔥 ROUTES
 const paymentRoutes = require("./routes/payment");
@@ -203,18 +212,7 @@ app.post("/redeem", authMiddleware, async (req, res) => {
   }
 });
 
-// =========================
-// DB CONNECT (POOL)
-// =========================
-const db = mysql.createPool({
-  host: "onehost-amdcloudhn022602.000nethost.com",
-  user: "igoiiqkjhosting_bot-license",
-  password: "Chucaolamday@179",
-  database: "igoiiqkjhosting_bot-license",
-  waitForConnections: true,
-  connectionLimit: 10
-});
-
+const db = require("./db");
 console.log("✅ MySQL pool ready");
 
 async function initDB() {
