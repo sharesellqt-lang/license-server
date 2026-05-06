@@ -5,26 +5,27 @@ console.log("🔥 user route loaded");
 const authMiddleware = require("../middleware/auth");
 
 router.get("/me", authMiddleware, async (req, res) => {
-
   try {
 
+    const user = req.user;
+
+    let plan = user.plan || "free";
+
+    // 🔥 check expire
+    if (user.expireAt && new Date(user.expireAt) < new Date()) {
+      plan = "free";
+    }
+
     res.json({
-      id: req.user.id,
-      plan: req.user.plan || "free",
-      licensed: true,
-      expireAt: req.user.expireAt || null
+      id: user.id,
+      plan: plan,
+      licensed: plan !== "free",
+      expireAt: user.expireAt || null
     });
 
   } catch (err) {
-
     console.log("ME ERROR:", err);
-
-    res.status(500).json({
-      error: "Server error"
-    });
-
+    res.status(500).json({ error: "Server error" });
   }
-
 });
-
 module.exports = router;
