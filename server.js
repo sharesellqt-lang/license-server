@@ -1,3 +1,10 @@
+app.use(cors({
+  origin: [
+    "https://sharesell.net",
+    "http://localhost:3000"
+  ],
+  credentials: true
+}));
 // =========================
 // IMPORT
 // =========================
@@ -114,6 +121,18 @@ function authMiddleware(req, res, next) {
     return res.status(401).json({ error: "INVALID_TOKEN" });
   }
 }
+
+// =========================
+// THANH TOAN
+// =========================
+const paymentRoutes = require("./routes/payment");
+
+// route
+app.use("/api", paymentRoutes);
+
+// chạy cron bank
+require("./jobs/bankScan");
+
 
 // =========================
 // REDEEM KEY
