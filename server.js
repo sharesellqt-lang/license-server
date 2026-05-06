@@ -1,10 +1,4 @@
-app.use(cors({
-  origin: [
-    "https://sharesell.net",
-    "http://localhost:3000"
-  ],
-  credentials: true
-}));
+
 // =========================
 // IMPORT
 // =========================
@@ -13,7 +7,13 @@ const cors = require("cors");
 const mysql = require("mysql2/promise");
 const jwt = require("jsonwebtoken");
 const app = express();
-
+app.use(cors({
+  origin: [
+    "https://sharesell.net",
+    "http://localhost:3000"
+  ],
+  credentials: true
+}));
 // =========================
 // CONFIG
 // =========================
