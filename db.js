@@ -2,15 +2,10 @@
 const mysql = require("mysql2/promise");
 
 const db = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
-
-  waitForConnections: true,
-  connectionLimit: 10
+  host: "onehost-amdcloudhn022602.000nethost.com",
+  user: "igoiiqkjhosting_bot-license",
+  password: "Chucaolamday@179",
+  database: "igoiiqkjhosting_bot-license"
 });
-
-console.log("✅ MySQL pool ready");
 
 module.exports = db;
