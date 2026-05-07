@@ -1,8 +1,7 @@
-const express =
-  require("express");
+```js
+const express = require("express");
 
-const router =
-  express.Router();
+const router = express.Router();
 
 const auth =
   require("../middleware/auth");
@@ -81,7 +80,7 @@ router.post(
       // VIETQR
       // =====================================
       const qrUrl =
-  `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
+        `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
 
       return res.json({
 
@@ -220,7 +219,6 @@ router.post(
           SELECT *
           FROM payments
           WHERE content = ?
-          AND status = 'pending'
           `,
           [content]
         );
@@ -236,6 +234,19 @@ router.post(
 
       const payment =
         rows[0];
+
+      // =====================================
+      // ALREADY PAID
+      // =====================================
+      if (
+        payment.status === "paid"
+      ) {
+
+        return res.json({
+          success: true
+        });
+
+      }
 
       // =====================================
       // DUPLICATE TRANSACTION
@@ -304,6 +315,11 @@ router.post(
         ]
       );
 
+      console.log(
+        "PAYMENT PAID:",
+        payment.id
+      );
+
       return res.json({
         success: true
       });
@@ -324,3 +340,4 @@ router.post(
 
 module.exports =
   router;
+```
