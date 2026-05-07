@@ -7,9 +7,16 @@ const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 
-const db = require("./db");
+const usageRoutes =
+  require("./routes/usage");
+const authRoutes =
+  require("./routes/auth");
 
-const app = express();
+const db =
+  require("./db");
+
+const app =
+  express();
 
 // =========================
 // MIDDLEWARE
@@ -22,16 +29,27 @@ app.use(cors({
   credentials: true
 }));
 
+// 🔥 parse json trước
 app.use(express.json());
+
+// =========================
+// ROUTES
+// =========================
+app.use("/api", usageRoutes);
 
 // 🔥 ROUTES
 const paymentRoutes = require("./routes/payment");
 const userRoutes = require("./routes/user");
 const upgradeRoutes = require("./routes/upgrade");
+const webhookRoutes = require("./routes/webhook");
+
 
 app.use("/api", paymentRoutes);
 app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
+app.use("/api", webhookRoutes);
+app.use("/api", authRoutes);
+
 
 // =========================
 // CONFIG

@@ -1,56 +1,112 @@
+```js
 const jwt = require("jsonwebtoken");
-const db = require("../db"); // 🔥 bạn cần có hàm getUserById
 
-module.exports = async function (req, res, next) {
+const db = require("../db");
+
+module.exports = async (req, res, next) => {
 
   try {
 
-    const authHeader = req.headers.authorization;
+    // 🔥 lấy authorization header
+    const authHeader =
+      req.headers.authorization;
 
     if (!authHeader) {
-      return res.status(401).json({ error: "No token" });
+
+      return res.status(401).json({
+        error: "No token"
+      });
+
     }
 
-    const token = authHeader.split(" ")[1];
+    // 🔥 lấy token
+    const token =
+      authHeader.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ error: "Invalid token format" });
+
+      return res.status(401).json({
+        error: "Invalid token"
+      });
+
     }
 
-    // 🔥 decode token (chỉ lấy id)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // 🔥 verify jwt
+    const decoded =
+      jwt.verify(
+        token,
+        process.env.JWT_SECRET
+      );
 
-    if (!decoded.id) {
-      return res.status(401).json({ error: "Invalid token payload" });
+    // 🔥 query user realtime từ DB
+    const [rows] =
+      await db.query(
+        `
+        SELECT
+          id,
+          plan,
+          expire_at
+        FROM users
+        WHERE id = ?
+        `,
+        [decoded.id]
+      );
+
+    if (!rows.length) {
+
+      return res.status(401).json({
+        error: "User not found"
+      });
+
     }
 
-    // 🔥 lấy user thật từ DB
-    const user = await db.getUserById(decoded.id);
+    const user = rows[0];
 
-    if (!user) {
-      return res.status(401).json({ error: "User not found" });
-    }
+    // 🔥 default free
+    let plan =
+      user.plan || "free";
 
-    // 🔥 check expire (nếu có)
-    let plan = user.plan || "free";
+    // 🔥 auto expire + auto downgrade
+    if (
+      user.expire_at &&
+      new Date(user.expire_at) < new Date()
+    ) {
 
-    if (user.expireAt && new Date(user.expireAt) < new Date()) {
+      await db.query(
+        `
+        UPDATE users
+        SET
+          plan = 'free',
+          expire_at = NULL
+        WHERE id = ?
+        `,
+        [user.id]
+      );
+
       plan = "free";
+
+      user.expire_at = null;
+
     }
 
-    // 🔥 attach vào request (CHUẨN)
+    // 🔥 attach user realtime
     req.user = {
       id: user.id,
-      plan: plan,
-      expireAt: user.expireAt || null
+      plan,
+      expireAt: user.expire_at
     };
 
     next();
 
   } catch (err) {
 
-    console.log("AUTH ERROR:", err);
+    console.error(err);
 
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({
+      error: "Invalid token"
+    });
+
   }
+
 };
+```

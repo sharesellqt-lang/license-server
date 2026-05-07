@@ -1,31 +1,30 @@
 const express = require("express");
+
 const router = express.Router();
-console.log("🔥 user route loaded");
 
-const authMiddleware = require("../middleware/auth");
+const auth =
+  require("../middleware/auth");
 
-router.get("/me", authMiddleware, async (req, res) => {
-  try {
+router.get(
+  "/me",
+  auth,
+  async (req, res) => {
 
-    const user = req.user;
+    return res.json({
 
-    let plan = user.plan || "free";
+      id: req.user.id,
 
-    // 🔥 check expire
-    if (user.expireAt && new Date(user.expireAt) < new Date()) {
-      plan = "free";
-    }
+      plan: req.user.plan,
 
-    res.json({
-      id: user.id,
-      plan: plan,
-      licensed: plan !== "free",
-      expireAt: user.expireAt || null
+      licensed:
+        req.user.plan !== "free",
+
+      expireAt:
+        req.user.expireAt
+
     });
 
-  } catch (err) {
-    console.log("ME ERROR:", err);
-    res.status(500).json({ error: "Server error" });
   }
-});
+);
+
 module.exports = router;

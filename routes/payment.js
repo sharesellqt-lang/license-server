@@ -1,32 +1,120 @@
 const express = require("express");
+
 const router = express.Router();
 
-const { createPaypalOrder } = require("../services/paypal");
+const auth = require("../middleware/auth");
 
-// tạo payment
-router.post("/paypal/create", createPaypalOrder);
+const db = require("../db");
 
-// webhook
-router.post("/paypal/webhook", async (req, res) => {
+router.post(
+  "/create-payment",
+  auth,
+  async (req, res) => {
 
-  const event = req.body;
+    try {
 
-  if (event.event_type === "CHECKOUT.ORDER.APPROVED") {
+      const { plan } = req.body;
 
-    const purchase = event.resource.purchase_units[0];
-    const meta = JSON.parse(purchase.custom_id);
+      const plans = {
+        pro: 99000,
+        vip: 199000
+      };
 
-    const { userId, plan } = meta;
+      if (!plans[plan]) {
+        return res.status(400).json({
+          error: "Invalid plan"
+        });
+      }
 
-    await db.query("UPDATE users SET plan=? WHERE id=?", [plan, userId]);
+      const amount = plans[plan];
 
-    await db.query(
-      "INSERT INTO payments (user_id, plan, method, status) VALUES (?, ?, 'paypal', 'done')",
-      [userId, plan]
-    );
+      const content =
+        `UPGRADE_${req.user.id}_${Date.now()}`;
+
+      const [result] = await db.query(
+        `
+        INSERT INTO payments
+        (
+          userId,
+          plan,
+          amount,
+          content
+        )
+        VALUES (?, ?, ?, ?)
+        `,
+        [
+          req.user.id,
+          plan,
+          amount,
+          content
+        ]
+      );
+
+      const qrUrl =
+        `https://img.vietqr.io/image/970422-123456789-print.png?amount=${amount}&addInfo=${content}`;
+
+      res.json({
+        paymentId: result.insertId,
+        qrUrl,
+        content,
+        amount
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+        error: "Create payment failed"
+      });
+
+    }
+
   }
-
-  res.sendStatus(200);
-});
+);
 
 module.exports = router;
+
+router.get(
+  "/payment-status/:id",
+  auth,
+  async (req, res) => {
+
+    try {
+
+      const [rows] =
+        await db.query(
+          `
+          SELECT status
+          FROM payments
+          WHERE id = ?
+          `,
+          [req.params.id]
+        );
+
+      if (!rows.length) {
+
+        return res
+          .status(404)
+          .json({
+            error:
+              "Payment not found"
+          });
+
+      }
+
+      res.json(rows[0]);
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+        error:
+          "Payment status failed"
+      });
+
+    }
+
+  }
+);
