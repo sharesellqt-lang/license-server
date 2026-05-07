@@ -31,6 +31,11 @@ app.use(cors({
 
 // 🔥 parse json trước
 app.use(express.json());
+//
+app.use(
+  "/api",
+  require("./routes/paymentHistory")
+);
 
 // =========================
 // ROUTES
