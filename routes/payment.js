@@ -78,6 +78,15 @@ router.post(
       // =====================================
       // VIETQR
       // =====================================
+console.log(
+  "BANK:",
+  process.env.BANK_ID
+);
+
+console.log(
+  "ACCOUNT:",
+  process.env.BANK_ACCOUNT
+);
       const qrUrl =
         `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
 
