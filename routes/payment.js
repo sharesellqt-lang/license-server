@@ -203,7 +203,8 @@ router.post(
 
       const {
         content,
-        transactionId
+        transactionId,
+        amount
       } = req.body;
 
       if (
@@ -242,7 +243,16 @@ router.post(
 
       const payment =
         rows[0];
+      if (
+        Number(amount)
+        < Number(payment.amount)
+      ) {
 
+        return res.status(400).json({
+        error: "Insufficient payment"
+      });
+
+    }
       // =====================================
       // ALREADY PAID
       // =====================================
