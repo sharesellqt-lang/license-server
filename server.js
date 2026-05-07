@@ -212,18 +212,6 @@ app.post("/redeem", authMiddleware, async (req, res) => {
   }
 });
 
-// =========================
-// DB CONNECT (POOL)
-// =========================
-const db = mysql.createPool({
-  host: "onehost-amdcloudhn022602.000nethost.com",
-  user: "igoiiqkjhosting_bot-license",
-  password: "Chucaolamday@179",
-  database: "igoiiqkjhosting_bot-license",
-  waitForConnections: true,
-  connectionLimit: 10
-});
-
 console.log("✅ MySQL pool ready");
 
 async function initDB() {
