@@ -36,7 +36,11 @@ app.use(
   "/api",
   require("./routes/paymentHistory")
 );
-
+//
+app.use(
+  "/api/admin",
+  require("./routes/admin")
+);
 // =========================
 // ROUTES
 // =========================
