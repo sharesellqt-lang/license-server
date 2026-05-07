@@ -1,91 +1,321 @@
-const express = require("express");
-const router = express.Router();
-const License = require("./models/License");
+const express =
+  require("express");
 
-/* =========================
-   ADMIN AUTH MIDDLEWARE
-========================= */
-function adminAuth(req, res, next) {
-  const { token } = req.headers;
+const router =
+  express.Router();
 
-  if (token !== "admin-token") {
-    return res.status(401).json({ error: "UNAUTHORIZED" });
+const db =
+  require("../db");
+
+// =====================================
+// ADMIN CONFIG
+// =====================================
+const ADMIN_USER =
+  process.env.ADMIN_USER;
+
+const ADMIN_PASS =
+  process.env.ADMIN_PASS;
+
+const ADMIN_TOKEN =
+  process.env.ADMIN_TOKEN;
+
+// =====================================
+// ADMIN AUTH
+// =====================================
+function adminAuth(
+  req,
+  res,
+  next
+) {
+
+  const token =
+    req.headers.token;
+
+  if (
+    !token ||
+    token !== ADMIN_TOKEN
+  ) {
+
+    return res.status(401).json({
+      error: "Unauthorized"
+    });
+
   }
 
   next();
+
 }
 
-/* =========================
-   LOGIN ADMIN
-========================= */
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "123456";
+// =====================================
+// ADMIN LOGIN
+// =====================================
+router.post(
+  "/login",
 
-router.post("/login", (req, res) => {
-  const { user, pass } = req.body;
+  async (req, res) => {
 
-  if (user === ADMIN_USER && pass === ADMIN_PASS) {
-    return res.json({ success: true, token: "admin-token" });
+    try {
+
+      const {
+        user,
+        pass
+      } = req.body;
+
+      if (
+        user !== ADMIN_USER ||
+        pass !== ADMIN_PASS
+      ) {
+
+        return res.status(401).json({
+          error:
+            "Invalid credentials"
+        });
+
+      }
+
+      return res.json({
+
+        success: true,
+
+        token:
+          ADMIN_TOKEN
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      return res.status(500).json({
+        error:
+          "Admin login failed"
+      });
+
+    }
+
   }
+);
 
-  return res.json({ success: false });
-});
+// =====================================
+// LIST USERS
+// =====================================
+router.get(
+  "/users",
 
-/* =========================
-   LIST LICENSES
-========================= */
-router.get("/licenses", adminAuth, async (req, res) => {
-  const list = await License.find();
-  res.json(list);
-});
+  adminAuth,
 
-/* =========================
-   CREATE LICENSE
-========================= */
-router.post("/create", adminAuth, async (req, res) => {
-  const { key } = req.body;
+  async (req, res) => {
 
-  const exist = await License.findOne({ key });
-  if (exist) return res.json({ error: "EXISTS" });
+    try {
 
-  const license = new License({
-    key,
-    valid: true,
-    devices: [],
-    expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-  });
+      const [rows] =
+        await db.query(
+          `
+          SELECT
+            id,
+            email,
+            plan,
+            expire_at,
+            created_at
+          FROM users
+          ORDER BY id DESC
+          `
+        );
 
-  await license.save();
+      return res.json(rows);
 
-  res.json({ success: true });
-});
+    } catch (err) {
 
-/* =========================
-   RESET DEVICE
-========================= */
-router.post("/reset-device", adminAuth, async (req, res) => {
-  const { key } = req.body;
+      console.error(err);
 
-  await License.updateOne(
-    { key },
-    { $set: { devices: [] } }
-  );
+      return res.status(500).json({
+        error:
+          "Load users failed"
+      });
 
-  res.json({ success: true });
-});
+    }
 
-/* =========================
-   REVOKE KEY
-========================= */
-router.post("/revoke", adminAuth, async (req, res) => {
-  const { key } = req.body;
+  }
+);
 
-  await License.updateOne(
-    { key },
-    { valid: false }
-  );
+// =====================================
+// LIST PAYMENTS
+// =====================================
+router.get(
+  "/payments",
 
-  res.json({ success: true });
-});
+  adminAuth,
 
-module.exports = router;
+  async (req, res) => {
+
+    try {
+
+      const [rows] =
+        await db.query(
+          `
+          SELECT
+            id,
+            user_id,
+            plan,
+            amount,
+            status,
+            transaction_id,
+            created_at,
+            paid_at
+          FROM payments
+          ORDER BY id DESC
+          `
+        );
+
+      return res.json(rows);
+
+    } catch (err) {
+
+      console.error(err);
+
+      return res.status(500).json({
+        error:
+          "Load payments failed"
+      });
+
+    }
+
+  }
+);
+
+// =====================================
+// SET PLAN
+// =====================================
+router.post(
+  "/set-plan",
+
+  adminAuth,
+
+  async (req, res) => {
+
+    try {
+
+      const {
+        userId,
+        plan,
+        days
+      } = req.body;
+
+      const expireAt =
+        new Date(
+          Date.now() +
+          (
+            Number(days || 30)
+            * 24
+            * 60
+            * 60
+            * 1000
+          )
+        );
+
+      await db.query(
+        `
+        UPDATE users
+        SET
+          plan = ?,
+          expire_at = ?
+        WHERE id = ?
+        `,
+        [
+          plan,
+          expireAt,
+          userId
+        ]
+      );
+
+      return res.json({
+        success: true
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      return res.status(500).json({
+        error:
+          "Set plan failed"
+      });
+
+    }
+
+  }
+);
+
+// =====================================
+// STATS
+// =====================================
+router.get(
+  "/stats",
+
+  adminAuth,
+
+  async (req, res) => {
+
+    try {
+
+      const [[users]] =
+        await db.query(
+          `
+          SELECT
+            COUNT(*) as total
+          FROM users
+          `
+        );
+
+      const [[payments]] =
+        await db.query(
+          `
+          SELECT
+            COUNT(*) as total
+          FROM payments
+          WHERE status = 'paid'
+          `
+        );
+
+      const [[revenue]] =
+        await db.query(
+          `
+          SELECT
+            IFNULL(
+              SUM(amount),
+              0
+            ) as total
+          FROM payments
+          WHERE status = 'paid'
+          `
+        );
+
+      return res.json({
+
+        users:
+          users.total,
+
+        payments:
+          payments.total,
+
+        revenue:
+          revenue.total
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      return res.status(500).json({
+        error:
+          "Load stats failed"
+      });
+
+    }
+
+  }
+);
+
+module.exports =
+  router;
