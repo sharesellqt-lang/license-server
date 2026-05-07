@@ -1,3 +1,4 @@
+console.log("AUTH MIDDLEWARE NEW VERSION");
 ```js
 const jwt = require("jsonwebtoken");
 
