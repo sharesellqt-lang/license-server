@@ -81,7 +81,7 @@ router.post(
       // VIETQR
       // =====================================
       const qrUrl =
-        `https://img.vietqr.io/image/970422-123456789-print.png?amount=${amount}&addInfo=${content}`;
+  `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
 
       return res.json({
 
