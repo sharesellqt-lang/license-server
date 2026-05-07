@@ -31,14 +31,12 @@ router.post(
       const plan =
         req.user.plan || "free";
 
+      // 🔥 lấy limit theo tool
       const limit =
-        plans[plan]
-          ?.limits?.[action];
+        plans[action]?.[plan];
 
-      // 🔥 unlimited
-      if (
-        limit === undefined
-      ) {
+      // 🔥 không config = unlimited
+      if (limit === undefined) {
 
         return res.json({
           allowed: true
@@ -46,6 +44,16 @@ router.post(
 
       }
 
+      // 🔥 VIP unlimited
+      if (limit === -1) {
+
+        return res.json({
+          allowed: true
+        });
+
+      }
+
+      // 🔥 count usage today
       const [rows] =
         await db.query(
           `
@@ -64,6 +72,7 @@ router.post(
       const total =
         rows[0].total;
 
+      // 🔥 limit reached
       if (total >= limit) {
 
         return res.json({
