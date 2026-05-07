@@ -1,5 +1,3 @@
-console.log("AUTH MIDDLEWARE NEW VERSION");
-```js
 const jwt = require("jsonwebtoken");
 
 const db = require("../db");
@@ -8,7 +6,9 @@ module.exports = async (req, res, next) => {
 
   try {
 
-    // 🔥 lấy authorization header
+    // =========================
+    // AUTH HEADER
+    // =========================
     const authHeader =
       req.headers.authorization;
 
@@ -20,7 +20,9 @@ module.exports = async (req, res, next) => {
 
     }
 
-    // 🔥 lấy token
+    // =========================
+    // TOKEN
+    // =========================
     const token =
       authHeader.split(" ")[1];
 
@@ -32,14 +34,18 @@ module.exports = async (req, res, next) => {
 
     }
 
-    // 🔥 verify jwt
+    // =========================
+    // VERIFY JWT
+    // =========================
     const decoded =
       jwt.verify(
         token,
         process.env.JWT_SECRET
       );
 
-    // 🔥 query user realtime từ DB
+    // =========================
+    // GET USER REALTIME
+    // =========================
     const [rows] =
       await db.query(
         `
@@ -53,6 +59,9 @@ module.exports = async (req, res, next) => {
         [decoded.id]
       );
 
+    // =========================
+    // USER NOT FOUND
+    // =========================
     if (!rows.length) {
 
       return res.status(401).json({
@@ -63,11 +72,15 @@ module.exports = async (req, res, next) => {
 
     const user = rows[0];
 
-    // 🔥 default free
+    // =========================
+    // DEFAULT PLAN
+    // =========================
     let plan =
       user.plan || "free";
 
-    // 🔥 auto expire + auto downgrade
+    // =========================
+    // AUTO EXPIRE
+    // =========================
     if (
       user.expire_at &&
       new Date(user.expire_at) < new Date()
@@ -90,11 +103,14 @@ module.exports = async (req, res, next) => {
 
     }
 
-    // 🔥 attach user realtime
+    // =========================
+    // ATTACH USER
+    // =========================
     req.user = {
       id: user.id,
       plan,
-      expireAt: user.expire_at
+      expireAt:
+        user.expire_at
     };
 
     next();
@@ -110,4 +126,3 @@ module.exports = async (req, res, next) => {
   }
 
 };
-```
