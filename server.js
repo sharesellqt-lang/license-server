@@ -199,7 +199,7 @@ require("./jobs/bankScan");
 app.post("/redeem", authMiddleware, async (req, res) => {
   try {
     const { key } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     if (!key) {
       return res.json({ success: false, msg: "MISSING_KEY" });
@@ -432,7 +432,7 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
     }
 
     // 🔥 lấy user từ JWT
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // 🔐 check license theo USER
     const [rows] = await db.execute(
