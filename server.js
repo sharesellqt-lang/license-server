@@ -422,6 +422,7 @@ app.post("/create", async (req, res) => {
     res.json({ success: false });
   }
 });
+
 //thay đổi
 app.get("/secure-post", authMiddleware, async (req, res) => {
   try {
@@ -431,10 +432,8 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
       return res.json({ error: "MISSING" });
     }
 
-    // 🔥 lấy user từ JWT
     const userId = req.user.userId;
 
-    // 🔐 check license theo USER
     const [rows] = await db.execute(
       "SELECT * FROM licenses WHERE user_id=? AND valid=1",
       [userId]
@@ -446,12 +445,10 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
 
     const lic = rows[0];
 
-    // ⏰ check expire
     if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
       return res.json({ error: "EXPIRED" });
     }
 
-    // 🌐 gọi WordPress
     const wpRes = await fetch(`${WP_API}/${postId}`);
 
     if (!wpRes.ok) {
@@ -460,20 +457,26 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
 
     const post = await wpRes.json();
 
-    // 🔥 watermark theo user (không còn key)
-    let content = addWatermark(post.content.rendered, userId);
+    // 🔥 FIX CHỐT: chống undefined crash
+    const rawContent =
+      post?.content?.rendered || "";
 
-    // 🔒 encode
+    if (!rawContent) {
+      return res.json({ error: "EMPTY_CONTENT" });
+    }
+
+    let content = addWatermark(rawContent, userId);
+
     content = encodeContent(content);
 
-    res.json({
-      title: post.title.rendered,
+    return res.json({
+      title: post?.title?.rendered || "No title",
       content
     });
 
   } catch (err) {
     console.log("SECURE POST ERROR:", err);
-    res.json({ error: "SERVER_ERROR" });
+    return res.json({ error: "SERVER_ERROR" });
   }
 });
 
