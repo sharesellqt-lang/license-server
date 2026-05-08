@@ -426,6 +426,10 @@ app.post("/create", async (req, res) => {
 //thay đổi
 app.get("/secure-post", authMiddleware, async (req, res) => {
   try {
+console.log("=== REQUEST START ===");
+console.log(req.url);
+console.log(req.query);
+console.log(req.user);
     console.log("🔥 SECURE POST HIT");
     console.log("QUERY:", req.query);
     console.log("USER:", req.user);
@@ -482,7 +486,7 @@ console.log("🌐 CALL WP:", `${WP_API}/${postId}`);
   console.error("❌ SECURE POST ERROR FULL:");
   console.error(err);
   console.error(err?.stack);
-
+console.error("🔥 RAW ERROR:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
   return res.json({ error: "SERVER_ERROR" });
 }
 });
