@@ -648,7 +648,8 @@ app.get("/api/search", async (req, res) => {
 app.post("/api/save", authMiddleware, async (req, res) => {
   try {
 
-    const { question, answer } = req.body;
+    const question = req.body.question || req.body.q;
+    const answer = req.body.answer || req.body.a;
     const userId = req.user.id;
 
     if (!question || !answer)
@@ -676,7 +677,12 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     // ✅ SAVE
     await db.execute(
       "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
-      [question, answer, normalize(question), userId]
+      [
+        question ?? null,
+        answer ?? null,
+        normalize(question ?? ""),
+        userId ?? null
+      ]
     );
 
     res.json({ success: true });
