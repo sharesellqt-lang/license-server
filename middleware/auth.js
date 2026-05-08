@@ -107,10 +107,11 @@ module.exports = async (req, res, next) => {
     // ATTACH USER
     // =========================
     req.user = {
+      userId: user.id,
       id: user.id,
       plan,
       expireAt:
-        user.expire_at
+      user.expire_at
     };
 
     next();
