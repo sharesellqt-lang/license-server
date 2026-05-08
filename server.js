@@ -493,7 +493,7 @@ console.log("🌐 CALL WP:", `${WP_API}/${postId}`);
 app.get("/me", authMiddleware, async (req, res) => {
   try {
 
-    const userId = req.user.userId;
+    const userId = req.user.userId || req.user.id;
 
     // 🔍 lấy license mới nhất của user
     const [rows] = await db.execute(
@@ -557,7 +557,7 @@ app.get("/me", authMiddleware, async (req, res) => {
 app.post("/check-limit", authMiddleware, async (req, res) => {
   try {
 
-    const userId = req.user.userId;
+    const userId = req.user.userId || req.user.id;
     const { tool } = req.body;
 
     // 🔥 lấy plan
