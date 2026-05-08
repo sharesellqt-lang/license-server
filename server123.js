@@ -199,7 +199,7 @@ require("./jobs/bankScan");
 app.post("/redeem", authMiddleware, async (req, res) => {
   try {
     const { key } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     if (!key) {
       return res.json({ success: false, msg: "MISSING_KEY" });
@@ -432,7 +432,7 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
     }
 
     // 🔥 lấy user từ JWT
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     // 🔐 check license theo USER
     const [rows] = await db.execute(
@@ -648,9 +648,8 @@ app.get("/api/search", async (req, res) => {
 app.post("/api/save", authMiddleware, async (req, res) => {
   try {
 
-    const question = req.body.question || req.body.q;
-    const answer = req.body.answer || req.body.a;
-    const userId = req.user.id;
+    const { question, answer } = req.body;
+    const userId = req.user.userId;
 
     if (!question || !answer)
       return res.json({ success: false, msg: "Thiếu dữ liệu" });
@@ -677,12 +676,7 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     // ✅ SAVE
     await db.execute(
       "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
-      [
-        question ?? null,
-        answer ?? null,
-        normalize(question ?? ""),
-        userId ?? null
-      ]
+      [question, answer, normalize(question), userId]
     );
 
     res.json({ success: true });
@@ -704,7 +698,7 @@ app.post("/api/save", authMiddleware, async (req, res) => {
 // ===============================
 app.post("/api/log-tool", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { tool } = req.body;
 
     await db.execute(
