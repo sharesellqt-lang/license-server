@@ -734,11 +734,56 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
   }
 });
 
-app.get("/api/me", (req, res) => {
-  res.json({
-    plan: "free",
-    licensed: false
-  });
+app.get("/api/me", authMiddleware, async (req, res) => {
+  try {
+
+    const userId = req.user.userId || req.user.id;
+
+    const [rows] = await db.execute(
+      `SELECT plan, expireAt, valid
+       FROM licenses
+       WHERE user_id=?
+       ORDER BY id DESC
+       LIMIT 1`,
+      [userId]
+    );
+
+    if (!rows.length) {
+      return res.json({
+        userId,
+        plan: "free",
+        licensed: false
+      });
+    }
+
+    const lic = rows[0];
+
+    if (!lic.valid) {
+      return res.json({
+        userId,
+        plan: "free",
+        licensed: false
+      });
+    }
+
+    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
+      return res.json({
+        userId,
+        plan: "free",
+        licensed: false
+      });
+    }
+
+    return res.json({
+      userId,
+      plan: lic.plan || "free",
+      licensed: true
+    });
+
+  } catch (err) {
+    console.log("ME ERROR:", err);
+    res.status(500).json({ error: "SERVER_ERROR" });
+  }
 });
 
 // =========================
