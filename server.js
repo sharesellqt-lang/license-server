@@ -426,6 +426,9 @@ app.post("/create", async (req, res) => {
 //thay đổi
 app.get("/secure-post", authMiddleware, async (req, res) => {
   try {
+    console.log("🔥 SECURE POST HIT");
+    console.log("QUERY:", req.query);
+    console.log("USER:", req.user);
     const { postId } = req.query;
 
     if (!postId) {
@@ -450,6 +453,7 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
     }
 
     const wpRes = await fetch(`${WP_API}/${postId}`);
+console.log("🌐 CALL WP:", `${WP_API}/${postId}`);
 
     if (!wpRes.ok) {
       return res.json({ error: "WP_FAIL" });
@@ -475,9 +479,12 @@ app.get("/secure-post", authMiddleware, async (req, res) => {
     });
 
   } catch (err) {
-    console.log("SECURE POST ERROR:", err);
-    return res.json({ error: "SERVER_ERROR" });
-  }
+  console.error("❌ SECURE POST ERROR FULL:");
+  console.error(err);
+  console.error(err?.stack);
+
+  return res.json({ error: "SERVER_ERROR" });
+}
 });
 
 // =========================
