@@ -199,7 +199,7 @@ require("./jobs/bankScan");
 app.post("/redeem", authMiddleware, async (req, res) => {
   try {
     const { key } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     if (!key) {
       return res.json({ success: false, msg: "MISSING_KEY" });
@@ -439,7 +439,7 @@ console.log(req.user);
       return res.json({ error: "MISSING" });
     }
 
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const [rows] = await db.execute(
       "SELECT * FROM licenses WHERE user_id=? AND valid=1",
