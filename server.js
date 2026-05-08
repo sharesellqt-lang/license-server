@@ -649,7 +649,7 @@ app.post("/api/save", authMiddleware, async (req, res) => {
   try {
 
     const { question, answer } = req.body;
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     if (!question || !answer)
       return res.json({ success: false, msg: "Thiếu dữ liệu" });
@@ -698,7 +698,7 @@ app.post("/api/save", authMiddleware, async (req, res) => {
 // ===============================
 app.post("/api/log-tool", authMiddleware, async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
     const { tool } = req.body;
 
     await db.execute(
