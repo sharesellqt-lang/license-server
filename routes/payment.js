@@ -3,7 +3,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-const PLANS = require("../config/plans");
+const PLANS = require("../routes/plans");
 
 // =====================================
 // CREATE PAYMENT
