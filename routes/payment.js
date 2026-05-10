@@ -8,15 +8,26 @@ const PLANS = require("../routes/plans");
 // =====================================
 // CREATE PAYMENT
 // =====================================
+
 router.post("/create-payment", auth, async (req, res) => {
+
   try {
+
     // =========================
-    // NORMALIZE PLAN
+    // LOAD PLANS
+    // =========================
+    const PLANS = require("../config/plans");
+
+    // =========================
+    // NORMALIZE INPUT
     // =========================
     const planKey = String(req.body.plan || "")
       .trim()
       .toLowerCase();
 
+    // =========================
+    // VALIDATE PLAN
+    // =========================
     const plan = PLANS[planKey];
 
     if (!plan) {
@@ -28,10 +39,8 @@ router.post("/create-payment", auth, async (req, res) => {
     const amount = plan.price;
 
     // =========================
-    // UNIQUE CONTENT
+    // CONTENT
     // =========================
-    const planKey = req.body.plan;
-
     const content = `${planKey.toUpperCase()}-ORDER-${req.user.id}-${Date.now()}`;
 
     // =========================
@@ -40,14 +49,7 @@ router.post("/create-payment", auth, async (req, res) => {
     const [result] = await db.query(
       `
       INSERT INTO payments
-      (
-        user_id,
-        plan,
-        amount,
-        method,
-        status,
-        content
-      )
+      (user_id, plan, amount, method, status, content)
       VALUES (?, ?, ?, ?, ?, ?)
       `,
       [
@@ -61,13 +63,10 @@ router.post("/create-payment", auth, async (req, res) => {
     );
 
     // =========================
-    // VIETQR
+    // QR
     // =========================
-    const qrUrl = `https://img.vietqr.io/image/${
-      process.env.BANK_ID
-    }-${
-      process.env.BANK_ACCOUNT
-    }-print.png?amount=${amount}&addInfo=${content}`;
+    const qrUrl =
+      `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
 
     return res.json({
       paymentId: result.insertId,
@@ -78,10 +77,9 @@ router.post("/create-payment", auth, async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: err.message
-    });
+    return res.status(500).json({ error: err.message });
   }
+
 });
 
 // =====================================
