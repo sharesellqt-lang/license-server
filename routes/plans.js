@@ -1,9 +1,4 @@
-// =========================================================
-// 🔥 SINGLE SOURCE OF TRUTH - PLANS
-// =========================================================
-
 const PLANS = {
-
   pro: {
     id: "pro",
     name: "🔥 PRO PLAN",
@@ -12,9 +7,7 @@ const PLANS = {
     currency: "VND",
     displayPrice: "15.000đ",
     displayMonthly: "15.000đ / month",
-
-    // 🔥 TEMPLATE ONLY (KHÔNG DÙNG TRỰC TIẾP Ở FRONTEND)
-    notePrefix: "PRO_ORDER"
+    level: 2
   },
 
   vip: {
@@ -25,52 +18,28 @@ const PLANS = {
     currency: "VND",
     displayPrice: "30.000đ",
     displayMonthly: "30.000đ / month",
-
-    notePrefix: "VIP_ORDER"
+    level: 3
   }
 };
 
-// =========================================================
-// 🔥 FORMAT PAYMENT NOTE (QUAN TRỌNG NHẤT)
-// =========================================================
-
-function buildPaymentContent(planKey, userId, paymentId) {
-
-  const plan = PLANS[planKey];
-
-  if (!plan) return null;
-
-  // 🔥 FORMAT CHUẨN DUY NHẤT (BACKEND + FRONTEND ĐỀU PHẢI HIỂU)
-  return `${plan.notePrefix}_${userId}_${paymentId}`;
+// =====================================================
+// 🔥 GET PLANS (FOR FRONTEND)
+// =====================================================
+function getPlans() {
+  return PLANS;
 }
 
-// =========================================================
-// 🔥 FORMAT QR SAFE (KHÔNG MẤT "_")
-// =========================================================
+// =====================================================
+// 🔥 GET PLAN BY KEY
+// =====================================================
+function getPlan(planKey) {
+  if (!planKey) return null;
 
-function buildQRContent(content) {
-
-  if (!content) return "";
-
-  // 🔥 CHỈ encodeURIComponent, KHÔNG strip "_"
-  return encodeURIComponent(content);
+  return PLANS[String(planKey).toLowerCase()] || null;
 }
 
-// =========================================================
-// 🔥 EXPORT (NODE BACKEND)
-// =========================================================
-
-if (typeof module !== "undefined") {
-  module.exports = {
-    PLANS,
-    buildPaymentContent,
-    buildQRContent
-  };
-}
-
-// =========================================================
-// 🔥 FRONTEND SAFE ACCESS
-// =========================================================
-
-window.PLANS = PLANS;
-window.buildPaymentContent = buildPaymentContent;
+module.exports = {
+  PLANS,
+  getPlans,
+  getPlan
+};
