@@ -30,7 +30,9 @@ router.post("/create-payment", auth, async (req, res) => {
     // =========================
     // UNIQUE CONTENT
     // =========================
-    const content = `USER${req.user.id}_${Date.now()}`;
+    const planKey = req.body.plan;
+
+    const content = `${planKey.toUpperCase()}-ORDER-${req.user.id}-${Date.now()}`;
 
     // =========================
     // INSERT PAYMENT
