@@ -1,23 +1,12 @@
 require("dotenv").config();
 
 // =========================
-// IMPORT
+// IMPORT CORE
 // =========================
 const express = require("express");
 const cors = require("cors");
-const jwt = require("jsonwebtoken");
-const plansRoute = require("./routes/plans");
 
-const usageRoutes =
-  require("./routes/usage");
-const authRoutes =
-  require("./routes/auth");
-
-const db =
-  require("./db");
-
-const app =
-  express();
+const app = express();
 
 // =========================
 // MIDDLEWARE
@@ -30,37 +19,55 @@ app.use(cors({
   credentials: true
 }));
 
-// 🔥 parse json trước
 app.use(express.json());
-//
-app.use(
-  "/api",
-  require("./routes/paymentHistory")
-);
-//
-app.use(
-  "/api/admin",
-  require("./routes/admin")
-);
+
 // =========================
-// ROUTES
+// DB (nếu dùng global)
 // =========================
-app.use("/api", usageRoutes);
+const db = require("./db");
+
+// =========================
+// ROUTES - AUTH / CORE
+// =========================
+const authRoutes = require("./routes/auth");
+const plansRoute = require("./routes/plans");
+const usageRoutes = require("./routes/usage");
+
+app.use("/api", authRoutes);
 app.use("/api", plansRoute);
+app.use("/api", usageRoutes);
 
-// 🔥 ROUTES
+// =========================
+// ROUTES - PAYMENT SYSTEM
+// =========================
 const paymentRoutes = require("./routes/payment");
-const userRoutes = require("./routes/user");
-const upgradeRoutes = require("./routes/upgrade");
 const webhookRoutes = require("./routes/webhook");
-
+const paymentHistoryRoutes = require("./routes/paymentHistory");
 
 app.use("/api", paymentRoutes);
+app.use("/api", webhookRoutes);
+app.use("/api", paymentHistoryRoutes);
+
+// =========================
+// ROUTES - USER / BUSINESS LOGIC
+// =========================
+const userRoutes = require("./routes/user");
+const upgradeRoutes = require("./routes/upgrade");
+
 app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
-app.use("/api", webhookRoutes);
-app.use("/api", authRoutes);
-app.use("/api", require("./routes/payment"));
+
+// =========================
+// ADMIN ROUTES
+// =========================
+const adminRoutes = require("./routes/admin");
+
+app.use("/api/admin", adminRoutes);
+
+// =========================
+// EXPORT / START SERVER
+// =========================
+module.exports = app;
 
 // =========================
 // CONFIG
