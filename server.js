@@ -60,7 +60,7 @@ app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
 app.use("/api", webhookRoutes);
 app.use("/api", authRoutes);
-
+app.use("/api", require("./routes/payment"));
 
 // =========================
 // CONFIG
