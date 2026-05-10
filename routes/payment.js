@@ -16,7 +16,7 @@ router.post("/create-payment", auth, async (req, res) => {
     // =========================
     // LOAD PLANS
     // =========================
-    const PLANS = require("../config/plans");
+    const PLANS = require("../routes/plans");
 
     // =========================
     // NORMALIZE INPUT
