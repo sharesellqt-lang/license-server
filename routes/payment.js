@@ -3,8 +3,15 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-
 const PLANS = require("../routes/plans");
+
+// =====================================================
+// 🔥 HELPER - NORMALIZE NOTE (SAFE FORMAT)
+// =====================================================
+function buildPaymentNote(userId, paymentId) {
+  // 👉 FIXED FORMAT (KHÔNG BAO GIỜ ĐỔI)
+  return `USER_${userId}_${paymentId}`;
+}
 
 // =====================================================
 // CREATE PAYMENT
@@ -13,33 +20,30 @@ router.post("/create-payment", auth, async (req, res) => {
 
   try {
 
-    // =========================
-    // PLAN INPUT
-    // =========================
-    const rawPlan = req.body.plan;
-
-    const planKey = String(rawPlan || "")
+    // =====================================================
+    // 1. VALIDATE PLAN
+    // =====================================================
+    const planKey = String(req.body.plan || "")
       .trim()
       .toLowerCase();
 
     const planData = PLANS[planKey];
 
     if (!planData) {
-      return res.status(400).json({
-        error: "Invalid plan"
-      });
+      return res.status(400).json({ error: "Invalid plan" });
     }
 
     const amount = planData.price;
 
-    // =========================
-    // CHECK EXISTING PENDING
-    // =========================
+    // =====================================================
+    // 2. OPTIONAL: LIMIT 1 PENDING PAYMENT / USER / PLAN
+    // =====================================================
     const [existing] = await db.query(`
-      SELECT * FROM payments
+      SELECT id, amount, content
+      FROM payments
       WHERE user_id = ?
-      AND plan = ?
-      AND status = 'pending'
+        AND plan = ?
+        AND status = 'pending'
       LIMIT 1
     `, [req.user.id, planKey]);
 
@@ -47,57 +51,70 @@ router.post("/create-payment", auth, async (req, res) => {
 
       const old = existing[0];
 
+      const qrNote = encodeURIComponent(old.content);
+
+      const qrUrl =
+        `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
+        `?amount=${old.amount}&addInfo=${qrNote}`;
+
       return res.json({
         paymentId: old.id,
-        qrUrl: `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${old.amount}&addInfo=${old.content}`,
+        amount: old.amount,
         content: old.content,
-        amount: old.amount
+        qrUrl
       });
     }
 
-    // =========================
-    // NEW PAYMENT CONTENT
-    // =========================
-    const content =
-      `${planKey.toUpperCase()}-ORDER-${req.user.id}-${Date.now()}`;
-
-    // =========================
-    // INSERT PAYMENT
-    // =========================
+    // =====================================================
+    // 3. CREATE PAYMENT ROW FIRST
+    // =====================================================
     const [result] = await db.query(`
       INSERT INTO payments
-      (user_id, plan, amount, method, status, content)
-      VALUES (?, ?, ?, ?, ?, ?)
+      (user_id, plan, amount, method, status)
+      VALUES (?, ?, ?, ?, ?)
     `, [
       req.user.id,
       planKey,
       amount,
       "bank",
-      "pending",
-      content
+      "pending"
     ]);
 
-    // =========================
-    // QR URL
-    // =========================
-    const qrUrl =
-      `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
+    const paymentId = result.insertId;
 
+    // =====================================================
+    // 4. STABLE NOTE (SOURCE OF TRUTH)
+    // =====================================================
+    const content = buildPaymentNote(req.user.id, paymentId);
+
+    await db.query(`
+      UPDATE payments SET content = ? WHERE id = ?
+    `, [content, paymentId]);
+
+    // =====================================================
+    // 5. QR GENERATION (ALWAYS ENCODED)
+    // =====================================================
+    const qrNote = encodeURIComponent(content);
+
+    const qrUrl =
+      `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
+      `?amount=${amount}&addInfo=${qrNote}`;
+
+    // =====================================================
+    // 6. RESPONSE (FRONTEND ONLY USE THIS)
+    // =====================================================
     return res.json({
-      paymentId: result.insertId,
-      qrUrl,
+      paymentId,
+      amount,
       content,
-      amount
+      qrUrl
     });
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: err.message
-    });
+    return res.status(500).json({ error: err.message });
   }
 });
-
 
 // =====================================================
 // PAYMENT STATUS
@@ -110,99 +127,82 @@ router.get("/payment-status/:id", auth, async (req, res) => {
       SELECT status
       FROM payments
       WHERE id = ?
-      AND user_id = ?
+        AND user_id = ?
     `, [req.params.id, req.user.id]);
 
     if (!rows.length) {
-      return res.status(404).json({
-        error: "Payment not found"
-      });
+      return res.status(404).json({ error: "Payment not found" });
     }
 
     return res.json(rows[0]);
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: err.message
-    });
+    return res.status(500).json({ error: err.message });
   }
 });
 
-
 // =====================================================
-// PAYMENT WEBHOOK
+// WEBHOOK (BANK CONFIRM)
 // =====================================================
 router.post("/payment-webhook", async (req, res) => {
 
   try {
 
-    // =========================
-    // VERIFY SECRET
-    // =========================
+    // =====================================================
+    // 1. SECURITY CHECK
+    // =====================================================
     const secret = req.headers["x-webhook-secret"];
 
     if (!secret || secret !== process.env.WEBHOOK_SECRET) {
-      return res.status(401).json({
-        error: "Unauthorized"
-      });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { content, transactionId, amount } = req.body;
 
     if (!content || !transactionId) {
-      return res.status(400).json({
-        error: "Missing data"
-      });
+      return res.status(400).json({ error: "Missing data" });
     }
 
-    // =========================
-    // FIND PAYMENT
-    // =========================
+    // =====================================================
+    // 2. FIND PAYMENT BY CONTENT (STABLE KEY)
+    // =====================================================
     const [rows] = await db.query(`
       SELECT * FROM payments WHERE content = ?
     `, [content]);
 
     if (!rows.length) {
-      return res.status(404).json({
-        error: "Payment not found"
-      });
+      return res.status(404).json({ error: "Payment not found" });
     }
 
     const payment = rows[0];
 
-    // =========================
-    // AMOUNT CHECK
-    // =========================
+    // =====================================================
+    // 3. AMOUNT CHECK
+    // =====================================================
     if (Number(amount) < Number(payment.amount)) {
-      return res.status(400).json({
-        error: "Insufficient payment"
-      });
+      return res.status(400).json({ error: "Insufficient amount" });
     }
 
-    // =========================
-    // DUPLICATE TRANSACTION
-    // =========================
+    // =====================================================
+    // 4. DUPLICATE TRANSACTION PROTECTION
+    // =====================================================
     const [dup] = await db.query(`
       SELECT id FROM payments WHERE transaction_id = ?
     `, [transactionId]);
 
     if (dup.length) {
-      return res.json({
-        success: true,
-        message: "Duplicate"
-      });
+      return res.json({ success: true, message: "Duplicate ignored" });
     }
 
-    // =========================
-    // EXPIRE DATE
-    // =========================
-    const expireAt =
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    // =====================================================
+    // 5. EXPIRE DATE
+    // =====================================================
+    const expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // =========================
-    // UPDATE USER
-    // =========================
+    // =====================================================
+    // 6. UPDATE USER PLAN
+    // =====================================================
     await db.query(`
       UPDATE users
       SET plan = ?, expire_at = ?
@@ -213,9 +213,9 @@ router.post("/payment-webhook", async (req, res) => {
       payment.user_id
     ]);
 
-    // =========================
-    // UPDATE PAYMENT
-    // =========================
+    // =====================================================
+    // 7. UPDATE PAYMENT
+    // =====================================================
     await db.query(`
       UPDATE payments
       SET status = 'paid',
@@ -227,15 +227,13 @@ router.post("/payment-webhook", async (req, res) => {
       payment.id
     ]);
 
-    console.log("PAYMENT PAID:", payment.id);
+    console.log("PAYMENT SUCCESS:", payment.id);
 
     return res.json({ success: true });
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({
-      error: err.message
-    });
+    return res.status(500).json({ error: err.message });
   }
 });
 
