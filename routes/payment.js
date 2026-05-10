@@ -3,7 +3,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-const { getPlan } = require("./plans");
+const { getPlan } = require(".router/plans");
 
 
 app.use("/api", plansRoute);
