@@ -5,6 +5,9 @@ const auth = require("../middleware/auth");
 const db = require("../db");
 const { getPlan } = require("./plans");
 
+
+app.use("/api", plansRoute);
+
 // =====================================================
 // 🔥 HELPER - NORMALIZE NOTE (SAFE FORMAT)
 // =====================================================

@@ -6,6 +6,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const plansRoute = require("./routes/plans");
 
 const usageRoutes =
   require("./routes/usage");
@@ -45,6 +46,7 @@ app.use(
 // ROUTES
 // =========================
 app.use("/api", usageRoutes);
+app.use("/api", plansRoute);
 
 // 🔥 ROUTES
 const paymentRoutes = require("./routes/payment");
