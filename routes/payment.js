@@ -59,11 +59,17 @@ router.post("/create-payment", auth, async (req, res) => {
         `?amount=${old.amount}&addInfo=${qrNote}`;
 
       return res.json({
-        paymentId: old.id,
-        amount: old.amount,
-        content: old.content,
-        qrUrl
-      });
+        paymentId,
+        amount,
+        content,
+        qrUrl,
+
+        bank: {
+            name: process.env.BANK_NAME,
+            account: process.env.BANK_ACCOUNT,
+            owner: process.env.BANK_OWNER
+        }
+        });
     }
 
     // =====================================================
