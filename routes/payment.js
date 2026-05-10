@@ -64,11 +64,11 @@ router.post("/create-payment", auth, async (req, res) => {
         content: old.content,
         qrUrl,
 
-        bank: {
-          name: process.env.BANK_NAME,
-          account: process.env.BANK_ACCOUNT,
-          owner: process.env.BANK_OWNER
-        }
+bank: {
+  name: (process.env.BANK_NAME || "").trim(),
+  account: (process.env.BANK_ACCOUNT || "").trim(),
+  owner: (process.env.BANK_OWNER || "").trim()
+}
       });
     }
 

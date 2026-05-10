@@ -180,12 +180,6 @@ function authMiddleware(req, res, next) {
   }
 }
 
-// =========================
-// THANH TOAN
-// =========================
-// route
-app.use("/api", paymentRoutes);
-
 // chạy cron bank
 require("./jobs/bankScan");
 
