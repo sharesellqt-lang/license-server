@@ -3,67 +3,82 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-const PLANS = require("../routes/plans");
 
-// =====================================
+const PLANS = require("../config/plans");
+
+// =====================================================
 // CREATE PAYMENT
-// =====================================
-
+// =====================================================
 router.post("/create-payment", auth, async (req, res) => {
 
   try {
 
     // =========================
-    // LOAD PLANS
+    // PLAN INPUT
     // =========================
-    const PLANS = require("../routes/plans");
+    const rawPlan = req.body.plan;
 
-    // =========================
-    // NORMALIZE INPUT
-    // =========================
-    const planKey = String(req.body.plan || "")
+    const planKey = String(rawPlan || "")
       .trim()
       .toLowerCase();
 
-    // =========================
-    // VALIDATE PLAN
-    // =========================
-    const plan = PLANS[planKey];
+    const planData = PLANS[planKey];
 
-    if (!plan) {
+    if (!planData) {
       return res.status(400).json({
         error: "Invalid plan"
       });
     }
 
-    const amount = plan.price;
+    const amount = planData.price;
 
     // =========================
-    // CONTENT
+    // CHECK EXISTING PENDING
     // =========================
-    const content = `${planKey.toUpperCase()}-ORDER-${req.user.id}-${Date.now()}`;
+    const [existing] = await db.query(`
+      SELECT * FROM payments
+      WHERE user_id = ?
+      AND plan = ?
+      AND status = 'pending'
+      LIMIT 1
+    `, [req.user.id, planKey]);
+
+    if (existing.length) {
+
+      const old = existing[0];
+
+      return res.json({
+        paymentId: old.id,
+        qrUrl: `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${old.amount}&addInfo=${old.content}`,
+        content: old.content,
+        amount: old.amount
+      });
+    }
+
+    // =========================
+    // NEW PAYMENT CONTENT
+    // =========================
+    const content =
+      `${planKey.toUpperCase()}-ORDER-${req.user.id}-${Date.now()}`;
 
     // =========================
     // INSERT PAYMENT
     // =========================
-    const [result] = await db.query(
-      `
+    const [result] = await db.query(`
       INSERT INTO payments
       (user_id, plan, amount, method, status, content)
       VALUES (?, ?, ?, ?, ?, ?)
-      `,
-      [
-        req.user.id,
-        planKey,
-        amount,
-        "bank",
-        "pending",
-        content
-      ]
-    );
+    `, [
+      req.user.id,
+      planKey,
+      amount,
+      "bank",
+      "pending",
+      content
+    ]);
 
     // =========================
-    // QR
+    // QR URL
     // =========================
     const qrUrl =
       `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png?amount=${amount}&addInfo=${content}`;
@@ -77,25 +92,26 @@ router.post("/create-payment", auth, async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({
+      error: err.message
+    });
   }
-
 });
 
-// =====================================
+
+// =====================================================
 // PAYMENT STATUS
-// =====================================
+// =====================================================
 router.get("/payment-status/:id", auth, async (req, res) => {
+
   try {
-    const [rows] = await db.query(
-      `
+
+    const [rows] = await db.query(`
       SELECT status
       FROM payments
       WHERE id = ?
       AND user_id = ?
-      `,
-      [req.params.id, req.user.id]
-    );
+    `, [req.params.id, req.user.id]);
 
     if (!rows.length) {
       return res.status(404).json({
@@ -113,11 +129,17 @@ router.get("/payment-status/:id", auth, async (req, res) => {
   }
 });
 
-// =====================================
+
+// =====================================================
 // PAYMENT WEBHOOK
-// =====================================
+// =====================================================
 router.post("/payment-webhook", async (req, res) => {
+
   try {
+
+    // =========================
+    // VERIFY SECRET
+    // =========================
     const secret = req.headers["x-webhook-secret"];
 
     if (!secret || secret !== process.env.WEBHOOK_SECRET) {
@@ -134,10 +156,12 @@ router.post("/payment-webhook", async (req, res) => {
       });
     }
 
-    const [rows] = await db.query(
-      `SELECT * FROM payments WHERE content = ?`,
-      [content]
-    );
+    // =========================
+    // FIND PAYMENT
+    // =========================
+    const [rows] = await db.query(`
+      SELECT * FROM payments WHERE content = ?
+    `, [content]);
 
     if (!rows.length) {
       return res.status(404).json({
@@ -148,7 +172,7 @@ router.post("/payment-webhook", async (req, res) => {
     const payment = rows[0];
 
     // =========================
-    // CHECK AMOUNT
+    // AMOUNT CHECK
     // =========================
     if (Number(amount) < Number(payment.amount)) {
       return res.status(400).json({
@@ -157,12 +181,11 @@ router.post("/payment-webhook", async (req, res) => {
     }
 
     // =========================
-    // DUPLICATE CHECK
+    // DUPLICATE TRANSACTION
     // =========================
-    const [dup] = await db.query(
-      `SELECT id FROM payments WHERE transaction_id = ?`,
-      [transactionId]
-    );
+    const [dup] = await db.query(`
+      SELECT id FROM payments WHERE transaction_id = ?
+    `, [transactionId]);
 
     if (dup.length) {
       return res.json({
@@ -174,35 +197,35 @@ router.post("/payment-webhook", async (req, res) => {
     // =========================
     // EXPIRE DATE
     // =========================
-    const expireAt = new Date(
-      Date.now() + 30 * 24 * 60 * 60 * 1000
-    );
+    const expireAt =
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     // =========================
     // UPDATE USER
     // =========================
-    await db.query(
-      `
+    await db.query(`
       UPDATE users
       SET plan = ?, expire_at = ?
       WHERE id = ?
-      `,
-      [payment.plan, expireAt, payment.user_id]
-    );
+    `, [
+      payment.plan,
+      expireAt,
+      payment.user_id
+    ]);
 
     // =========================
     // UPDATE PAYMENT
     // =========================
-    await db.query(
-      `
+    await db.query(`
       UPDATE payments
       SET status = 'paid',
           transaction_id = ?,
           paid_at = NOW()
       WHERE id = ?
-      `,
-      [transactionId, payment.id]
-    );
+    `, [
+      transactionId,
+      payment.id
+    ]);
 
     console.log("PAYMENT PAID:", payment.id);
 
