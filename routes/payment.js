@@ -36,41 +36,29 @@ router.post("/create-payment", auth, async (req, res) => {
 
     const amount = planData.price;
 
-    // =====================================================
-    // 2. OPTIONAL: LIMIT 1 PENDING PAYMENT / USER / PLAN
-    // =====================================================
-    const [existing] = await db.query(`
-      SELECT id, amount, content
-      FROM payments
-      WHERE user_id = ?
-        AND plan = ?
-        AND status = 'pending'
-      LIMIT 1
-    `, [req.user.id, planKey]);
+   if (existing.length) {
 
-    if (existing.length) {
+  const old = existing[0];
 
-      const old = existing[0];
+  const qrNote = encodeURIComponent(old.content);
 
-      const qrNote = encodeURIComponent(old.content);
+  const qrUrl =
+    `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
+    `?amount=${old.amount}&addInfo=${qrNote}`;
 
-      const qrUrl =
-        `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
-        `?amount=${old.amount}&addInfo=${qrNote}`;
+  return res.json({
+    paymentId: old.id,
+    amount: old.amount,
+    content: old.content,
+    qrUrl,
 
-      return res.json({
-        paymentId,
-        amount,
-        content,
-        qrUrl,
-
-        bank: {
-            name: process.env.BANK_NAME,
-            account: process.env.BANK_ACCOUNT,
-            owner: process.env.BANK_OWNER
-        }
-        });
+    bank: {
+      name: process.env.BANK_NAME,
+      account: process.env.BANK_ACCOUNT,
+      owner: process.env.BANK_OWNER
     }
+  });
+}
 
     // =====================================================
     // 3. CREATE PAYMENT ROW FIRST
