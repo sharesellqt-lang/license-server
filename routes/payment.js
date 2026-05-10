@@ -3,7 +3,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-const { getPlan } = require("../routes/plans");
+const { getPlan } = require("./plans");
 
 // =====================================================
 // 🔥 HELPER - NORMALIZE NOTE (SAFE FORMAT)

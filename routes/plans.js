@@ -1,3 +1,11 @@
+const express = require("express");
+
+const router = express.Router();
+
+// =====================================================
+// PLAN DATA
+// =====================================================
+
 const PLANS = {
 
   pro: {
@@ -37,17 +45,13 @@ const PLANS = {
 };
 
 // =====================================================
-// GET ALL PLANS
+// HELPERS
 // =====================================================
 
 function getPlans() {
 
   return PLANS;
 }
-
-// =====================================================
-// GET PLAN BY KEY
-// =====================================================
 
 function getPlan(planKey) {
 
@@ -63,8 +67,34 @@ function getPlan(planKey) {
   return PLANS[key] || null;
 }
 
-module.exports = {
-  PLANS,
-  getPlans,
-  getPlan
-};
+// =====================================================
+// API
+// =====================================================
+
+router.get("/plans", (req, res) => {
+
+  try {
+
+    return res.json(
+      getPlans()
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Failed to load plans"
+    });
+  }
+});
+
+// =====================================================
+// EXPORTS
+// =====================================================
+
+module.exports = router;
+
+module.exports.PLANS = PLANS;
+module.exports.getPlans = getPlans;
+module.exports.getPlan = getPlan;
