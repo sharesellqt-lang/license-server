@@ -3,7 +3,7 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-const PLANS = require("../routes/plans");
+const { getPlan } = require("../routes/plans");
 
 // =====================================================
 // 🔥 HELPER - NORMALIZE NOTE (SAFE FORMAT)
@@ -27,7 +27,7 @@ router.post("/create-payment", auth, async (req, res) => {
       .trim()
       .toLowerCase();
 
-    const planData = PLANS[planKey];
+    const planData = getPlan(planKey);
 
     if (!planData) {
       return res.status(400).json({ error: "Invalid plan" });
