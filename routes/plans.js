@@ -73,20 +73,9 @@ function getPlan(planKey) {
 
 router.get("/plans", (req, res) => {
 
-  try {
-
-    return res.json(
-      getPlans()
-    );
-
-  } catch (err) {
-
-    console.error(err);
-
-    return res.status(500).json({
-      error: "Failed to load plans"
-    });
-  }
+  return res.json(
+    getPlans()
+  );
 });
 
 // =====================================================
