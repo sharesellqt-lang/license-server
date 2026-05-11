@@ -71,6 +71,7 @@ app.use("/api", uploadBillRoutes);
 app.use("/api/admin", adminPayment);
 app.use("/uploads", express.static("uploads"));
 app.use("/api", paymentStatusRoutes);
+app.use("/assets", express.static("assets"));
 
 // =========================
 // CONFIG
