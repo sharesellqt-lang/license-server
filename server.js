@@ -10,6 +10,8 @@ const jwt = require("jsonwebtoken");
 const usageRoutes = require("./routes/usage");
 const plansRoute = require("./routes/plans");
 const authRoutes = require("./routes/auth");
+const uploadBillRoutes = require("./routes/uploadBill");
+const adminPayment = require("./routes/adminPayment");
 
 const db = require("./db");
 
@@ -51,6 +53,7 @@ const userRoutes = require("./routes/user");
 const upgradeRoutes = require("./routes/upgrade");
 const webhookRoutes = require("./routes/webhook");
 const paymentHistoryRoutes = require("./routes/paymentHistory");
+const paymentStatusRoutes = require("./routes/paymentStatus");
 
 app.use("/api/admin", adminRoutes);
 app.use("/api", paymentRoutes);
@@ -64,6 +67,10 @@ app.use("/api", webhookRoutes);
 app.use("/api", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
+app.use("/api", uploadBillRoutes);
+app.use("/api/admin", adminPayment);
+app.use("/uploads", express.static("uploads"));
+app.use("/api", paymentStatusRoutes);
 
 // =========================
 // CONFIG
