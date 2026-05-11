@@ -63,6 +63,11 @@ app.use("/api", usageRoutes);
 const PORT = process.env.PORT || 10000;
 // 🔥 THÊM
 require("dotenv").config();
+console.log("ENV TEST:", {
+  BANK_NAME: process.env.BANK_NAME,
+  BANK_ACCOUNT: process.env.BANK_ACCOUNT,
+  BANK_OWNER: process.env.BANK_OWNER
+});
 
 const { OAuth2Client } = require("google-auth-library");
 
