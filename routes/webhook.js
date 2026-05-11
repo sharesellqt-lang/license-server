@@ -1,3 +1,4 @@
+console.log("WEBHOOK BODY:", req.body);
 const express = require("express");
 
 const router = express.Router();
@@ -5,6 +6,13 @@ const router = express.Router();
 const db = require("../db");
 
 const { getExpireDate } = require("../services/planService");
+function normalizeContent(str) {
+  return String(str || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+}
 
 // =====================================================
 // PAYMENT WEBHOOK
@@ -22,16 +30,29 @@ router.post("/payment-webhook", async (req, res) => {
     // =========================
     // FIND PAYMENT
     // =========================
-    const [rows] = await db.query(
-      `
-      SELECT *
-      FROM payments
-      WHERE content = ?
-      AND status = 'pending'
-      LIMIT 1
-      `,
-      [content]
-    );
+    const normalizedIncoming = normalizeContent(content);
+
+const [rows] = await db.query(`
+  SELECT *
+  FROM payments
+  WHERE status = 'pending'
+`);
+
+const payment = rows.find(p =>
+  normalizeContent(p.content) === normalizedIncoming
+);
+
+if (!payment) {
+
+  console.log("❌ PAYMENT NOT FOUND");
+  console.log("Incoming:", content);
+  console.log("Normalized:", normalizedIncoming);
+
+  return res.json({
+    success: false,
+    message: "Payment not found"
+  });
+}
 
     if (!rows.length) {
       return res.json({
