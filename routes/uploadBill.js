@@ -42,6 +42,8 @@ router.post(
   upload.single("bill"),
 
   async (req, res) => {
+  console.log("BODY:", req.body);
+  console.log("FILE:", req.file);
 
     try {
 
@@ -79,7 +81,7 @@ router.post(
 
     } catch (err) {
 
-      console.error(err);
+      console.error("UPLOAD ERROR:", err);
 
       return res.status(500).json({
         error: err.message
