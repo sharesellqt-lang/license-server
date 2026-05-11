@@ -61,7 +61,6 @@ if (!payment) {
       });
     }
 
-    const payment = rows[0];
 
     // =========================
     // DUPLICATE TRANSACTION
