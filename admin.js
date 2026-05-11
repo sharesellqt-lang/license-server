@@ -48,52 +48,29 @@ function adminAuth(
 // =====================================
 // ADMIN LOGIN
 // =====================================
-router.post(
-  "/login",
+router.post("/login", async (req, res) => {
+  try {
+    const { user, pass } = req.body;
 
-  async (req, res) => {
-
-    try {
-
-      const {
-        user,
-        pass
-      } = req.body;
-
-      if (
-        user !== ADMIN_USER ||
-        pass !== ADMIN_PASS
-      ) {
-
-        return res.status(401).json({
-          error:
-            "Invalid credentials"
-        });
-
-      }
-
-      return res.json({
-
-        success: true,
-
-        token:
-          ADMIN_TOKEN
-
+    if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
+      return res.status(401).json({
+        error: "Invalid credentials"
       });
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Admin login failed"
-      });
-
     }
 
+    return res.json({
+      success: true,
+      token: ADMIN_TOKEN
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      error: "Admin login failed"
+    });
   }
-);
+});
 
 // =====================================
 // LIST USERS
