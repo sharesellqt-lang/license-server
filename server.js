@@ -28,6 +28,10 @@ app.use(cors({
 
 // 🔥 parse json trước
 app.use(express.json());
+app.use(
+  "/uploads",
+  express.static("uploads")
+);
 //
 app.use(
   "/api",
@@ -50,6 +54,10 @@ const paymentHistoryRoutes = require("./routes/paymentHistory");
 
 app.use("/api/admin", adminRoutes);
 app.use("/api", paymentRoutes);
+app.use(
+  "/api",
+  require("./routes/uploadBill")
+);
 app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
 app.use("/api", webhookRoutes);

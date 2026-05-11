@@ -6,29 +6,93 @@ setInterval(async () => {
 
   // giả lập
   const fakeTransactions = [
-    { id: "tx1", content: "1 PRO" }
+    {
+      id: "tx1",
+      content: "USER1P33"
+    }
   ];
 
-  for (let tx of fakeTransactions) {
+  for (const tx of fakeTransactions) {
 
-    const [userId, plan] = tx.content.split(" ");
+    // =================================================
+    // PARSE CONTENT
+    // =================================================
 
-    const exists = await db.query(
-      "SELECT * FROM payments WHERE transaction_id=?",
-      [tx.id]
-    );
+    const match = tx.content.match(/^USER(\d+)P(\d+)$/);
 
-    if (exists.length) continue;
+    if (!match) {
+      console.log("❌ invalid content:", tx.content);
+      continue;
+    }
 
-    await db.query(
-      "UPDATE users SET plan=? WHERE id=?",
-      [plan.toLowerCase(), userId]
-    );
+    const userId = Number(match[1]);
+    const paymentId = Number(match[2]);
 
-    await db.query(
-      "INSERT INTO payments (user_id, plan, method, status, transaction_id) VALUES (?, ?, 'bank', 'done', ?)",
-      [userId, plan, tx.id]
-    );
+    // =================================================
+    // FIND PAYMENT
+    // =================================================
+
+    const [rows] = await db.query(`
+      SELECT *
+      FROM payments
+      WHERE id = ?
+      AND user_id = ?
+      AND status = 'pending'
+      LIMIT 1
+    `, [paymentId, userId]);
+
+    if (!rows.length) {
+      console.log("❌ payment not found");
+      continue;
+    }
+
+    const payment = rows[0];
+
+    // =================================================
+    // DUPLICATE CHECK
+    // =================================================
+
+    const [dup] = await db.query(`
+      SELECT id
+      FROM payments
+      WHERE transaction_id = ?
+      LIMIT 1
+    `, [tx.id]);
+
+    if (dup.length) {
+      console.log("⚠ duplicate tx");
+      continue;
+    }
+
+    // =================================================
+    // UPDATE USER
+    // =================================================
+
+    await db.query(`
+      UPDATE users
+      SET plan = ?
+      WHERE id = ?
+    `, [
+      payment.plan,
+      userId
+    ]);
+
+    // =================================================
+    // UPDATE PAYMENT
+    // =================================================
+
+    await db.query(`
+      UPDATE payments
+      SET status = 'paid',
+          transaction_id = ?,
+          paid_at = NOW()
+      WHERE id = ?
+    `, [
+      tx.id,
+      paymentId
+    ]);
+
+    console.log("✅ payment success:", paymentId);
   }
 
 }, 60000);
