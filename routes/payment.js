@@ -7,14 +7,29 @@ const router = express.Router();
 
 const auth = require("../middleware/auth");
 const db = require("../db");
-
 const { getPlan } = require("./plans");
+
 // =====================================================
-// 🔥 HELPER - NORMALIZE NOTE (SAFE FORMAT)
+// HELPER
 // =====================================================
 function buildPaymentNote(userId, paymentId) {
-  // 👉 FIXED FORMAT (KHÔNG BAO GIỜ ĐỔI)
   return `USER_${userId}_${paymentId}`;
+}
+
+// =====================================================
+// NORMALIZE BANK (IMPORTANT FIX)
+// =====================================================
+function getBankInfo() {
+
+  const name = process.env.BANK_NAME?.trim();
+  const account = process.env.BANK_ACCOUNT?.trim();
+  const owner = process.env.BANK_OWNER?.trim();
+
+  return {
+    name: name || null,
+    account: account || null,
+    owner: owner || null
+  };
 }
 
 // =====================================================
@@ -25,7 +40,7 @@ router.post("/create-payment", auth, async (req, res) => {
   try {
 
     // =========================
-    // 1. VALIDATE PLAN
+    // 1. PLAN
     // =========================
     const planKey = String(req.body.plan || "")
       .trim()
@@ -40,7 +55,7 @@ router.post("/create-payment", auth, async (req, res) => {
     const amount = planData.price;
 
     // =========================
-    // 2. CHECK EXISTING PAYMENT
+    // 2. EXISTING PAYMENT
     // =========================
     const [existing] = await db.query(`
       SELECT id, amount, content, plan
@@ -53,31 +68,24 @@ router.post("/create-payment", auth, async (req, res) => {
 
     if (existing.length) {
 
-  const old = existing[0];
+      const old = existing[0];
 
-  const bankId = process.env.BANK_ID?.trim();
-  const bankAccount = process.env.BANK_ACCOUNT?.trim();
+      const bank = getBankInfo();
 
-  const qrNote = encodeURIComponent(old.content || "");
+      const qrNote = encodeURIComponent(old.content || "");
 
-  const qrUrl =
-    `https://img.vietqr.io/image/${bankId}-${bankAccount}-print.png` +
-    `?amount=${old.amount}&addInfo=${qrNote}`;
+      const qrUrl =
+        `https://img.vietqr.io/image/${bank.account ? process.env.BANK_ID : ""}-${bank.account}-print.png` +
+        `?amount=${old.amount}&addInfo=${qrNote}`;
 
-  const bank = {
-    name: process.env.BANK_NAME || "",
-    account: bankAccount || "",
-    owner: process.env.BANK_OWNER || ""
-  };
-
-  return res.json({
-    paymentId: old.id,
-    amount: old.amount,
-    content: old.content || "",
-    qrUrl,
-    bank
-  });
-}
+      return res.json({
+        paymentId: old.id,
+        amount: old.amount,
+        content: old.content || "",
+        qrUrl,
+        bank
+      });
+    }
 
     // =========================
     // 3. CREATE PAYMENT
@@ -97,7 +105,7 @@ router.post("/create-payment", auth, async (req, res) => {
     const paymentId = result.insertId;
 
     // =========================
-    // 4. STABLE NOTE
+    // 4. NOTE
     // =========================
     const content = buildPaymentNote(req.user.id, paymentId);
 
@@ -108,26 +116,23 @@ router.post("/create-payment", auth, async (req, res) => {
     // =========================
     // 5. QR
     // =========================
+    const bank = getBankInfo();
+
     const qrNote = encodeURIComponent(content);
 
     const qrUrl =
-      `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
+      `https://img.vietqr.io/image/${process.env.BANK_ID}-${bank.account}-print.png` +
       `?amount=${amount}&addInfo=${qrNote}`;
 
     // =========================
-    // 6. RESPONSE
+    // 6. RESPONSE (STRICT FORMAT)
     // =========================
     return res.json({
       paymentId,
       amount,
       content,
       qrUrl,
-
-  bank: {
-  name: process.env.BANK_NAME || "",
-  account: process.env.BANK_ACCOUNT || "",
-  owner: process.env.BANK_OWNER || ""
-}
+      bank
     });
 
   } catch (err) {
