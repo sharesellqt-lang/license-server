@@ -32,21 +32,22 @@ setInterval(async () => {
     // FIND PAYMENT
     // =================================================
 
-    const [rows] = await db.query(`
-      SELECT *
-      FROM payments
-      WHERE id = ?
-      AND user_id = ?
-      AND status = 'pending'
-      LIMIT 1
-    `, [paymentId, userId]);
+    const [rows] = await db.query(
+  "SELECT * FROM payments WHERE content = ? AND status='pending'",
+  [tx.content]
+);
 
-    if (!rows.length) {
-      console.log("❌ payment not found");
-      continue;
-    }
+if (!rows.length) {
+  console.log("❌ payment not found");
+  continue;
+}
 
-    const payment = rows[0];
+const payment = rows[0];
+
+await db.query(
+  "UPDATE payments SET status='paid', transaction_id=? WHERE id=?",
+  [tx.id, payment.id]
+);
 
     // =================================================
     // DUPLICATE CHECK
