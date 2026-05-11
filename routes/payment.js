@@ -123,6 +123,12 @@ router.post("/create-payment", auth, async (req, res) => {
     // =========================
     // 6. RESPONSE (STRICT FORMAT)
     // =========================
+console.log("BANK ENV:", {
+  name: process.env.BANK_NAME,
+  account: process.env.BANK_ACCOUNT,
+  owner: process.env.BANK_OWNER
+});
+console.log("BANK DEBUG:", getBankInfo());
     return res.json({
       paymentId,
       amount,
