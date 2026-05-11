@@ -12,44 +12,48 @@ setInterval(async () => {
     }
   ];
 
-  for (const tx of fakeTransactions) {
+for (const tx of fakeTransactions) {
 
-    // =================================================
-    // PARSE CONTENT
-    // =================================================
+  // 1. find payment FIRST
+  const [rows] = await db.query(
+    "SELECT * FROM payments WHERE content = ? AND status = 'pending'",
+    [tx.content]
+  );
 
-    const match = tx.content.match(/^USER(\d+)P(\d+)$/);
+  if (!rows.length) {
+    console.log("❌ payment not found:", tx.content);
+    continue;
+  }
 
-    if (!match) {
-      console.log("❌ invalid content:", tx.content);
-      continue;
-    }
+  const payment = rows[0];
 
-    const userId = Number(match[1]);
-    const paymentId = Number(match[2]);
+  // 2. duplicate check
+  const [dup] = await db.query(
+    "SELECT id FROM payments WHERE transaction_id = ?",
+    [tx.id]
+  );
 
-    // =================================================
-    // FIND PAYMENT
-    // =================================================
+  if (dup.length) {
+    console.log("⚠ duplicate tx");
+    continue;
+  }
 
-    const [rows] = await db.query(
-  "SELECT * FROM payments WHERE content = ? AND status='pending'",
-  [tx.content]
+  // 3. update payment
+  await db.query(
+    `UPDATE payments 
+     SET status='paid', transaction_id=?, paid_at=NOW() 
+     WHERE id=?`,
+    [tx.id, payment.id]
+  );
 
-);
+  // 4. update user
+  await db.query(
+    "UPDATE users SET plan=? WHERE id=?",
+    [payment.plan, payment.user_id]
+  );
 
-if (!rows.length) {
-  console.log("❌ payment not found");
-  continue;
+  console.log("✅ payment success:", payment.id);
 }
-
-const payment = rows[0];
-
-await db.query(
-  "UPDATE payments SET status='paid', transaction_id=? WHERE id=?",
-  [tx.id, payment.id]
-);
-
     // =================================================
     // DUPLICATE CHECK
     // =================================================
