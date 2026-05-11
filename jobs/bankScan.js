@@ -41,9 +41,9 @@ setInterval(async () => {
       // =========================
 
       const [rows] = await db.query(
-        "SELECT * FROM payments WHERE content = ? AND status = 'pending'",
-        [tx.content]
-      );
+  "SELECT * FROM payments WHERE id = ? AND status = 'pending'",
+  [tx.id] // hoặc tx.paymentId
+);
 
       if (!rows.length) {
         console.log("❌ payment not found:", tx.content);

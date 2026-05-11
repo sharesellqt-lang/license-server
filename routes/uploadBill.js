@@ -27,30 +27,41 @@ File: ${filePath}
   });
 }
 
-// =========================
-// UPLOAD BILL
-// =========================
-router.post("/upload-bill", async (req, res) => {
+router.post("/upload-bill", upload.single("bill"), async (req, res) => {
 
-  const { paymentId } = req.body;
-  const file = req.file;
+  try {
 
-  if (!paymentId || !file) {
-    return res.status(400).json({ error: "Missing data" });
+    console.log("BODY:", req.body);
+    console.log("FILE:", req.file);
+
+    const { paymentId } = req.body;
+    const file = req.file;
+
+    if (!paymentId || !file) {
+      return res.status(400).json({ error: "Missing data" });
+    }
+
+    // =========================
+    // UPDATE PAYMENT
+    // =========================
+    await db.query(
+      `UPDATE payments 
+       SET bill_image = ?, status = 'pending_review'
+       WHERE id = ?`,
+      [file.filename, paymentId]
+    );
+
+    // =========================
+    // TELEGRAM NOTIFY
+    // =========================
+    await notifyAdmin(paymentId, file.filename);
+
+    return res.json({ success: true });
+
+  } catch (err) {
+    console.error("UPLOAD BILL ERROR:", err);
+    return res.status(500).json({ error: "Server error" });
   }
-
-  // save to DB
-  await db.query(
-    `UPDATE payments 
-     SET bill_image = ?, status = 'pending_review'
-     WHERE id = ?`,
-    [file.filename, paymentId]
-  );
-
-  // notify admin
-  await notifyAdmin(paymentId, file.filename);
-
-  res.json({ success: true });
 });
 
 module.exports = router;
