@@ -1,4 +1,7 @@
 const express = require("express");
+if (!process.env.BANK_ID || !process.env.BANK_ACCOUNT) {
+  throw new Error("Missing BANK_ID or BANK_ACCOUNT in .env");
+}
 
 const router = express.Router();
 
@@ -50,27 +53,31 @@ router.post("/create-payment", auth, async (req, res) => {
 
     if (existing.length) {
 
-      const old = existing[0];
+  const old = existing[0];
 
-      const qrNote = encodeURIComponent(old.content);
+  const bankId = process.env.BANK_ID?.trim();
+  const bankAccount = process.env.BANK_ACCOUNT?.trim();
 
-      const qrUrl =
-        `https://img.vietqr.io/image/${process.env.BANK_ID}-${process.env.BANK_ACCOUNT}-print.png` +
-        `?amount=${old.amount}&addInfo=${qrNote}`;
+  const qrNote = encodeURIComponent(old.content || "");
 
-      return res.json({
-        paymentId: old.id,
-        amount: old.amount,
-        content: old.content,
-        qrUrl,
+  const qrUrl =
+    `https://img.vietqr.io/image/${bankId}-${bankAccount}-print.png` +
+    `?amount=${old.amount}&addInfo=${qrNote}`;
 
-bank: {
-  name: (process.env.BANK_NAME || "").trim(),
-  account: (process.env.BANK_ACCOUNT || "").trim(),
-  owner: (process.env.BANK_OWNER || "").trim()
+  const bank = {
+    name: process.env.BANK_NAME || "",
+    account: bankAccount || "",
+    owner: process.env.BANK_OWNER || ""
+  };
+
+  return res.json({
+    paymentId: old.id,
+    amount: old.amount,
+    content: old.content || "",
+    qrUrl,
+    bank
+  });
 }
-      });
-    }
 
     // =========================
     // 3. CREATE PAYMENT
@@ -116,11 +123,11 @@ bank: {
       content,
       qrUrl,
 
-      bank: {
-        name: process.env.BANK_NAME,
-        account: process.env.BANK_ACCOUNT,
-        owner: process.env.BANK_OWNER
-      }
+  bank: {
+  name: process.env.BANK_NAME || "",
+  account: process.env.BANK_ACCOUNT || "",
+  owner: process.env.BANK_OWNER || ""
+}
     });
 
   } catch (err) {
