@@ -28,8 +28,7 @@ function adminAuth(
   next
 ) {
 
-  const token =
-    req.headers.token;
+ const token = req.headers.authorization?.replace("Bearer ", "");
 
   if (
     !token ||
