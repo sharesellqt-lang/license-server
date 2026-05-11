@@ -49,6 +49,8 @@ router.post("/create-payment", auth, async (req, res) => {
     }
 
     const amount = planData.price;
+console.log("PLAN DATA:", planData);
+console.log("AMOUNT:", amount);
 
     // =========================
     // 2. EXISTING PAYMENT
@@ -59,6 +61,7 @@ router.post("/create-payment", auth, async (req, res) => {
       WHERE user_id = ?
         AND plan = ?
         AND status = 'pending'
+        AND created_at >= NOW() - INTERVAL 15 MINUTE
       LIMIT 1
     `, [req.user.id, planKey]);
 
