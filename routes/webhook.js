@@ -1,4 +1,3 @@
-console.log("WEBHOOK BODY:", req.body);
 const express = require("express");
 
 const router = express.Router();
@@ -18,6 +17,7 @@ function normalizeContent(str) {
 // PAYMENT WEBHOOK
 // =====================================================
 router.post("/payment-webhook", async (req, res) => {
+console.log("WEBHOOK BODY:", req.body);
   try {
     const { content, transactionId, amount } = req.body;
 
