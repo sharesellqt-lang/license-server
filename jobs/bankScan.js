@@ -34,7 +34,6 @@ setInterval(async () => {
 
     const [rows] = await db.query(
   "SELECT * FROM payments WHERE content = ? AND status='pending'",
-  [tx.content]
 );
 
 if (!rows.length) {
