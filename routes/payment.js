@@ -17,18 +17,14 @@ function buildPaymentNote(userId, paymentId) {
 }
 
 // =====================================================
-// NORMALIZE BANK (IMPORTANT FIX)
+// NORMALIZE BANK (SAFE + FRONTEND FRIENDLY)
 // =====================================================
 function getBankInfo() {
 
-  const name = process.env.BANK_NAME?.trim();
-  const account = process.env.BANK_ACCOUNT?.trim();
-  const owner = process.env.BANK_OWNER?.trim();
-
   return {
-    name: name || null,
-    account: account || null,
-    owner: owner || null
+    name: process.env.BANK_NAME?.trim() || "",
+    account: process.env.BANK_ACCOUNT?.trim() || "",
+    owner: process.env.BANK_OWNER?.trim() || ""
   };
 }
 
@@ -132,7 +128,7 @@ router.post("/create-payment", auth, async (req, res) => {
       amount,
       content,
       qrUrl,
-      bank
+      bank: getBankInfo()
     });
 
   } catch (err) {
