@@ -13,7 +13,7 @@ const { getPlan } = require("./plans");
 // HELPER
 // =====================================================
 function buildPaymentNote(userId, paymentId) {
-  return `USER_${userId}_${paymentId}`;
+  return `USER${userId}P${paymentId}`;
 }
 
 // =====================================================

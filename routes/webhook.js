@@ -19,7 +19,11 @@ function normalizeContent(str) {
 router.post("/payment-webhook", async (req, res) => {
 console.log("WEBHOOK BODY:", req.body);
   try {
-    const { content, transactionId, amount } = req.body;
+console.log("WEBHOOK BODY:", JSON.stringify(req.body, null, 2));
+
+const { content, transactionId, amount } = req.body;
+
+console.log("CONTENT RECEIVED:", content);
 
     if (!content || !transactionId) {
       return res.status(400).json({
