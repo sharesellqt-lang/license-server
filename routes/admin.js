@@ -80,7 +80,6 @@ function adminAuth(
 // =====================================
 // ADMIN LOGIN
 // =====================================
-const bcrypt = require("bcrypt");
 
 // adminAuth, users, payments, set-plan, stats giữ nguyên
 
