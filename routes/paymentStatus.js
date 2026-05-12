@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 
 // =====================================================
-// GET PAYMENT STATUS
+// GET PAYMENT STATUS (FIXED)
 // =====================================================
 router.get("/payment-status/:id", async (req, res) => {
 
@@ -12,7 +12,7 @@ router.get("/payment-status/:id", async (req, res) => {
     const paymentId = req.params.id;
 
     const [rows] = await db.query(
-      `SELECT id, status, bill_image
+      `SELECT id, user_id, status, plan, bill_image, updated_at
        FROM payments
        WHERE id = ?`,
       [paymentId]
@@ -28,8 +28,11 @@ router.get("/payment-status/:id", async (req, res) => {
 
     return res.json({
       id: payment.id,
+      user_id: payment.user_id,
       status: payment.status,
-      bill_image: payment.bill_image || null
+      plan: payment.plan,
+      bill_image: payment.bill_image || null,
+      updated_at: payment.updated_at
     });
 
   } catch (err) {

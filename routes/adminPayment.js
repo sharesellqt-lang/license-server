@@ -19,44 +19,34 @@ router.get("/payments", async (req, res) => {
 // APPROVE PAYMENT
 // =========================
 router.post("/approve", async (req, res) => {
+
   const { paymentId } = req.body;
 
-  try {
-    // 1. lấy payment
-    const [rows] = await db.query(
-      `SELECT * FROM payments WHERE id=?`,
-      [paymentId]
-    );
+  const [rows] = await db.query(
+    "SELECT * FROM payments WHERE id=?",
+    [paymentId]
+  );
 
-    if (!rows.length) {
-      return res.status(404).json({ error: "Not found" });
-    }
+  const payment = rows[0];
 
-    const payment = rows[0];
+  // ✔ 1. UPDATE PAYMENT (QUAN TRỌNG NHẤT)
+  await db.query(
+    `UPDATE payments
+     SET status='paid',
+         paid_at=NOW()
+     WHERE id=?`,
+    [paymentId]
+  );
 
-    // 2. update payment
-    await db.query(
-      `UPDATE payments
-       SET status='paid',
-           paid_at=NOW()
-       WHERE id=?`,
-      [paymentId]
-    );
+  // ✔ 2. UPDATE USER (PHỤ)
+  await db.query(
+    `UPDATE users
+     SET plan=?
+     WHERE id=?`,
+    [payment.plan, payment.user_id]
+  );
 
-    // 3. upgrade user
-    await db.query(
-      `UPDATE users
-       SET plan=?
-       WHERE id=?`,
-      [payment.plan, payment.user_id]
-    );
-
-    res.json({ success: true });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({ success: true });
 });
 
 // =========================
