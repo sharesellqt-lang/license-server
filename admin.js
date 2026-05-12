@@ -25,6 +25,8 @@ const ADMIN_TOKEN =
 function adminAuth(req, res, next) {
 
   const token = req.headers.authorization?.replace("Bearer ", "").trim();
+console.log("TOKEN FROM CLIENT:", token);
+console.log("ADMIN_TOKEN FROM SERVER:", ADMIN_TOKEN);
 
   console.log("TOKEN:", token);
   console.log("ADMIN_TOKEN:", ADMIN_TOKEN);
