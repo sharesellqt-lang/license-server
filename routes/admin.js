@@ -1,24 +1,55 @@
-const express =
-  require("express");
+const express = require("express");
+const router = express.Router();
+const db = require("../db"); // Kết nối MySQL
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
-const router =
-  express.Router();
+// ==============================
+// JWT TOKEN GENERATOR
+// ==============================
+const SECRET = process.env.JWT_SECRET || "supersecret";
 
-const db =
-  require("../db");
+function generateToken(adminId) {
+  return jwt.sign({ id: adminId }, SECRET, { expiresIn: '7d' });
+}
 
 // =====================================
-// ADMIN CONFIG
+// ADMIN LOGIN ROUTE
 // =====================================
-const ADMIN_USER =
-  process.env.ADMIN_USER;
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-const ADMIN_PASS =
-  process.env.ADMIN_PASS;
+    const [rows] = await db.query(
+      "SELECT * FROM admin WHERE username = ?", 
+      [username]
+    );
 
-const ADMIN_TOKEN =
-  process.env.ADMIN_TOKEN;
+    if (!rows.length) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
 
+    const admin = rows[0];
+
+    const match = await bcrypt.compare(password, admin.password_hash);
+    if (!match) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    const token = generateToken(admin.id);
+    res.json({ success: true, token });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Login failed" });
+  }
+});
+
+// =====================================
+// Các route admin khác: users, payments, set-plan, stats...
+// =====================================
+
+module.exports = router;
 // =====================================
 // ADMIN AUTH
 // =====================================
@@ -49,53 +80,42 @@ function adminAuth(
 // =====================================
 // ADMIN LOGIN
 // =====================================
-router.post(
-  "/login",
+const bcrypt = require("bcrypt");
 
-  async (req, res) => {
+// adminAuth, users, payments, set-plan, stats giữ nguyên
 
-    try {
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
 
-      const {
-        user,
-        pass
-      } = req.body;
+    // Lấy admin từ database
+    const [rows] = await db.query(
+      "SELECT * FROM admin WHERE username = ?", 
+      [username]
+    );
 
-      if (
-        user !== ADMIN_USER ||
-        pass !== ADMIN_PASS
-      ) {
+    if (!rows.length)
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
 
-        return res.status(401).json({
-          error:
-            "Invalid credentials"
-        });
+    const admin = rows[0];
 
-      }
-
-      return res.json({
-
-        success: true,
-
-        token:
-          ADMIN_TOKEN
-
-      });
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Admin login failed"
-      });
-
+    // So sánh password hash
+    const match = await bcrypt.compare(password, admin.password_hash);
+    if (!match){
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
 
-  }
-);
+    // ✅ Tạo token đúng vị trí, chỉ khai báo 1 lần
+    const token = generateToken(admin.id);
 
+    // Trả token cho frontend
+    res.json({ success: true, token });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Login failed" });
+  }
+});
 // =====================================
 // LIST USERS
 // =====================================
