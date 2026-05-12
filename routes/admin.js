@@ -206,10 +206,33 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
   try {
     const paymentId = req.params.id;
 
-    // 1. Cập nhật trạng thái payment
-    await db.query(`UPDATE payments SET status = 'paid' WHERE id = ?`, [paymentId]);
+    // 1. Lấy payment info
+    const [payments] = await db.query(
+      `SELECT user_id, plan, amount FROM payments WHERE id = ?`,
+      [paymentId]
+    );
+
+    if (!payments.length) {
+      return res.status(404).json({ error: "Payment not found" });
+    }
+
+    const payment = payments[0];
+
+    // 2. Cập nhật trạng thái payment
+    await db.query(
+      `UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = ?`,
+      [paymentId]
+    );
+
+    // 3. Cập nhật user plan
+    const expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 ngày
+    await db.query(
+      `UPDATE users SET plan = ?, expire_at = ? WHERE id = ?`,
+      [payment.plan, expireAt, payment.user_id]
+    );
 
     res.json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Approve failed" });
@@ -222,7 +245,10 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
     const paymentId = req.params.id;
 
     // 1. Cập nhật trạng thái payment
-    await db.query(`UPDATE payments SET status = 'rejected' WHERE id = ?`, [paymentId]);
+    await db.query(
+      `UPDATE payments SET status = 'rejected' WHERE id = ?`,
+      [paymentId]
+    );
 
     res.json({ success: true });
   } catch (err) {
