@@ -1,292 +1,106 @@
-const express =
-  require("express");
+const express = require("express");
+const router = express.Router();
+const db = require("../db");
+const jwt = require("jsonwebtoken");
 
-const router =
-  express.Router();
+// =========================
+// CONFIG
+// =========================
+const ADMIN_USER = process.env.ADMIN_USER;
+const ADMIN_PASS = process.env.ADMIN_PASS;
+const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
-const db =
-  require("../db");
-
-// =====================================
-// ADMIN CONFIG
-// =====================================
-const ADMIN_USER =
-  process.env.ADMIN_USER;
-
-const ADMIN_PASS =
-  process.env.ADMIN_PASS;
-
-const ADMIN_TOKEN =
-  process.env.ADMIN_TOKEN;
-
-// =====================================
-// ADMIN AUTH
-// =====================================
+// =========================
+// AUTH MIDDLEWARE
+// =========================
 function adminAuth(req, res, next) {
+  const token = req.headers.authorization?.replace("Bearer ", "");
 
-  const token = req.headers.authorization?.replace("Bearer ", "").trim();
-console.log("TOKEN FROM CLIENT:", token);
-console.log("ADMIN_TOKEN FROM SERVER:", ADMIN_TOKEN);
-
-  console.log("TOKEN:", token);
-  console.log("ADMIN_TOKEN:", ADMIN_TOKEN);
-
-  if (!token || token !== ADMIN_TOKEN) {
+  if (!token) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  next();
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    if (!decoded || decoded.role !== "admin") {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    req.user = decoded;
+    next();
+
+  } catch (err) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 }
 
-// =====================================
-// ADMIN LOGIN
-// =====================================
+// =========================
+// LOGIN
+// =========================
 router.post("/login", async (req, res) => {
-  console.log("LOGIN HIT"); // 👈 thêm ở đây
-
   try {
     const { user, pass } = req.body;
 
     if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
-      return res.status(401).json({
-        error: "Invalid credentials"
-      });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
+
+    const token = jwt.sign(
+      { role: "admin" },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
     return res.json({
       success: true,
-      token: ADMIN_TOKEN
+      token
     });
 
   } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      error: "Admin login failed"
-    });
+    return res.status(500).json({ error: "Login failed" });
   }
 });
 
-// =====================================
-// LIST USERS
-// =====================================
-router.get(
-  "/users",
-
-  adminAuth,
-
-  async (req, res) => {
-
-    try {
-
-      const [rows] =
-        await db.query(
-          `
-          SELECT
-            id,
-            email,
-            plan,
-            expire_at,
-            created_at
-          FROM users
-          ORDER BY id DESC
-          `
-        );
-
-      return res.json(rows);
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Load users failed"
-      });
-
-    }
-
-  }
-);
-
-// =====================================
-// LIST PAYMENTS
-// =====================================
-router.get(
-  "/payments",
-
-  adminAuth,
-
-  async (req, res) => {
-
-    try {
-
-      const [rows] =
-        await db.query(
-          `
-          SELECT
-            id,
-            user_id,
-            plan,
-            amount,
-            status,
-            transaction_id,
-            created_at,
-            paid_at
-          FROM payments
-          ORDER BY id DESC
-          `
-        );
-
-      return res.json(rows);
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Load payments failed"
-      });
-
-    }
-
-  }
-);
-
-// =====================================
-// SET PLAN
-// =====================================
-router.post(
-  "/set-plan",
-
-  adminAuth,
-
-  async (req, res) => {
-
-    try {
-
-      const {
-        userId,
-        plan,
-        days
-      } = req.body;
-
-      const expireAt =
-        new Date(
-          Date.now() +
-          (
-            Number(days || 30)
-            * 24
-            * 60
-            * 60
-            * 1000
-          )
-        );
-
-      await db.query(
-        `
-        UPDATE users
-        SET
-          plan = ?,
-          expire_at = ?
-        WHERE id = ?
-        `,
-        [
-          plan,
-          expireAt,
-          userId
-        ]
-      );
-
-      return res.json({
-        success: true
-      });
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Set plan failed"
-      });
-
-    }
-
-  }
-);
-
-// =====================================
+// =========================
 // STATS
-// =====================================
-router.get(
-  "/stats",
+// =========================
+router.get("/stats", adminAuth, async (req, res) => {
+  const [[users]] = await db.query(`SELECT COUNT(*) as total FROM users`);
+  const [[payments]] = await db.query(`SELECT COUNT(*) as total FROM payments WHERE status='paid'`);
+  const [[revenue]] = await db.query(`SELECT IFNULL(SUM(amount),0) as total FROM payments WHERE status='paid'`);
 
-  adminAuth,
+  res.json({
+    users: users.total,
+    payments: payments.total,
+    revenue: revenue.total
+  });
+});
 
-  async (req, res) => {
+// =========================
+// USERS
+// =========================
+router.get("/users", adminAuth, async (req, res) => {
+  const [rows] = await db.query(`
+    SELECT id, email, plan, expire_at, created_at
+    FROM users
+    ORDER BY id DESC
+  `);
 
-    try {
+  res.json(rows);
+});
 
-      const [[users]] =
-        await db.query(
-          `
-          SELECT
-            COUNT(*) as total
-          FROM users
-          `
-        );
+// =========================
+// PAYMENTS
+// =========================
+router.get("/payments", adminAuth, async (req, res) => {
+  const [rows] = await db.query(`
+    SELECT id, user_id, plan, amount, status, created_at
+    FROM payments
+    ORDER BY id DESC
+  `);
 
-      const [[payments]] =
-        await db.query(
-          `
-          SELECT
-            COUNT(*) as total
-          FROM payments
-          WHERE status = 'paid'
-          `
-        );
+  res.json(rows);
+});
 
-      const [[revenue]] =
-        await db.query(
-          `
-          SELECT
-            IFNULL(
-              SUM(amount),
-              0
-            ) as total
-          FROM payments
-          WHERE status = 'paid'
-          `
-        );
-
-      return res.json({
-
-        users:
-          users.total,
-
-        payments:
-          payments.total,
-
-        revenue:
-          revenue.total
-
-      });
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Load stats failed"
-      });
-
-    }
-
-  }
-);
-
-module.exports =
-  router;
+module.exports = router;
