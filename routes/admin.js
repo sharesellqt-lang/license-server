@@ -54,8 +54,6 @@ module.exports = router;
 // ADMIN AUTH
 // =====================================
 
-const SECRET = process.env.JWT_SECRET || "supersecret";
-
 function adminAuth(req, res, next) {
   const authHeader = req.headers.authorization; // Bearer <token>
   if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
