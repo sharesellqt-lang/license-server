@@ -53,29 +53,30 @@ module.exports = router;
 // =====================================
 // ADMIN AUTH
 // =====================================
-function adminAuth(
-  req,
-  res,
-  next
-) {
+const jwt = require("jsonwebtoken");
+const SECRET = process.env.JWT_SECRET || "supersecret";
 
-  const token =
-    req.headers.token;
+function adminAuth(req, res, next) {
+  const authHeader = req.headers.authorization; // Bearer <token>
+  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
 
-  if (
-    !token ||
-    token !== ADMIN_TOKEN
-  ) {
+  const token = authHeader.split(" ")[1];
 
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
-
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    req.adminId = decoded.adminId; // gán adminId nếu cần dùng
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
-
-  next();
-
 }
+
+// Hàm tạo token login
+function generateToken(adminId) {
+  return jwt.sign({ adminId }, SECRET, { expiresIn: "8h" });
+}
+
+module.exports = { adminAuth, generateToken };
 
 // =====================================
 // ADMIN LOGIN
