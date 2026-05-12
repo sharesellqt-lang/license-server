@@ -49,6 +49,8 @@ function adminAuth(
 // ADMIN LOGIN
 // =====================================
 router.post("/login", async (req, res) => {
+  console.log("LOGIN HIT"); // 👈 thêm ở đây
+
   try {
     const { user, pass } = req.body;
 
