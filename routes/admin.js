@@ -201,6 +201,36 @@ router.get(
   }
 );
 
+// APPROVE PAYMENT
+router.post("/payments/:id/approve", adminAuth, async (req, res) => {
+  try {
+    const paymentId = req.params.id;
+
+    // 1. Cập nhật trạng thái payment
+    await db.query(`UPDATE payments SET status = 'paid' WHERE id = ?`, [paymentId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Approve failed" });
+  }
+});
+
+// REJECT PAYMENT
+router.post("/payments/:id/reject", adminAuth, async (req, res) => {
+  try {
+    const paymentId = req.params.id;
+
+    // 1. Cập nhật trạng thái payment
+    await db.query(`UPDATE payments SET status = 'rejected' WHERE id = ?`, [paymentId]);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Reject failed" });
+  }
+});
+
 // =====================================
 // SET PLAN
 // =====================================
@@ -268,70 +298,32 @@ router.post(
 // STATS
 // =====================================
 router.get(
-  "/stats",
-
+  "/payments",
   adminAuth,
-
   async (req, res) => {
-
     try {
+      const [rows] = await db.query(`
+        SELECT 
+          p.id,
+          p.user_id,
+          u.email AS user_email,
+          p.plan,
+          p.amount,
+          p.status,
+          p.transaction_id,
+          p.created_at,
+          p.paid_at
+        FROM payments p
+        LEFT JOIN users u ON u.id = p.user_id
+        ORDER BY p.id DESC
+      `);
 
-      const [[users]] =
-        await db.query(
-          `
-          SELECT
-            COUNT(*) as total
-          FROM users
-          `
-        );
-
-      const [[payments]] =
-        await db.query(
-          `
-          SELECT
-            COUNT(*) as total
-          FROM payments
-          WHERE status = 'paid'
-          `
-        );
-
-      const [[revenue]] =
-        await db.query(
-          `
-          SELECT
-            IFNULL(
-              SUM(amount),
-              0
-            ) as total
-          FROM payments
-          WHERE status = 'paid'
-          `
-        );
-
-      return res.json({
-
-        users:
-          users.total,
-
-        payments:
-          payments.total,
-
-        revenue:
-          revenue.total
-
-      });
+      return res.json(rows);
 
     } catch (err) {
-
       console.error(err);
-
-      return res.status(500).json({
-        error:
-          "Load stats failed"
-      });
-
+      return res.status(500).json({ error: "Load payments failed" });
     }
-
   }
 );
 
