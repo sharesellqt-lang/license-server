@@ -22,27 +22,18 @@ const ADMIN_TOKEN =
 // =====================================
 // ADMIN AUTH
 // =====================================
-function adminAuth(
-  req,
-  res,
-  next
-) {
+function adminAuth(req, res, next) {
 
- const token = req.headers.authorization?.replace("Bearer ", "");
+  const token = req.headers.authorization?.replace("Bearer ", "").trim();
 
-  if (
-    !token ||
-    token !== ADMIN_TOKEN
-  ) {
+  console.log("TOKEN:", token);
+  console.log("ADMIN_TOKEN:", ADMIN_TOKEN);
 
-    return res.status(401).json({
-      error: "Unauthorized"
-    });
-
+  if (!token || token !== ADMIN_TOKEN) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
 
   next();
-
 }
 
 // =====================================
