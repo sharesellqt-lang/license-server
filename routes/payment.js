@@ -67,8 +67,15 @@ const discount =
     ? yearlyDiscount
     : 1;
 
-const amount
+const amount = Math.round(
+  planData.price *
+  multiplier *
+  discount
+);
 
+console.log("PLAN DATA:", planData);
+console.log("CYCLE:", cycle);
+console.log("AMOUNT:", amount);
     // =========================
     // 2. EXISTING PAYMENT
     // =========================
