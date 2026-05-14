@@ -324,8 +324,5 @@ router.get(
   }
 );
 
-module.exports = {
-  router,
-  adminAuth,
-  generateToken
-};
+module.exports =
+  router;
