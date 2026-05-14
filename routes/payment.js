@@ -48,9 +48,26 @@ router.post("/create-payment", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    const amount = planData.price;
-console.log("PLAN DATA:", planData);
-console.log("AMOUNT:", amount);
+const cycle = String(req.body.cycle || "month")
+  .trim()
+  .toLowerCase();
+
+const multiplier =
+  cycle === "year"
+    ? 12
+    : 1;
+
+const yearlyDiscount =
+  typeof planData.yearlyDiscount === "number"
+    ? (1 - planData.yearlyDiscount)
+    : 1;
+
+const discount =
+  cycle === "year"
+    ? yearlyDiscount
+    : 1;
+
+const amount
 
     // =========================
     // 2. EXISTING PAYMENT
