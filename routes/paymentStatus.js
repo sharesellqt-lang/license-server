@@ -66,10 +66,14 @@ router.get("/payment-stream/:id", async (req, res) => {
       const status = rows[0].status;
       res.write(`data: ${JSON.stringify({ status })}\n\n`);
 
-      if (status === "paid" || status === "rejected") {
-        clearInterval(intervalId); // dừng SSE khi đã có kết quả
-        res.end();
-      }
+     if (status === "paid" || status === "rejected") {
+  res.write(`data: ${JSON.stringify({ status })}\n\n`);
+  // delay đóng stream để client nhận chắc chắn
+  setTimeout(() => {
+    clearInterval(intervalId);
+    res.end();
+  }, 1000);
+}
     } catch (err) {
       console.error(err);
     }
