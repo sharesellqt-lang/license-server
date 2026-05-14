@@ -203,19 +203,32 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
   try {
     const paymentId = req.params.id;
 
-    // 1. Cập nhật trạng thái payment
+    // 1. lấy payment
+    const [rows] = await db.query(
+      "SELECT * FROM payments WHERE id = ?",
+      [paymentId]
+    );
+
+    const payment = rows[0];
+    if (!payment) return res.status(404).json({ error: "Not found" });
+
+    // 2. update payment
     await db.query(`
-  UPDATE users
-  SET plan = (
-    SELECT plan FROM payments WHERE id = ?
-  ),
-  plan_start_date = NOW()
-  WHERE id = (
-    SELECT user_id FROM payments WHERE id = ?
-  )
-`, [paymentId, paymentId]);
+      UPDATE payments
+      SET status = 'paid',
+          paid_at = NOW()
+      WHERE id = ?
+    `, [paymentId]);
+
+    // 3. update user
+    await db.query(`
+      UPDATE users
+      SET plan = ?
+      WHERE id = ?
+    `, [payment.plan, payment.user_id]);
 
     res.json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Approve failed" });
@@ -227,19 +240,14 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
   try {
     const paymentId = req.params.id;
 
-    // 1. Cập nhật trạng thái payment
-   await db.query(`
-  UPDATE users
-  SET plan = (
-    SELECT plan FROM payments WHERE id = ?
-  ),
-  plan_start_date = NOW()
-  WHERE id = (
-    SELECT user_id FROM payments WHERE id = ?
-  )
-`, [paymentId, paymentId]);
+    await db.query(`
+      UPDATE payments
+      SET status = 'rejected'
+      WHERE id = ?
+    `, [paymentId]);
 
     res.json({ success: true });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Reject failed" });
@@ -312,35 +320,6 @@ router.post(
 // =====================================
 // STATS
 // =====================================
-router.get(
-  "/payments",
-  adminAuth,
-  async (req, res) => {
-    try {
-      const [rows] = await db.query(`
-        SELECT 
-          p.id,
-          p.user_id,
-          u.email AS user_email,
-          p.plan,
-          p.amount,
-          p.status,
-          p.transaction_id,
-          p.created_at,
-          p.paid_at
-        FROM payments p
-        LEFT JOIN users u ON u.id = p.user_id
-        ORDER BY p.id DESC
-      `);
-
-      return res.json(rows);
-
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: "Load payments failed" });
-    }
-  }
-);
 
 module.exports =
   router;
