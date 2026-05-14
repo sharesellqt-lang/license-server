@@ -204,7 +204,16 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     const paymentId = req.params.id;
 
     // 1. Cập nhật trạng thái payment
-    await db.query(`UPDATE payments SET status = 'paid' WHERE id = ?`, [paymentId]);
+    await db.query(`
+  UPDATE users
+  SET plan = (
+    SELECT plan FROM payments WHERE id = ?
+  ),
+  plan_start_date = NOW()
+  WHERE id = (
+    SELECT user_id FROM payments WHERE id = ?
+  )
+`, [paymentId, paymentId]);
 
     res.json({ success: true });
   } catch (err) {
@@ -219,7 +228,16 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
     const paymentId = req.params.id;
 
     // 1. Cập nhật trạng thái payment
-    await db.query(`UPDATE payments SET status = 'rejected' WHERE id = ?`, [paymentId]);
+   await db.query(`
+  UPDATE users
+  SET plan = (
+    SELECT plan FROM payments WHERE id = ?
+  ),
+  plan_start_date = NOW()
+  WHERE id = (
+    SELECT user_id FROM payments WHERE id = ?
+  )
+`, [paymentId, paymentId]);
 
     res.json({ success: true });
   } catch (err) {
