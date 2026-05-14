@@ -203,7 +203,7 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
   try {
     const paymentId = req.params.id;
 
-    // 1. lấy payment
+    // Lấy payment
     const [rows] = await db.query(
       "SELECT * FROM payments WHERE id = ?",
       [paymentId]
@@ -212,20 +212,23 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     const payment = rows[0];
     if (!payment) return res.status(404).json({ error: "Not found" });
 
-    // 2. update payment
-    await db.query(`
-      UPDATE payments
-      SET status = 'paid',
-          paid_at = NOW()
-      WHERE id = ?
-    `, [paymentId]);
+    // 1. Cập nhật trạng thái payment
+    await db.query(
+      `UPDATE payments
+       SET status = 'paid',
+           paid_at = NOW()
+       WHERE id = ?`,
+      [paymentId]
+    );
 
-    // 3. update user
-    await db.query(`
-      UPDATE users
-      SET plan = ?
-      WHERE id = ?
-    `, [payment.plan, payment.user_id]);
+    // 2. Update user plan
+    await db.query(
+      `UPDATE users
+       SET plan = ?,
+           plan_start_date = NOW()
+       WHERE id = ?`,
+      [payment.plan, payment.user_id]
+    );
 
     res.json({ success: true });
 
