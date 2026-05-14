@@ -220,8 +220,7 @@ router.get("/payment-status/:paymentId", (req, res) => {
   const { paymentId } = req.params;
 
   // Giả lập status ngẫu nhiên (frontend SSE/polling test)
-  const statuses = ["pending_review", "paid", "rejected"];
-  const status = statuses[Math.floor(Math.random() * statuses.length)];
+const status = "pending_review";
 
   res.json({ paymentId, status });
 });
