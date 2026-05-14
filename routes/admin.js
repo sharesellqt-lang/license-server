@@ -49,7 +49,6 @@ router.post("/login", async (req, res) => {
 // Các route admin khác: users, payments, set-plan, stats...
 // =====================================
 
-module.exports = router;
 // =====================================
 // ADMIN AUTH
 // =====================================
@@ -73,8 +72,6 @@ function adminAuth(req, res, next) {
 function generateToken(adminId) {
   return jwt.sign({ adminId }, SECRET, { expiresIn: "8h" });
 }
-
-module.exports = { adminAuth, generateToken };
 
 // =====================================
 // ADMIN LOGIN
@@ -327,5 +324,8 @@ router.get(
   }
 );
 
-module.exports =
-  router;
+module.exports = {
+  router,
+  adminAuth,
+  generateToken
+};
