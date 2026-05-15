@@ -36,8 +36,8 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/admin", adminPaymentRoutes);
 
 app.use("/api", paymentRoutes);
-//app.use("/api", paymentHistoryRoutes);
-app.use("/api", paymentStatusRoutes);
+app.use("/api", paymentHistoryRoutes);
+//app.use("/api", paymentStatusRoutes);
 app.use("/api", uploadBillRoutes);
 
 app.use("/api", userRoutes);
