@@ -213,13 +213,13 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     if (!payment) return res.status(404).json({ error: "Not found" });
 
     // 1. Cập nhật trạng thái payment
-    await db.query(
-      `UPDATE payments
-       SET status = 'paid',
-           paid_at = NOW()
-       WHERE id = ?`,
-      [paymentId]
-    );
+await db.query(
+  `UPDATE payments
+   SET status = 'approved',
+       paid_at = NOW()
+   WHERE id = ?`,
+  [paymentId]
+);
 
     // 2. Update user plan
     await db.query(
