@@ -122,7 +122,7 @@ console.log("AMOUNT:", amount);
   "pending_review",
   0
 ]);
-
+ const paymentId = result.insertId;
     // =========================
     // 4. NOTE
     // =========================
