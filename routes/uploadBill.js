@@ -1,63 +1,69 @@
-const upload = require("../middleware/upload");
 const express = require("express");
 const router = express.Router();
+
+const upload = require("../middleware/upload");
 const db = require("../db");
 
 // =========================
-// TELEGRAM CONFIG SAFE
+// TELEGRAM CONFIG
 // =========================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // =========================
-// SAFE TELEGRAM
+// TELEGRAM SAFE NOTIFY
 // =========================
-async function notifyAdmin(paymentId, filePath) {
+async function notifyAdmin(paymentId, fileName) {
   try {
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
       console.log("⚠ Telegram not configured");
       return;
     }
 
-    const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`;
-
-    const message = `
-🧾 NEW PAYMENT BILL UPLOADED
+    const message =
+`🧾 NEW PAYMENT BILL UPLOADED
 Payment ID: ${paymentId}
-File: ${filePath}
-    `;
+File: ${fileName}`;
 
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message
-      })
-    });
+    await fetch(
+      `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: message
+        })
+      }
+    );
 
   } catch (err) {
-    console.error("Telegram error:", err.message);
+    console.error("Telegram notify error:", err.message);
   }
 }
 
 // =========================
 // UPLOAD BILL ROUTE
+// FINAL ENDPOINT:
+// /api/upload-bill
 // =========================
 router.post(
   "/upload-bill",
   upload.single("bill"),
   async (req, res) => {
     try {
+      console.log("BODY:", req.body);
+      console.log("FILE:", req.file);
+
       const paymentId = Number(req.body.paymentId);
       const file = req.file;
 
-      console.log("BODY:", req.body);
-      console.log("FILE:", file);
-
-      if (!paymentId || isNaN(paymentId)) {
+      // =========================
+      // VALIDATION
+      // =========================
+      if (!paymentId || Number.isNaN(paymentId)) {
         return res.status(400).json({
           error: "Invalid paymentId"
         });
@@ -69,7 +75,9 @@ router.post(
         });
       }
 
+      // =========================
       // CHECK PAYMENT
+      // =========================
       const [payments] = await db.query(
         `
         SELECT id, status
@@ -87,20 +95,21 @@ router.post(
       }
 
       const payment = payments[0];
+      const status = String(payment.status || "")
+        .trim()
+        .toLowerCase();
 
-      // Chỉ cho upload khi đang pending
-      if (
-        !["pending", "pending_review"].includes(
-          String(payment.status).trim().toLowerCase()
-        )
-      ) {
+      // Chỉ cho upload khi payment đang chờ
+      if (!["pending", "pending_review"].includes(status)) {
         return res.status(400).json({
           error: "Payment is not pending"
         });
       }
 
-      // UPDATE DB
-      await db.query(
+      // =========================
+      // UPDATE PAYMENT
+      // =========================
+      const [result] = await db.query(
         `
         UPDATE payments
         SET
@@ -111,13 +120,25 @@ router.post(
         [file.filename, paymentId]
       );
 
-      // Notify admin
+      if (!result.affectedRows) {
+        return res.status(500).json({
+          error: "Update failed"
+        });
+      }
+
+      // =========================
+      // NOTIFY ADMIN
+      // =========================
       notifyAdmin(paymentId, file.filename);
 
+      // =========================
+      // SUCCESS
+      // =========================
       return res.json({
         success: true,
         paymentId,
-        status: "pending_review"
+        status: "pending_review",
+        file: file.filename
       });
 
     } catch (err) {
@@ -130,4 +151,7 @@ router.post(
   }
 );
 
+// =========================
+// EXPORT ROUTER (CRITICAL)
+// =========================
 module.exports = router;
