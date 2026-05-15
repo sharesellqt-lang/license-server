@@ -3,19 +3,21 @@ const router = express.Router();
 const db = require("../db");
 
 // =====================================================
-// GET PAYMENT STATUS (FIXED)
+// PAYMENT STREAM (SSE) FIXED
 // =====================================================
 router.get("/payment-stream/:id", async (req, res) => {
   const paymentId = req.params.id;
 
+  // SSE headers
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.(); // Node < 18 không có flushHeaders, an toàn với optional chaining
 
   const sendStatus = async () => {
     try {
       const [rows] = await db.query(
-        "SELECT status FROM payments WHERE id = ?",
+        "SELECT status, approved_by_admin FROM payments WHERE id = ?",
         [paymentId]
       );
 
@@ -26,64 +28,39 @@ router.get("/payment-stream/:id", async (req, res) => {
         return;
       }
 
-      const status = rows[0].status;
+      const payment = rows[0];
 
-      // ✅ Chỉ gửi "pending", "paid" hoặc "rejected"
-      if (!["pending", "pending_review", "paid", "rejected"].includes(status)) {
-        return;
-      }
+      // Chỉ gửi trạng thái hợp lệ
+      const validStatuses = ["pending", "pending_review", "paid", "rejected"];
+      if (!validStatuses.includes(payment.status)) return;
 
-      res.write(`data: ${JSON.stringify({ status })}\n\n`);
-
-      if (status === "paid" || status === "rejected") {
-        clearInterval(intervalId);
-        res.end();
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const intervalId = setInterval(sendStatus, 2000);
-  sendStatus(); // gửi ngay lần đầu
-});
-
-// =====================================================
-// PAYMENT STATUS STREAM (SSE) - gửi liên tục trạng thái
-// =====================================================
-router.get("/payment-stream/:id", async (req, res) => {
-  const paymentId = req.params.id;
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  const sendStatus = async () => {
-    try {
-      const [rows] = await db.query(
-        "SELECT status FROM payments WHERE id = ?",
-        [paymentId]
+      res.write(
+        `data: ${JSON.stringify({
+          status: payment.status,
+          approvedByAdmin: payment.approved_by_admin === 1
+        })}\n\n`
       );
 
-      if (!rows.length) {
-        res.write(`data: ${JSON.stringify({ status: "not_found" })}\n\n`);
-        return;
-      }
-
-      const status = rows[0].status;
-      res.write(`data: ${JSON.stringify({ status })}\n\n`);
-
-      if (status === "paid" || status === "rejected") {
+      // Nếu đã paid hoặc rejected thì dừng SSE
+      if (payment.status === "paid" || payment.status === "rejected") {
         clearInterval(intervalId);
         res.end();
       }
     } catch (err) {
-      console.error(err);
+      console.error("SSE ERROR:", err);
     }
   };
 
+  // gửi ngay lần đầu
+  sendStatus();
+
+  // polling mỗi 2 giây
   const intervalId = setInterval(sendStatus, 2000);
-  sendStatus(); // gửi ngay lần đầu
+
+  // cleanup khi client disconnect
+  req.on("close", () => {
+    clearInterval(intervalId);
+  });
 });
 
 module.exports = router;

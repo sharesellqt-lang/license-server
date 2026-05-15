@@ -180,6 +180,7 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
 await db.query(
   `UPDATE payments
    SET status = 'paid',
+       approved_by_admin = 1,
        paid_at = NOW()
    WHERE id = ?`,
   [paymentId]
