@@ -186,13 +186,17 @@ await db.query(
 );
 
     // 2. Update user plan
-    await db.query(
-      `UPDATE users
-       SET plan = ?,
-           plan_start_date = NOW()
-       WHERE id = ?`,
-      [payment.plan, payment.user_id]
-    );
+   const expireAt = new Date(
+  Date.now() + 30 * 24 * 60 * 60 * 1000
+);
+
+await db.query(
+  `UPDATE users
+   SET plan = ?,
+       expire_at = ?
+   WHERE id = ?`,
+  [payment.plan, expireAt, payment.user_id]
+);
 
     res.json({ success: true });
 
