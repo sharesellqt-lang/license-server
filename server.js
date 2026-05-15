@@ -3,70 +3,48 @@ require("dotenv").config();
 // =========================
 // IMPORT
 // =========================
-const express = require("express");
-const cors = require("cors");
-const jwt = require("jsonwebtoken");
-
-const usageRoutes = require("./routes/usage");
-const plansRoute = require("./routes/plans");
-const authRoutes = require("./routes/auth");
-const uploadBillRoutes = require("./routes/uploadBill");
-const adminPayment = require("./routes/adminPayment");
-
-const db = require("./db");
-
-const app = express();
-
 // =========================
-// MIDDLEWARE
-// =========================
-app.use(cors({
-  origin: [
-    "https://sharesell.net",
-    "http://localhost:3000"
-  ],
-  credentials: true
-}));
-
-// 🔥 parse json trước
-app.use(express.json());
-app.use(
-  "/uploads",
-  express.static("uploads")
-);
-//
-app.use(
-  "/api",
-  require("./routes/paymentHistory")
-);
-//
-app.use(
-  "/api/admin",
-  require("./routes/admin")
-);
-// =========================
-// ROUTES
+// ROUTES IMPORT
 // =========================
 const adminRoutes = require("./routes/admin");
 const paymentRoutes = require("./routes/payment");
 const userRoutes = require("./routes/user");
 const upgradeRoutes = require("./routes/upgrade");
 const webhookRoutes = require("./routes/webhook");
-const paymentHistoryRoutes = require("./routes/paymentHistory");
-const paymentStatusRoutes = require("./routes/paymentStatus");
+const paymentHistoryRoutes = require("./routes/paymenthistory");
+const paymentStatusRoutes = require("./routes/paymentstatus");
+const uploadBillRoutes = require("./routes/uploadBill");
+const usageRoutes = require("./routes/usage");
+const plansRoute = require("./routes/plans");
+const authRoutes = require("./routes/auth");
+const adminPaymentRoutes = require("./routes/adminPayment");
 
+// =========================
+// DEBUG
+// =========================
+console.log("paymentHistoryRoutes:", typeof paymentHistoryRoutes);
+console.log("paymentStatusRoutes:", typeof paymentStatusRoutes);
+console.log("uploadBillRoutes:", typeof uploadBillRoutes);
+
+// =========================
+// ROUTES USE
+// =========================
 app.use("/api/admin", adminRoutes);
+app.use("/api/admin", adminPaymentRoutes);
+
 app.use("/api", paymentRoutes);
+app.use("/api", paymentHistoryRoutes);
+app.use("/api", paymentStatusRoutes);
 app.use("/api", uploadBillRoutes);
+
 app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
 app.use("/api", webhookRoutes);
 app.use("/api", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
-app.use("/api/admin", adminPayment);
+
 app.use("/uploads", express.static("uploads"));
-app.use("/api", paymentStatusRoutes);
 app.use("/assets", express.static("assets"));
 
 // =========================
