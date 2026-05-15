@@ -215,7 +215,8 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     // 1. Cập nhật trạng thái payment
 await db.query(
   `UPDATE payments
-   SET status = 'approved',
+   SET status = 'paid',
+       approved_by_admin = 1,
        paid_at = NOW()
    WHERE id = ?`,
   [paymentId]
@@ -246,6 +247,7 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
     await db.query(`
       UPDATE payments
       SET status = 'rejected'
+      approved_by_admin = 0
       WHERE id = ?
     `, [paymentId]);
 
