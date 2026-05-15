@@ -57,17 +57,13 @@ const paymentStatusRoutes = require("./routes/paymentStatus");
 
 app.use("/api/admin", adminRoutes);
 app.use("/api", paymentRoutes);
-app.use(
-  "/api",
-  require("./routes/uploadBill")
-);
+app.use("/api", uploadBillRoutes);
 app.use("/api", userRoutes);
 app.use("/api", upgradeRoutes);
 app.use("/api", webhookRoutes);
 app.use("/api", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
-app.use("/api", uploadBillRoutes);
 app.use("/api/admin", adminPayment);
 app.use("/uploads", express.static("uploads"));
 app.use("/api", paymentStatusRoutes);
