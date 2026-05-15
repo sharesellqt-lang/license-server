@@ -9,6 +9,42 @@ const jwt = require("jsonwebtoken");
 // ==============================
 const SECRET = process.env.JWT_SECRET || "supersecret";
 
+function generateToken(adminId) {
+  return jwt.sign({ id: adminId }, SECRET, { expiresIn: '7d' });
+}
+
+// =====================================
+// ADMIN LOGIN ROUTE
+// =====================================
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const [rows] = await db.query(
+      "SELECT * FROM admin WHERE username = ?", 
+      [username]
+    );
+
+    if (!rows.length) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    const admin = rows[0];
+
+    const match = await bcrypt.compare(password, admin.password_hash);
+    if (!match) {
+      return res.status(401).json({ success: false, message: "Invalid credentials" });
+    }
+
+    const token = generateToken(admin.id);
+    res.json({ success: true, token });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Login failed" });
+  }
+});
+
 // =====================================
 // Các route admin khác: users, payments, set-plan, stats...
 // =====================================
@@ -177,13 +213,13 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     if (!payment) return res.status(404).json({ error: "Not found" });
 
     // 1. Cập nhật trạng thái payment
-await db.query(
-  `UPDATE payments
-   SET status = 'paid',
-       paid_at = NOW()
-   WHERE id = ?`,
-  [paymentId]
-);
+    await db.query(
+      `UPDATE payments
+       SET status = 'paid',
+           paid_at = NOW()
+       WHERE id = ?`,
+      [paymentId]
+    );
 
     // 2. Update user plan
     await db.query(
@@ -208,10 +244,10 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
     const paymentId = req.params.id;
 
     await db.query(`
-  UPDATE payments
-  SET status = 'rejected'
-  WHERE id = ?
-`, [paymentId]);
+      UPDATE payments
+      SET status = 'rejected'
+      WHERE id = ?
+    `, [paymentId]);
 
     res.json({ success: true });
 
