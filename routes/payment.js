@@ -110,22 +110,18 @@ console.log("AMOUNT:", amount);
       });
     }
 
-    // =========================
-    // 3. CREATE PAYMENT
-    // =========================
-    const [result] = await db.query(`
-      INSERT INTO payments
-      (user_id, plan, amount, method, status)
-      VALUES (?, ?, ?, ?, ?)
-    `, [
-      req.user.id,
-      planKey,
-      amount,
-      "bank",
-      "pending"
-    ]);
-
-    const paymentId = result.insertId;
+  const [result] = await db.query(`
+  INSERT INTO payments
+  (user_id, plan, amount, method, status, approved_by_admin)
+  VALUES (?, ?, ?, ?, ?, ?)
+`, [
+  req.user.id,
+  planKey,
+  amount,
+  "bank",
+  "pending_review",
+  0
+]);
 
     // =========================
     // 4. NOTE
