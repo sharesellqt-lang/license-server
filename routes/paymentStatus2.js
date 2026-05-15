@@ -43,9 +43,7 @@ router.get("/payment-status/:id", async (req, res) => {
   }
 });
 
-// =====================================================
-// PAYMENT STATUS STREAM (SSE) - gửi liên tục trạng thái
-// =====================================================
+// SSE để gửi trạng thái payment theo thời gian thực
 router.get("/payment-stream/:id", async (req, res) => {
   const paymentId = req.params.id;
 
@@ -68,10 +66,14 @@ router.get("/payment-stream/:id", async (req, res) => {
       const status = rows[0].status;
       res.write(`data: ${JSON.stringify({ status })}\n\n`);
 
-      if (status === "paid" || status === "rejected") {
-        clearInterval(intervalId);
-        res.end();
-      }
+     if (status === "paid" || status === "rejected") {
+  res.write(`data: ${JSON.stringify({ status })}\n\n`);
+  // delay đóng stream để client nhận chắc chắn
+  setTimeout(() => {
+    clearInterval(intervalId);
+    res.end();
+  }, 1000);
+}
     } catch (err) {
       console.error(err);
     }
