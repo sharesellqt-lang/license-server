@@ -180,7 +180,6 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
 await db.query(
   `UPDATE payments
    SET status = 'paid',
-       approved_by_admin = 1,
        paid_at = NOW()
    WHERE id = ?`,
   [paymentId]
@@ -209,11 +208,10 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
     const paymentId = req.params.id;
 
     await db.query(`
-      UPDATE payments
-      SET status = 'rejected'
-      approved_by_admin = 0,
-      WHERE id = ?
-    `, [paymentId]);
+  UPDATE payments
+  SET status = 'rejected'
+  WHERE id = ?
+`, [paymentId]);
 
     res.json({ success: true });
 
