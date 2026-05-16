@@ -29,6 +29,7 @@ router.get("/payment-stream/:id", async (req, res) => {
       }
 
       const payment = rows[0];
+      console.log("SSE PAYMENT:", payment);
 
       // Chỉ gửi các status hợp lệ
       if (!["pending", "pending_review", "paid", "rejected"].includes(payment.status)) {
