@@ -10,44 +10,34 @@ router.get("/payment-stream/:id", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   const sendStatus = async () => {
-    try {
-      const [rows] = await db.query(
-        "SELECT status, approved_by_admin FROM payments WHERE id = ?",
-        [paymentId]
-      );
+  try {
+    // Lấy lại từ DB mới nhất
+    const [rows] = await db.query(
+      "SELECT status, approved_by_admin FROM payments WHERE id = ?",
+      [paymentId]
+    );
+    if (!rows.length) return;
 
-      if (!rows.length) {
-        res.write(`data: ${JSON.stringify({ status: "not_found" })}\n\n`);
-        clearInterval(intervalId);
-        res.end();
-        return;
-      }
+    const payment = rows[0];
+    const approvedByAdmin = payment.approved_by_admin === 1;
 
-      const payment = rows[0];
+    console.log("SSE send:", payment.status, approvedByAdmin);
 
-      // Chỉ gửi các status hợp lệ
-      if (!["pending", "pending_review", "paid", "rejected"].includes(payment.status)) {
-        return;
-      }
+    res.write(`data: ${JSON.stringify({
+      status: payment.status,
+      approvedByAdmin
+    })}\n\n`);
 
-      const approvedByAdmin = payment.approved_by_admin === 1;
-
-      // Gửi SSE
-      res.write(`data: ${JSON.stringify({
-        status: payment.status,
-        approvedByAdmin
-      })}\n\n`);
-
-      // Chỉ đóng SSE khi thực sự xong
-      if ((payment.status === "paid" && approvedByAdmin) || payment.status === "rejected") {
-        clearInterval(intervalId);
-        res.end();
-      }
-
-    } catch (err) {
-      console.error("SSE ERROR:", err);
+    // Đóng SSE chỉ khi approved hoặc rejected
+    if ((payment.status === "paid" && approvedByAdmin) || payment.status === "rejected") {
+      clearInterval(intervalId);
+      res.end();
     }
-  };
+
+  } catch (err) {
+    console.error("SSE ERROR:", err);
+  }
+};
 
   const intervalId = setInterval(sendStatus, 2000);
   sendStatus(); // gửi ngay lần đầu
