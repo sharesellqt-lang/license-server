@@ -2,18 +2,13 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// =====================================================
-// PAYMENT STREAM SSE - lắng nghe trạng thái payment
-// =====================================================
 router.get("/payment-stream/:id", async (req, res) => {
   const paymentId = req.params.id;
 
-  // Cấu hình SSE
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
-  // Hàm gửi trạng thái payment
   const sendStatus = async () => {
     try {
       const [rows] = await db.query(
@@ -35,26 +30,27 @@ router.get("/payment-stream/:id", async (req, res) => {
         return;
       }
 
-      // Gửi SSE, kèm approvedByAdmin
+      const approvedByAdmin = payment.approved_by_admin === 1;
+
+      // Gửi SSE
       res.write(`data: ${JSON.stringify({
         status: payment.status,
-        approvedByAdmin: payment.approved_by_admin === 1
+        approvedByAdmin
       })}\n\n`);
 
-      // Nếu payment đã xong (paid hoặc rejected) -> đóng SSE
-      if (payment.status === "paid" || payment.status === "rejected") {
+      // Chỉ đóng SSE khi thực sự xong
+      if ((payment.status === "paid" && approvedByAdmin) || payment.status === "rejected") {
         clearInterval(intervalId);
         res.end();
       }
+
     } catch (err) {
       console.error("SSE ERROR:", err);
     }
   };
 
   const intervalId = setInterval(sendStatus, 2000);
-
-  // Gửi ngay lần đầu
-  sendStatus();
+  sendStatus(); // gửi ngay lần đầu
 });
 
 module.exports = router;
