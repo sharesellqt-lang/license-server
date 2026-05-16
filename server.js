@@ -11,7 +11,7 @@ const usageRoutes = require("./routes/usage");
 const plansRoute = require("./routes/plans");
 const authRoutes = require("./routes/auth");
 const uploadBillRoutes = require("./routes/uploadBill");
-const adminPayment = require("./routes/adminPayment");
+//const adminPayment = require("./routes/adminPayment");
 
 const db = require("./db");
 
@@ -68,7 +68,7 @@ app.use("/api", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
 app.use("/api", uploadBillRoutes);
-app.use("/api/admin", adminPayment);
+//app.use("/api/admin", adminPayment);
 app.use("/uploads", express.static("uploads"));
 app.use("/api", paymentStatusRoutes);
 app.use("/assets", express.static("assets"));
