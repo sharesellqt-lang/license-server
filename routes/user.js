@@ -24,11 +24,11 @@ router.get("/me", auth, async (req, res) => {
       planStartDate = new Date(req.user.created_at);
     }
 
-    return res.json({
+   return res.json({
   id: req.user.id,
   plan: req.user.plan || "free",
   licensed: req.user.plan !== "free",
-  planStartDate: req.user.planStartDate || req.user.created_at,
+  planStartDate: planStartDate,   // ← dùng biến vừa tính
   expireAt: req.user.expire_at
 });
   } catch (err) {
