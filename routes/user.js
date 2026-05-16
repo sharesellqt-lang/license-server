@@ -25,13 +25,36 @@ router.get("/me", auth, async (req, res) => {
     } else {
       planStartDate = new Date(user.created_at);
     }
+const now = Date.now();
 
-   return res.json({
-  id: req.user.id,
-  plan: req.user.plan || "free",
-  licensed: req.user.plan !== "free",
-  planStartDate: req.user.plan === "free" ? null : req.user.created_at,
-  expireAt: req.user.expire_at || null
+const expireAt = user.expire_at
+  ? new Date(user.expire_at)
+  : null;
+
+const isLicensed =
+  expireAt &&
+  expireAt.getTime() > now;
+
+const activePlan =
+  isLicensed
+    ? (user.plan || "free")
+    : "free";
+
+return res.json({
+  id: user.id,
+
+  // DB là source of truth
+  plan: activePlan,
+
+  licensed: !!isLicensed,
+
+  // dùng biến đã tính đúng
+  planStartDate:
+    activePlan === "free"
+      ? null
+      : planStartDate,
+
+  expireAt
 });
 
   } catch (err) {
