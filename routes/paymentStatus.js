@@ -23,10 +23,13 @@ router.get("/payment-stream/:id", async (req, res) => {
 
     console.log("SSE send:", payment.status, approvedByAdmin);
 
-    res.write(`data: ${JSON.stringify({
-      status: payment.status,
-      approvedByAdmin
-    })}\n\n`);
+   res.write(`data: ${JSON.stringify({
+  status: payment.status,
+  approvedByAdmin,
+  amount: payment.amount,
+  plan: payment.plan,
+  content: payment.content // hoặc note QR
+})}\n\n`);
 
     // Đóng SSE chỉ khi approved hoặc rejected
     if ((payment.status === "paid" && approvedByAdmin) || payment.status === "rejected") {
