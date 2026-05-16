@@ -27,12 +27,12 @@ router.get("/me", auth, async (req, res) => {
     }
 
     return res.json({
-      id: user.id,
-      plan: planKey,
-      licensed: planKey !== "free",
-      planStartDate,
-      expireAt: user.expire_at
-    });
+  id: user.id,
+  plan: planKey,
+  licensed: planKey !== "free",
+  planStartDate: planStartDate.toISOString(), // Bắt buộc ISO
+  expireAt: user.expire_at
+});
 
   } catch (err) {
     console.error("Error in /me:", err);
