@@ -27,11 +27,11 @@ router.get("/me", auth, async (req, res) => {
     }
 
     return res.json({
-  id: user.id,
-  plan: planKey,
-  licensed: planKey !== "free",
-  planStartDate: planStartDate.toISOString(), // Bắt buộc ISO
-  expireAt: user.expire_at
+  id: req.user.id,
+  plan: req.user.plan || "free",
+  licensed: req.user.plan !== "free",
+  planStartDate: req.user.plan === "free" ? null : req.user.created_at,
+  expireAt: req.user.expire_at || null
 });
 
   } catch (err) {
