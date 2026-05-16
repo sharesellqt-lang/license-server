@@ -453,8 +453,9 @@ console.log(req.user);
 
     const userId = req.user.id;
 
+   // 🔥 CHECK USER PLAN MỚI
     const [rows] = await db.execute(
-      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+      "SELECT plan, expire_at FROM users WHERE id=? LIMIT 1",
       [userId]
     );
 
@@ -462,9 +463,18 @@ console.log(req.user);
       return res.json({ error: "NO_LICENSE" });
     }
 
-    const lic = rows[0];
+    const user = rows[0];
 
-    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
+    // FREE = không có quyền
+    if (!user.plan || user.plan === "free") {
+      return res.json({ error: "NO_LICENSE" });
+    }
+
+    // hết hạn
+    if (
+      user.expire_at &&
+      new Date() > new Date(user.expire_at)
+    ) {
       return res.json({ error: "EXPIRED" });
     }
 
@@ -507,66 +517,68 @@ console.error("🔥 RAW ERROR:", JSON.stringify(err, Object.getOwnPropertyNames(
 // ME (USER INFO)
 // =========================
 app.get("/me", authMiddleware, async (req, res) => {
+
   try {
 
-    const userId = req.user.id || req.user.id;
-
-    // 🔍 lấy license mới nhất của user
     const [rows] = await db.execute(
-      `SELECT plan, expireAt, valid 
-       FROM licenses 
-       WHERE user_id=? 
-       ORDER BY id DESC 
-       LIMIT 1`,
-      [userId]
+      `
+      SELECT 
+        id,
+        plan,
+        created_at,
+        expire_at
+      FROM users
+      WHERE id=?
+      LIMIT 1
+      `,
+      [req.user.id]
     );
 
-    // ❌ chưa có license
-    if (rows.length === 0) {
-      return res.json({
-        userId,
-        licensed: false,
-        plan: "free",
-        expireAt: null
+    if (!rows.length) {
+
+      return res.status(404).json({
+        error: "USER_NOT_FOUND"
       });
     }
 
-    const lic = rows[0];
+    const user = rows[0];
 
-    // ❌ license không hợp lệ
-    if (lic.valid !== 1) {
-      return res.json({
-        userId,
-        licensed: false,
-        plan: "free",
-        expireAt: lic.expireAt || null
-      });
+    // 🔥 FREE nếu hết hạn
+    let plan = user.plan || "free";
+
+    if (
+      user.expire_at &&
+      new Date() > new Date(user.expire_at)
+    ) {
+      plan = "free";
     }
 
-    // ❌ hết hạn
-    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
-      return res.json({
-        userId,
-        licensed: false,
-        plan: "free",
-        expireAt: lic.expireAt
-      });
-    }
-
-    // ✅ hợp lệ
     return res.json({
-      userId,
-      licensed: true,
-      plan: lic.plan || "free",
-      expireAt: lic.expireAt || null
+
+      id: user.id,
+
+      licensed: plan !== "free",
+
+      plan: plan,
+
+      planStartDate:
+        plan !== "free"
+          ? user.created_at
+          : null,
+
+      expireAt:
+        user.expire_at || null
     });
 
   } catch (err) {
+
     console.log("ME ERROR:", err);
-    res.status(500).json({ error: "SERVER_ERROR" });
+
+    res.status(500).json({
+      error: "SERVER_ERROR"
+    });
   }
 });
-
 // =========================
 // CHECK (LIMIT)
 // =========================
@@ -744,13 +756,6 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
     console.log(err);
     res.json({ success: false });
   }
-});
-
-app.get("/api/me", (req, res) => {
-  res.json({
-    plan: "free",
-    licensed: false
-  });
 });
 
 // =========================
