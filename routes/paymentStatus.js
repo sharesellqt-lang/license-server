@@ -2,48 +2,59 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+// =====================================================
+// PAYMENT STREAM SSE - lắng nghe trạng thái payment
+// =====================================================
 router.get("/payment-stream/:id", async (req, res) => {
   const paymentId = req.params.id;
 
+  // Cấu hình SSE
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
+  // Hàm gửi trạng thái payment
   const sendStatus = async () => {
-  try {
-    // Lấy lại từ DB mới nhất
-    const [rows] = await db.query(
-      "SELECT status, approved_by_admin FROM payments WHERE id = ?",
-      [paymentId]
-    );
-    if (!rows.length) return;
+    try {
+      const [rows] = await db.query(
+        "SELECT status, approved_by_admin FROM payments WHERE id = ?",
+        [paymentId]
+      );
 
-    const payment = rows[0];
-    const approvedByAdmin = payment.approved_by_admin === 1;
+      if (!rows.length) {
+        res.write(`data: ${JSON.stringify({ status: "not_found" })}\n\n`);
+        clearInterval(intervalId);
+        res.end();
+        return;
+      }
 
-    console.log("SSE send:", payment.status, approvedByAdmin);
+      const payment = rows[0];
 
-   res.write(`data: ${JSON.stringify({
-  status: payment.status,
-  approvedByAdmin,
-  amount: payment.amount,
-  plan: payment.plan,
-  content: payment.content // hoặc note QR
-})}\n\n`);
+      // Chỉ gửi các status hợp lệ
+      if (!["pending", "pending_review", "paid", "rejected"].includes(payment.status)) {
+        return;
+      }
 
-    // Đóng SSE chỉ khi approved hoặc rejected
-    if ((payment.status === "paid" && approvedByAdmin) || payment.status === "rejected") {
-      clearInterval(intervalId);
-      res.end();
+      // Gửi SSE, kèm approvedByAdmin
+      res.write(`data: ${JSON.stringify({
+        status: payment.status,
+        approvedByAdmin: payment.approved_by_admin === 1
+      })}\n\n`);
+
+      // Nếu payment đã xong (paid hoặc rejected) -> đóng SSE
+      if (payment.status === "paid" || payment.status === "rejected") {
+        clearInterval(intervalId);
+        res.end();
+      }
+    } catch (err) {
+      console.error("SSE ERROR:", err);
     }
-
-  } catch (err) {
-    console.error("SSE ERROR:", err);
-  }
-};
+  };
 
   const intervalId = setInterval(sendStatus, 2000);
-  sendStatus(); // gửi ngay lần đầu
+
+  // Gửi ngay lần đầu
+  sendStatus();
 });
 
 module.exports = router;
