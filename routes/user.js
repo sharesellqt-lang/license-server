@@ -25,13 +25,12 @@ router.get("/me", auth, async (req, res) => {
     }
 
     return res.json({
-      id: req.user.id,
-      email: req.user.email,
-      plan: plan,
-      licensed: plan !== "free",
-      planStartDate: planStartDate.toISOString(),
-      expireAt: req.user.expire_at
-    });
+  id: req.user.id,
+  plan: req.user.plan || "free",
+  licensed: req.user.plan !== "free",
+  planStartDate: req.user.planStartDate || req.user.created_at,
+  expireAt: req.user.expire_at
+});
   } catch (err) {
     console.error("Error in /me:", err);
     return res.status(500).json({ error: "Failed to fetch user info" });
