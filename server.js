@@ -706,9 +706,9 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     if (question.length > 200)
       return res.json({ success: false, msg: "Q max 200 ký tự" });
 
-    // 🔥 CHECK LICENSE
+    // 🔥 CHECK USER (FIX: bỏ expireAt vì DB không có)
     const [userRows] = await db.execute(
-      "SELECT plan, expireAt FROM users WHERE id=?",
+      "SELECT plan FROM users WHERE id=?",
       [userId]
     );
 
@@ -718,33 +718,32 @@ app.post("/api/save", authMiddleware, async (req, res) => {
       return res.json({ success: false, msg: "User không tồn tại" });
     }
 
-    // 🔥 CHUYỂN SANG PLAN SYSTEM
+    // 🔥 PLAN CHECK (giữ nguyên logic)
     const plan = user.plan;
 
     if (!plan || plan === "free") {
       return res.json({ success: false, msg: "Bạn chưa nâng cấp plan" });
     }
 
-    // optional expire check
-    if (user.expireAt && new Date() > new Date(user.expireAt)) {
-      return res.json({ success: false, msg: "Plan đã hết hạn" });
-    }
+    // ❌ REMOVED: expireAt check (gây crash vì DB không có cột này)
 
+    // =========================
     // ✅ SAVE
+    // =========================
     const normalized = normalize(question);
 
-await db.execute(
-  `INSERT INTO qa_data 
-   (question, answer, searchText, user_id, user_plan)
-   VALUES (?, ?, ?, ?, ?)`,
-  [
-    question ?? null,
-    answer ?? null,
-    normalized,
-    userId ?? null,
-    user.plan ?? null
-  ]
-);
+    await db.execute(
+      `INSERT INTO qa_data 
+       (question, answer, searchText, user_id, user_plan)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        question ?? null,
+        answer ?? null,
+        normalized,
+        userId ?? null,
+        user.plan ?? null
+      ]
+    );
 
     res.json({ success: true });
 
