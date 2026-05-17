@@ -179,8 +179,6 @@ app.post("/auth/google", async (req, res) => {
 // =========================
 // AUTH MIDDLEWARE
 // =========================
-const jwt = require("jsonwebtoken"); // ✅ FIX thiếu import
-
 function authMiddleware(req, res, next) {
 
   const authHeader = req.headers.authorization;
