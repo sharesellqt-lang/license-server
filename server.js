@@ -179,6 +179,8 @@ app.post("/auth/google", async (req, res) => {
 // =========================
 // AUTH MIDDLEWARE
 // =========================
+const jwt = require("jsonwebtoken"); // ✅ FIX thiếu import
+
 function authMiddleware(req, res, next) {
 
   const authHeader = req.headers.authorization;
@@ -206,10 +208,11 @@ require("./jobs/bankScan");
 
 
 // =========================
-// REDEEM KEY
+// REDEEM KEY (FIX SAFE - PLAN INTEGRATION)
 // =========================
 app.post("/redeem", authMiddleware, async (req, res) => {
   try {
+
     const { key } = req.body;
     const userId = req.user.id;
 
@@ -217,7 +220,7 @@ app.post("/redeem", authMiddleware, async (req, res) => {
       return res.json({ success: false, msg: "MISSING_KEY" });
     }
 
-    // 🔍 tìm key cũ
+    // 🔍 tìm key
     const [rows] = await db.execute(
       "SELECT * FROM licenses WHERE `key`=?",
       [key]
@@ -229,17 +232,24 @@ app.post("/redeem", authMiddleware, async (req, res) => {
 
     const lic = rows[0];
 
-    if (!lic.valid) {
+    // ❌ KEY đã dùng
+    if (lic.user_id) {
       return res.json({ success: false, msg: "KEY_USED" });
     }
 
-    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
-      return res.json({ success: false, msg: "EXPIRED" });
-    }
+    // =========================
+    // 🔥 APPLY PLAN (KHÔNG HARD CODE)
+    // =========================
+    const planToApply = lic.plan || "pro";
 
-    // 🔥 GẮN KEY VÀO USER
     await db.execute(
-      "UPDATE licenses SET user_id=?, valid=1 WHERE id=?",
+      "UPDATE users SET plan=? WHERE id=?",
+      [planToApply, userId]
+    );
+
+    // 🔒 mark key used
+    await db.execute(
+      "UPDATE licenses SET user_id=? WHERE id=?",
       [userId, lic.id]
     );
 
