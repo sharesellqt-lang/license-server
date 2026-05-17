@@ -29,6 +29,10 @@ router.get("/payment-stream/:id", async (req, res) => {
       }
 
       const payment = rows[0];
+
+      if (payment.status === "paid" && payment.approved_by_admin !== 1) {
+      return; // chặn fake paid
+      }
       console.log("SSE PAYMENT:", payment);
 
       // Chỉ gửi các status hợp lệ

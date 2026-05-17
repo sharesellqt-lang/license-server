@@ -697,19 +697,27 @@ app.post("/api/save", authMiddleware, async (req, res) => {
       return res.json({ success: false, msg: "Q max 200 ký tự" });
 
     // 🔥 CHECK LICENSE
-    const [rows] = await db.execute(
-      "SELECT * FROM licenses WHERE user_id=? AND valid=1",
+    const [userRows] = await db.execute(
+      "SELECT plan, expireAt FROM users WHERE id=?",
       [userId]
     );
 
-    if (rows.length === 0) {
-      return res.json({ success: false, msg: "Bạn chưa kích hoạt key" });
+    const user = userRows[0];
+
+    if (!user) {
+      return res.json({ success: false, msg: "User không tồn tại" });
     }
 
-    const lic = rows[0];
+    // 🔥 CHUYỂN SANG PLAN SYSTEM
+    const plan = user.plan;
 
-    if (lic.expireAt && new Date() > new Date(lic.expireAt)) {
-      return res.json({ success: false, msg: "Key đã hết hạn" });
+    if (!plan || plan === "free") {
+      return res.json({ success: false, msg: "Bạn chưa nâng cấp plan" });
+    }
+
+    // optional expire check
+    if (user.expireAt && new Date() > new Date(user.expireAt)) {
+      return res.json({ success: false, msg: "Plan đã hết hạn" });
     }
 
     // ✅ SAVE
