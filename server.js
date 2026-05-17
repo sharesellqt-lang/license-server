@@ -721,15 +721,20 @@ app.post("/api/save", authMiddleware, async (req, res) => {
     }
 
     // ✅ SAVE
-    await db.execute(
-      "INSERT INTO qa_data (question, answer, searchText, user_id) VALUES (?, ?, ?, ?)",
-      [
-        question ?? null,
-        answer ?? null,
-        normalize(question ?? ""),
-        userId ?? null
-      ]
-    );
+    const normalized = normalize(question);
+
+await db.execute(
+  `INSERT INTO qa_data 
+   (question, answer, searchText, user_id, user_plan)
+   VALUES (?, ?, ?, ?, ?)`,
+  [
+    question ?? null,
+    answer ?? null,
+    normalized,
+    userId ?? null,
+    user.plan ?? null
+  ]
+);
 
     res.json({ success: true });
 
