@@ -155,10 +155,6 @@ app.post("/auth/google", async (req, res) => {
     const email = payload.email;
     const googleId = payload.sub;
 
-    // 🔒 BLOCK SPAM EMAIL DOMAIN
-const email = payload.email;
-const googleId = payload.sub;
-
     // 🔥 BLOCK SPAM CHECK (1 block duy nhất)
     const emailLower = email.toLowerCase();
 
