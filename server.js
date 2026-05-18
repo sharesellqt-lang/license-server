@@ -580,7 +580,7 @@ app.get("/me", authMiddleware, async (req, res) => {
     const user = rows[0];
 
     // 🔥 FREE nếu hết hạn
-    let plan = user.plan || "free";
+    let plan = String(user.plan || "free").trim().toLowerCase();
 
     if (
       user.expire_at &&
