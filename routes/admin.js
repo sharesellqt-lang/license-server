@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require("../db"); // Kết nối MySQL
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { PLANS } = require("./plans");
 
 // ==============================
 // JWT TOKEN GENERATOR
@@ -165,61 +164,45 @@ router.get(
 
 // APPROVE PAYMENT
 router.post("/payments/:id/approve", adminAuth, async (req, res) => {
-  const paymentId = req.params.id;
-
   try {
-    console.log("👉 APPROVE START:", paymentId);
+    const paymentId = req.params.id;
 
+    // Lấy payment
     const [rows] = await db.query(
       "SELECT * FROM payments WHERE id = ?",
       [paymentId]
     );
 
-    if (!rows.length) {
-      console.log("❌ PAYMENT NOT FOUND");
-      return res.status(404).json({ error: "Not found" });
-    }
-
     const payment = rows[0];
-    console.log("PAYMENT:", payment);
+    if (!payment) return res.status(404).json({ error: "Not found" });
 
-    const { PLANS } = require("../plans");
-    const planData = PLANS[payment.plan];
+    // 1. Cập nhật trạng thái payment
+await db.query(
+  `UPDATE payments
+   SET status = 'paid',
+       approved_by_admin = 1,
+       paid_at = NOW()
+   WHERE id = ?`,
+  [paymentId]
+);
 
-    if (!planData) {
-      console.log("❌ INVALID PLAN:", payment.plan);
-      return res.status(400).json({ error: "Invalid plan" });
-    }
+    // 2. Update user plan
+   const expireAt = new Date(
+  Date.now() + 30 * 24 * 60 * 60 * 1000
+);
 
-    const cycle = req.body.cycle || "month";
-
-    const days =
-      cycle === "year"
-        ? planData.durationDays * 12
-        : planData.durationDays;
-
-    const expireAt = new Date(
-      Date.now() + days * 24 * 60 * 60 * 1000
-    );
-
-    console.log("➡️ EXPIRE:", expireAt);
-
-    await db.query(
-      `UPDATE payments SET status='paid', approved_by_admin=1, paid_at=NOW() WHERE id=?`,
-      [paymentId]
-    );
-
-    await db.query(
-      `UPDATE users SET plan=?, expire_at=? WHERE id=?`,
-      [payment.plan, expireAt, payment.user_id]
-    );
-
-    console.log("✅ APPROVE SUCCESS");
+await db.query(
+  `UPDATE users
+   SET plan = ?,
+       expire_at = ?
+   WHERE id = ?`,
+  [payment.plan, expireAt, payment.user_id]
+);
 
     res.json({ success: true });
 
   } catch (err) {
-    console.error("🔥 APPROVE ERROR:", err);
+    console.error(err);
     res.status(500).json({ error: "Approve failed" });
   }
 });
@@ -248,37 +231,30 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
 // =====================================
 router.post(
   "/set-plan",
+
   adminAuth,
+
   async (req, res) => {
+
     try {
-      const { userId, plan } = req.body;
 
-      if (!userId || !plan) {
-        return res.status(400).json({
-          error: "Missing userId or plan"
-        });
-      }
+      const {
+        userId,
+        plan,
+        days
+      } = req.body;
 
-      // load plan config (source of truth)
-      const planData = require("../plans").PLANS[plan];
-
-      if (!planData) {
-        return res.status(400).json({
-          error: "Invalid plan"
-        });
-      }
-
-      // duration chuẩn từ PLANS
-      const cycle = payment.cycle || "month";
-
-      const days =
-      cycle === "year"
-    ? planData.durationDays * 12
-    : planData.durationDays;
-
-      const expireAt = new Date(
-        Date.now() + days * 24 * 60 * 60 * 1000
-      );
+      const expireAt =
+        new Date(
+          Date.now() +
+          (
+            Number(days || 30)
+            * 24
+            * 60
+            * 60
+            * 1000
+          )
+        );
 
       await db.query(
         `
@@ -288,21 +264,28 @@ router.post(
           expire_at = ?
         WHERE id = ?
         `,
-        [plan, expireAt, userId]
+        [
+          plan,
+          expireAt,
+          userId
+        ]
       );
 
       return res.json({
-        success: true,
-        plan,
-        expireAt
+        success: true
       });
 
     } catch (err) {
+
       console.error(err);
+
       return res.status(500).json({
-        error: "Set plan failed"
+        error:
+          "Set plan failed"
       });
+
     }
+
   }
 );
 
