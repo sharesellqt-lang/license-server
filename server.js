@@ -155,6 +155,34 @@ app.post("/auth/google", async (req, res) => {
     const email = payload.email;
     const googleId = payload.sub;
 
+   // 🔥 BLOCK SPAM CHECK (1 block duy nhất)
+    const emailLower = email.toLowerCase();
+
+    const blockedKeywords = [
+      "blogspot",
+      "btc",
+      "binance",
+      "mining"
+    ];
+
+    const domain = emailLower.split("@")[1];
+
+    const blockedDomains = [
+      "blogspot.com",
+      "blogspot.cz",
+      "blogspot.de",
+      "blogspot.dk"
+    ];
+
+    if (
+      blockedKeywords.some(k => emailLower.includes(k)) ||
+      blockedDomains.includes(domain)
+    ) {
+      return res.status(403).json({
+        error: "BLOCKED_EMAIL"
+      });
+    }
+
     // 🔥 TODO: thay bằng MySQL của bạn
     let user = await findUserByEmail(email);
 
