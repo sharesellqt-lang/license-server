@@ -164,45 +164,58 @@ router.get(
 
 // APPROVE PAYMENT
 router.post("/payments/:id/approve", adminAuth, async (req, res) => {
-  try {
-    const paymentId = req.params.id;
+  const paymentId = req.params.id;
 
-    // Lấy payment
-    const [rows] = await db.query(
-      "SELECT * FROM payments WHERE id = ?",
+  const [rows] = await db.query(
+    "SELECT * FROM payments WHERE id = ?",
+    [paymentId]
+  );
+
+  const payment = rows[0];
+  if (!payment) {
+    return res.status(404).json({ error: "Not found" });
+  }
+
+  try {
+    await db.beginTransaction();
+
+    // 1. lấy plan config
+    const planData = require("../plans").PLANS[payment.plan];
+
+    const days =
+      payment.cycle === "year"
+        ? planData.durationDays * 12
+        : planData.durationDays;
+
+    const expireAt = new Date(
+      Date.now() + days * 24 * 60 * 60 * 1000
+    );
+
+    // 2. update payment
+    await db.query(
+      `UPDATE payments
+       SET status='paid',
+           approved_by_admin=1,
+           paid_at=NOW()
+       WHERE id=?`,
       [paymentId]
     );
 
-    const payment = rows[0];
-    if (!payment) return res.status(404).json({ error: "Not found" });
+    // 3. update user
+    await db.query(
+      `UPDATE users
+       SET plan=?,
+           expire_at=?
+       WHERE id=?`,
+      [payment.plan, expireAt, payment.user_id]
+    );
 
-    // 1. Cập nhật trạng thái payment
-await db.query(
-  `UPDATE payments
-   SET status = 'paid',
-       approved_by_admin = 1,
-       paid_at = NOW()
-   WHERE id = ?`,
-  [paymentId]
-);
-
-    // 2. Update user plan
-   const expireAt = new Date(
-  Date.now() + 30 * 24 * 60 * 60 * 1000
-);
-
-await db.query(
-  `UPDATE users
-   SET plan = ?,
-       expire_at = ?
-   WHERE id = ?`,
-  [payment.plan, expireAt, payment.user_id]
-);
+    await db.commit();
 
     res.json({ success: true });
 
   } catch (err) {
-    console.error(err);
+    await db.rollback();
     res.status(500).json({ error: "Approve failed" });
   }
 });
@@ -231,30 +244,32 @@ router.post("/payments/:id/reject", adminAuth, async (req, res) => {
 // =====================================
 router.post(
   "/set-plan",
-
   adminAuth,
-
   async (req, res) => {
-
     try {
+      const { userId, plan } = req.body;
 
-      const {
-        userId,
-        plan,
-        days
-      } = req.body;
+      if (!userId || !plan) {
+        return res.status(400).json({
+          error: "Missing userId or plan"
+        });
+      }
 
-      const expireAt =
-        new Date(
-          Date.now() +
-          (
-            Number(days || 30)
-            * 24
-            * 60
-            * 60
-            * 1000
-          )
-        );
+      // load plan config (source of truth)
+      const planData = require("../plans").PLANS[plan];
+
+      if (!planData) {
+        return res.status(400).json({
+          error: "Invalid plan"
+        });
+      }
+
+      // duration chuẩn từ PLANS
+      const days = planData.durationDays;
+
+      const expireAt = new Date(
+        Date.now() + days * 24 * 60 * 60 * 1000
+      );
 
       await db.query(
         `
@@ -264,28 +279,21 @@ router.post(
           expire_at = ?
         WHERE id = ?
         `,
-        [
-          plan,
-          expireAt,
-          userId
-        ]
+        [plan, expireAt, userId]
       );
 
       return res.json({
-        success: true
+        success: true,
+        plan,
+        expireAt
       });
 
     } catch (err) {
-
       console.error(err);
-
       return res.status(500).json({
-        error:
-          "Set plan failed"
+        error: "Set plan failed"
       });
-
     }
-
   }
 );
 
