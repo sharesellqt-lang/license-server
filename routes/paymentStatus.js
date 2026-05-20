@@ -40,10 +40,9 @@ router.get("/payment-stream/:id", async (req, res) => {
         return;
       }
 
-      res.write(`data: ${JSON.stringify({
-      status: payment.status,
-      approvedByAdmin: payment.approved_by_admin === 1
-      })}\n\n`);
+     res.write(`data: ${JSON.stringify({
+     status: payment.status
+     })}\n\n`);
 
       // Nếu payment đã xong (paid hoặc rejected) -> đóng SSE
       if (payment.status === "paid" || payment.status === "rejected") {

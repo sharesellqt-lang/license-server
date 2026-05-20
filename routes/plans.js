@@ -225,5 +225,36 @@ const status = "pending_review";
   res.json({ paymentId, status });
 });
 
+// =====================================================
+// SSE cập nhật thanh toán (giả lập) cho checkout.js
+// =====================================================
+router.get("/payment-stream/:paymentId", (req, res) => {
+  const { paymentId } = req.params;
+
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive"
+  });
+  res.flushHeaders();
+
+  const statuses = ["pending_review", "paid"];
+  let i = 0;
+
+  const interval = setInterval(() => {
+    if (i >= statuses.length) {
+      clearInterval(interval);
+      res.end();
+      return;
+    }
+
+    res.write(`data: ${JSON.stringify({ status: statuses[i] })}\n\n`);
+    i++;
+  }, 3000);
+
+  req.on("close", () => {
+    clearInterval(interval);
+  });
+});
 
 module.exports = router;

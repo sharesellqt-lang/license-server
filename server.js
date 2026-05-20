@@ -811,26 +811,6 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
 // =========================
 // START SERVER
 // =========================
-app.get("/ip", async (req, res) => {
-
-  try {
-
-    const response = await fetch("https://api.ipify.org?format=json");
-
-    const data = await response.json();
-
-    res.json(data);
-
-  } catch (err) {
-
-    res.json({
-      error: err.message
-    });
-
-  }
-
-});
-
 initDB().then(() => {
   app.listen(PORT, "0.0.0.0", () => {
     console.log("🚀 Server chạy port", PORT);
