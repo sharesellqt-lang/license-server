@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { PLANS, getPlan } = require("./plans.data");
 
 // =====================================================
 // PLAN DATA
@@ -220,9 +221,18 @@ router.get("/payment-status/:paymentId", (req, res) => {
   const { paymentId } = req.params;
 
   // Giả lập status ngẫu nhiên (frontend SSE/polling test)
-const status = "pending_review";
+const [rows] = await db.query(
+  "SELECT status FROM payments WHERE id = ?",
+  [paymentId]
+);
 
-  res.json({ paymentId, status });
+if (!rows.length) {
+  return res.status(404).json({ error: "Payment not found" });
+}
+
+res.json({
+  paymentId,
+  status: rows[0].status
 });
 
 // =====================================================

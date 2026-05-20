@@ -166,33 +166,41 @@ router.get(
 router.post("/payments/:id/approve", adminAuth, async (req, res) => {
   const paymentId = req.params.id;
 
-  const [rows] = await db.query(
-    "SELECT * FROM payments WHERE id = ?",
-    [paymentId]
-  );
-
-  const payment = rows[0];
-  if (!payment) {
-    return res.status(404).json({ error: "Not found" });
-  }
+  const conn = await db.getConnection();
 
   try {
-    await db.beginTransaction();
+    await conn.beginTransaction();
 
-    // 1. lấy plan config
-    const planData = require("../plans").PLANS[payment.plan];
-
-    const days =
-      payment.cycle === "year"
-        ? planData.durationDays * 12
-        : planData.durationDays;
-
-    const expireAt = new Date(
-      Date.now() + days * 24 * 60 * 60 * 1000
+    const [rows] = await conn.query(
+      "SELECT * FROM payments WHERE id = ?",
+      [paymentId]
     );
 
-    // 2. update payment
-    await db.query(
+    const payment = rows[0];
+    if (!payment) {
+      await conn.rollback();
+      return res.status(404).json({ error: "Not found" });
+    }
+
+    const { PLANS } = require("../plans");
+    const planData = PLANS[payment.plan];
+
+    if (!planData) {
+      await conn.rollback();
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    // ✔ FIX cycle (QUAN TRỌNG)
+    const cycle = payment.cycle || "month";
+
+    const multiplier = cycle === "year" ? 12 : 1;
+
+    const expireAt = new Date(
+    Date.now() + planData.durationDays * multiplier * 24 * 60 * 60 * 1000
+    );
+
+    // 1. update payment
+    await conn.query(
       `UPDATE payments
        SET status='paid',
            approved_by_admin=1,
@@ -201,8 +209,8 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
       [paymentId]
     );
 
-    // 3. update user
-    await db.query(
+    // 2. update user
+    await conn.query(
       `UPDATE users
        SET plan=?,
            expire_at=?
@@ -210,12 +218,16 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
       [payment.plan, expireAt, payment.user_id]
     );
 
-    await db.commit();
+    await conn.commit();
+    conn.release();
 
     res.json({ success: true });
 
   } catch (err) {
-    await db.rollback();
+    await conn.rollback();
+    conn.release();
+
+    console.error(err);
     res.status(500).json({ error: "Approve failed" });
   }
 });

@@ -117,6 +117,7 @@ console.log("AMOUNT:", amount);
 `, [
   req.user.id,
   planKey,
+  cycle,
   amount,
   "bank",
   "pending_review",
