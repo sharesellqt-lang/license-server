@@ -166,68 +166,59 @@ router.get(
 router.post("/payments/:id/approve", adminAuth, async (req, res) => {
   const paymentId = req.params.id;
 
-  const conn = await db.getConnection();
-
   try {
-    await conn.beginTransaction();
+    console.log("👉 APPROVE START:", paymentId);
 
-    const [rows] = await conn.query(
+    const [rows] = await db.query(
       "SELECT * FROM payments WHERE id = ?",
       [paymentId]
     );
 
-    const payment = rows[0];
-    if (!payment) {
-      await conn.rollback();
+    if (!rows.length) {
+      console.log("❌ PAYMENT NOT FOUND");
       return res.status(404).json({ error: "Not found" });
     }
+
+    const payment = rows[0];
+    console.log("PAYMENT:", payment);
 
     const { PLANS } = require("../plans");
     const planData = PLANS[payment.plan];
 
     if (!planData) {
-      await conn.rollback();
+      console.log("❌ INVALID PLAN:", payment.plan);
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    // ✔ FIX cycle (QUAN TRỌNG)
     const cycle = payment.cycle || "month";
 
-    const multiplier = cycle === "year" ? 12 : 1;
+    const days =
+      cycle === "year"
+        ? planData.durationDays * 12
+        : planData.durationDays;
 
     const expireAt = new Date(
-    Date.now() + planData.durationDays * multiplier * 24 * 60 * 60 * 1000
+      Date.now() + days * 24 * 60 * 60 * 1000
     );
 
-    // 1. update payment
-    await conn.query(
-      `UPDATE payments
-       SET status='paid',
-           approved_by_admin=1,
-           paid_at=NOW()
-       WHERE id=?`,
+    console.log("➡️ EXPIRE:", expireAt);
+
+    await db.query(
+      `UPDATE payments SET status='paid', approved_by_admin=1, paid_at=NOW() WHERE id=?`,
       [paymentId]
     );
 
-    // 2. update user
-    await conn.query(
-      `UPDATE users
-       SET plan=?,
-           expire_at=?
-       WHERE id=?`,
+    await db.query(
+      `UPDATE users SET plan=?, expire_at=? WHERE id=?`,
       [payment.plan, expireAt, payment.user_id]
     );
 
-    await conn.commit();
-    conn.release();
+    console.log("✅ APPROVE SUCCESS");
 
     res.json({ success: true });
 
   } catch (err) {
-    await conn.rollback();
-    conn.release();
-
-    console.error(err);
+    console.error("🔥 APPROVE ERROR:", err);
     res.status(500).json({ error: "Approve failed" });
   }
 });
@@ -277,7 +268,12 @@ router.post(
       }
 
       // duration chuẩn từ PLANS
-      const days = planData.durationDays;
+      const cycle = payment.cycle || "month";
+
+      const days =
+      cycle === "year"
+    ? planData.durationDays * 12
+    : planData.durationDays;
 
       const expireAt = new Date(
         Date.now() + days * 24 * 60 * 60 * 1000
