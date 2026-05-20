@@ -27,8 +27,12 @@ app.use(cors({
     "https://sharesell.net",
     "http://localhost:3000"
   ],
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+app.options("*", cors());
 
 // 🔥 parse json trước
 app.use(express.json());
