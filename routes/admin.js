@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require("../db"); // Kết nối MySQL
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { PLANS } = require("./plans");
 
 // ==============================
 // JWT TOKEN GENERATOR
@@ -190,7 +191,7 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    const cycle = payment.cycle || "month";
+    const cycle = req.body.cycle || "month";
 
     const days =
       cycle === "year"
