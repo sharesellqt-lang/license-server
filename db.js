@@ -4,7 +4,7 @@ const mysql = require("mysql2/promise");
 const db = mysql.createPool({
   host: "onehost-amdcloudhn022602.000nethost.com",
   user: "igoiiqkjhosting_bot-license",
-  password: "Chucaolamday@179",
+  password: "Kythuattoancau@179",
   database: "igoiiqkjhosting_bot-license"
 });
 
