@@ -563,6 +563,7 @@ app.get("/me", authMiddleware, async (req, res) => {
       SELECT 
         id,
         plan,
+	cycle,
         created_at,
         expire_at
       FROM users
