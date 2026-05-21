@@ -17,9 +17,15 @@ router.post("/upgrade", authMiddleware, async (req, res) => {
     if (!planData) return res.status(400).json({ error: "Plan not found" });
 
     // Tính expire_at = NOW + durationDays
-    const now = new Date();
-    const expireAt = new Date(now);
-    expireAt.setDate(now.getDate() + planData.durationDays);
+    const cycle = req.body.cycle || "month";
+
+const expireAt = new Date();
+
+if (cycle === "year") {
+  expireAt.setMonth(expireAt.getMonth() + 12);
+} else {
+  expireAt.setMonth(expireAt.getMonth() + 1);
+}
 
     // Cập nhật user: plan + expire_at
     await db.query(
@@ -27,7 +33,7 @@ router.post("/upgrade", authMiddleware, async (req, res) => {
       [plan, expireAt, req.user.id]
     );
 
-    res.json({ success: true, plan, expireAt });
+    res.json({ success: true, plan, cycle, expireAt });
   } catch (err) {
     console.log("UPGRADE ERROR:", err);
     res.status(500).json({ error: "Server error" });

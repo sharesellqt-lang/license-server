@@ -31,6 +31,21 @@ router.post(
       const plan =
         req.user.plan || "free";
 
+        const [userRows] = await db.query(
+      "SELECT plan, expire_at FROM users WHERE id = ?",
+        [req.user.id]
+      );
+
+      const user = userRows[0];
+      const isExpired = new Date(user.expire_at) < new Date();
+
+      if (isExpired) {
+        return res.json({
+          allowed: false,
+          error: "Plan expired"
+        });
+      }
+
       // 🔥 lấy limit theo tool
       const limit =
         plans[action]?.[plan];

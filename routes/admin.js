@@ -187,9 +187,17 @@ await db.query(
 );
 
     // 2. Update user plan
-   const expireAt = new Date(
-  Date.now() + 30 * 24 * 60 * 60 * 1000
+const cycle = payment.cycle || "month";
+
+let expireAt = new Date(
+  payment.current_expire_at || Date.now()
 );
+
+if (cycle === "year") {
+  expireAt.setMonth(expireAt.getMonth() + 12);
+} else {
+  expireAt.setMonth(expireAt.getMonth() + 1);
+}
 
 await db.query(
   `UPDATE users
