@@ -615,22 +615,24 @@ const daysLeft =
 
     return res.json({
 
-      id: user.id,
+  id: user.id,
 
-      licensed: plan !== "free",
+  licensed:
+    plan !== "free",
 
-      plan: plan,
+  isActive,
 
-      cycle: user.cycle || "month",
+  daysLeft,
 
-      planStartDate:
-        plan !== "free"
-          ? user.created_at
-          : null,
+  plan,
 
-      expireAt:
-        user.expire_at || null
-    });
+  cycle:
+    user.cycle || "month",
+
+  expireAt:
+    user.expire_at || null
+
+});
 
   } catch (err) {
 

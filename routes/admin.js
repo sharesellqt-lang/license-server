@@ -192,11 +192,18 @@ const cycle = payment.cycle || "month";
 let expireAt = new Date(
   payment.current_expire_at || Date.now()
 );
-
 if (cycle === "year") {
-  expireAt.setMonth(expireAt.getMonth() + 12);
+
+  expireAt.setFullYear(
+    expireAt.getFullYear() + 1
+  );
+
 } else {
-  expireAt.setMonth(expireAt.getMonth() + 1);
+
+  expireAt.setMonth(
+    expireAt.getMonth() + 1
+  );
+
 }
 
 await db.query(

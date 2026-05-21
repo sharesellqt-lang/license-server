@@ -22,9 +22,17 @@ router.post("/upgrade", authMiddleware, async (req, res) => {
 const expireAt = new Date();
 
 if (cycle === "year") {
-  expireAt.setMonth(expireAt.getMonth() + 12);
+
+  expireAt.setFullYear(
+    expireAt.getFullYear() + 1
+  );
+
 } else {
-  expireAt.setMonth(expireAt.getMonth() + 1);
+
+  expireAt.setMonth(
+    expireAt.getMonth() + 1
+  );
+
 }
 
     // Cập nhật user: plan + expire_at
