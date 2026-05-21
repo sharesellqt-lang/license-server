@@ -2,32 +2,19 @@ const express = require("express");
 const router = express.Router();
 
 // =====================================================
-// PLANS (SOURCE OF TRUTH)
+// PLANS CONFIG (SINGLE SOURCE OF TRUTH)
 // =====================================================
 
 const PLANS = {
   free: {
     id: "free",
-    name: "Free Trial",
-    shortName: "FREE",
-    price: 0,
-    currency: "VND",
-    displayPrice: "0đ",
-    level: 1,
     cycles: ["trial"],
-    duration: {
-      trial: 7
-    }
+    duration: { trial: 7 }
   },
 
   pro: {
     id: "pro",
-    name: "🔥 PRO PLAN",
-    shortName: "PRO",
     price: 19000,
-    currency: "VND",
-    displayPrice: "19.000đ",
-    level: 2,
     cycles: ["month", "year"],
     duration: {
       month: 30,
@@ -38,12 +25,7 @@ const PLANS = {
 
   vip: {
     id: "vip",
-    name: "🚀 VIP PLAN",
-    shortName: "VIP",
     price: 35000,
-    currency: "VND",
-    displayPrice: "35.000đ",
-    level: 3,
     cycles: ["month", "year"],
     duration: {
       month: 30,
@@ -53,22 +35,15 @@ const PLANS = {
   }
 };
 
-// =====================================================
-// HELPERS
-// =====================================================
-
+// normalize
 const norm = (v) => String(v || "").toLowerCase();
 
-function getPlan(planKey) {
-  return PLANS[norm(planKey)] || null;
-}
-
-function getPlans() {
-  return PLANS;
+function getPlan(plan) {
+  return PLANS[norm(plan)] || null;
 }
 
 // =====================================================
-// API: GET ALL PLANS
+// GET PLANS
 // =====================================================
 
 router.get("/plans", (req, res) => {
@@ -76,7 +51,7 @@ router.get("/plans", (req, res) => {
 });
 
 // =====================================================
-// PLAN STATUS (USE expire_at ONLY)
+// PLAN STATUS (ONLY expire_at)
 // =====================================================
 
 router.get("/plan-status", (req, res) => {
@@ -98,4 +73,3 @@ router.get("/plan-status", (req, res) => {
 module.exports = router;
 module.exports.PLANS = PLANS;
 module.exports.getPlan = getPlan;
-module.exports.getPlans = getPlans;

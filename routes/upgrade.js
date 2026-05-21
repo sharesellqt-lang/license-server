@@ -1,14 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const authMiddleware = require("../middleware/auth");
+const auth = require("../middleware/auth");
 const { getPlan } = require("./plans");
 
 // =====================================================
-// UPGRADE PLAN (CLEAN LOGIC)
+// UPGRADE PLAN (NO BUG VERSION)
 // =====================================================
 
-router.post("/upgrade", authMiddleware, async (req, res) => {
+router.post("/upgrade", auth, async (req, res) => {
   try {
     const plan = String(req.body.plan || "").toLowerCase();
     const cycle = String(req.body.cycle || "month").toLowerCase();
@@ -19,18 +19,28 @@ router.post("/upgrade", authMiddleware, async (req, res) => {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
+    // validate cycle
     const validCycle = planData.cycles.includes(cycle)
       ? cycle
       : "month";
 
     // =====================================================
-    // SOURCE OF TRUTH: expire_at ONLY
+    // FIX: ALWAYS SAFE DURATION
     // =====================================================
 
-    const now = Date.now();
-    const durationDays = planData.duration[validCycle];
+    const durationDays =
+      planData.duration?.[validCycle] ??
+      planData.duration?.month ??
+      30;
 
+    const now = Date.now();
+
+    // ✔ ABSOLUTE FIX (NO setDate BUG)
     const expireAt = new Date(now + durationDays * 86400000);
+
+    // =====================================================
+    // SAVE DB
+    // =====================================================
 
     await db.query(
       `UPDATE users 
@@ -55,7 +65,7 @@ router.post("/upgrade", authMiddleware, async (req, res) => {
 
   } catch (err) {
     console.log("UPGRADE ERROR:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "server error" });
   }
 });
 
