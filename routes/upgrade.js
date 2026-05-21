@@ -1,72 +1,36 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const auth = require("../middleware/auth");
-const { getPlan, normalizeCycle } = require("./plans");
+const authMiddleware = require("../middleware/auth");
+const { getPlan } = require("./plans"); // import helper planData
 
-router.post("/upgrade", auth, async (req, res) => {
+router.post("/upgrade", authMiddleware, async (req, res) => {
+  const { plan } = req.body;
+
+  if (!["pro", "vip"].includes(plan)) {
+    return res.status(400).json({ error: "Invalid plan" });
+  }
+
   try {
-    // 🔒 FORCE SAFE INPUT
-    const plan = String(req.body.plan || "free").toLowerCase();
+    // Lấy durationDays từ plan
     const planData = getPlan(plan);
+    if (!planData) return res.status(400).json({ error: "Plan not found" });
 
-    const cycle = normalizeCycle(planData, req.body.cycle);
+    // Tính expire_at = NOW + durationDays
+    const now = new Date();
+    const expireAt = new Date(now);
+    expireAt.setDate(now.getDate() + planData.durationDays);
 
-    // 🔒 SAFE DURATION (NEVER undefined)
-    const durationDays =
-      planData.duration?.[cycle] ??
-      planData.duration?.month ??
-      30;
-
-    const now = Date.now();
-
-    // 🔥 ONLY SOURCE OF TRUTH
-    const expireAt = new Date(now + durationDays * 86400000);
-
-    // =====================================================
-    // UPDATE USERS (STATE)
-    // =====================================================
+    // Cập nhật user: plan + expire_at
     await db.query(
-      `UPDATE users 
-       SET plan=?, plan_cycle=?, plan_start_date=?, expire_at=? 
-       WHERE id=?`,
-      [
-        planData.id,
-        cycle,
-        new Date(now).toISOString(),
-        expireAt.toISOString(),
-        req.user.id
-      ]
+      "UPDATE users SET plan = ?, expire_at = ? WHERE id = ?",
+      [plan, expireAt, req.user.id]
     );
 
-    // =====================================================
-    // PAYMENT LOG (HISTORY ONLY)
-    // =====================================================
-    await db.query(
-      `INSERT INTO payments 
-      (user_id, plan, amount, cycle, status, expire_at, plan_start_date)
-      VALUES (?, ?, ?, ?, 'paid', ?, ?)`,
-      [
-        req.user.id,
-        planData.id,
-        planData.price,
-        cycle,
-        expireAt.toISOString(),
-        new Date(now).toISOString()
-      ]
-    );
-
-    res.json({
-      success: true,
-      plan: planData.id,
-      cycle,
-      expire_at: expireAt.toISOString(),
-      days: durationDays
-    });
-
+    res.json({ success: true, plan, expireAt });
   } catch (err) {
     console.log("UPGRADE ERROR:", err);
-    res.status(500).json({ error: "server error" });
+    res.status(500).json({ error: "Server error" });
   }
 });
 
