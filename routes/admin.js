@@ -189,9 +189,7 @@ await db.query(
     // 2. Update user plan
 const cycle = payment.cycle || "month";
 
-let expireAt = new Date(
-  payment.current_expire_at || Date.now()
-);
+let expireAt = new Date();
 if (cycle === "year") {
 
   expireAt.setFullYear(
