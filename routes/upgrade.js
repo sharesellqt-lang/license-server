@@ -19,12 +19,16 @@ router.post("/upgrade", auth, async (req, res) => {
       ? cycle
       : "month";
 
+    // 🔥 CHỐT 1: LUÔN LUÔN LẤY DURATION AN TOÀN
     const durationDays =
-      planData.duration?.[validCycle] || 30;
+      planData.duration[validCycle] ??
+      planData.duration.month;
 
+    // 🔥 CHỐT 2: KHÔNG DÙNG setDate (tránh lỗi tháng 30/31)
     const now = Date.now();
     const expireAt = new Date(now + durationDays * 86400000);
 
+    // 🔥 UPDATE USERS (SOURCE OF TRUTH)
     await db.query(
       `UPDATE users 
        SET plan=?, plan_cycle=?, plan_start_date=?, expire_at=? 
@@ -38,11 +42,11 @@ router.post("/upgrade", auth, async (req, res) => {
       ]
     );
 
-    // log payment (snapshot)
+    // 🔥 LOG PAYMENT (KHÔNG ĐƯỢC TÍNH LẠI NGÀY Ở ĐÂY)
     await db.query(
       `INSERT INTO payments 
-       (user_id, plan, amount, cycle, status, expire_at, plan_start_date)
-       VALUES (?, ?, ?, ?, 'paid', ?, ?)`,
+      (user_id, plan, amount, cycle, status, expire_at, plan_start_date)
+      VALUES (?, ?, ?, ?, 'paid', ?, ?)`,
       [
         req.user.id,
         plan,
@@ -57,7 +61,7 @@ router.post("/upgrade", auth, async (req, res) => {
       success: true,
       plan,
       cycle: validCycle,
-      expire_at: expireAt
+      expire_at: expireAt.toISOString()
     });
 
   } catch (err) {

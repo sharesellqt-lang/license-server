@@ -29,32 +29,24 @@ const PLANS = {
   }
 };
 
-const norm = (v) => String(v || "").toLowerCase();
+const norm = v => String(v || "").toLowerCase();
 
 function getPlan(plan) {
   return PLANS[norm(plan)] || null;
 }
 
-// GET plans (frontend dùng render UI)
 router.get("/plans", (req, res) => {
   res.json(PLANS);
 });
 
-// PLAN STATUS (debug / admin)
+// CHỈ DEBUG - KHÔNG TÍNH LOGIC Ở ĐÂY
 router.get("/plan-status", (req, res) => {
-  const expire_at = req.query.expire_at;
-
-  if (!expire_at) {
-    return res.json({ daysLeft: 0 });
-  }
+  const { expire_at } = req.query;
 
   const end = new Date(expire_at);
-  const daysLeft = Math.ceil((end - new Date()) / 86400000);
+  const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
 
-  res.json({
-    expire_at,
-    daysLeft: daysLeft > 0 ? daysLeft : 0
-  });
+  res.json({ expire_at, daysLeft });
 });
 
 module.exports = router;
