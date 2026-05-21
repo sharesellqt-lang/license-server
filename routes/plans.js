@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 // =====================================================
-// PLAN DATA (CHUẨN SUBSCRIPTION)
+// PLANS (SOURCE OF TRUTH)
 // =====================================================
 
 const PLANS = {
@@ -57,81 +57,14 @@ const PLANS = {
 // HELPERS
 // =====================================================
 
-function normalizePlanKey(key) {
-  if (!key) return null;
-  return String(key).trim().toLowerCase();
+const norm = (v) => String(v || "").toLowerCase();
+
+function getPlan(planKey) {
+  return PLANS[norm(planKey)] || null;
 }
 
 function getPlans() {
   return PLANS;
-}
-
-function getPlan(planKey) {
-  const key = normalizePlanKey(planKey);
-  return PLANS[key] || null;
-}
-
-// =====================================================
-// TÍNH EXPIRATION CHUẨN (THEO CYCLE)
-// =====================================================
-
-function getPlanEndDate(user, cycle = "month") {
-  if (!user?.plan || !user?.planStartDate) return null;
-
-  const plan = getPlan(user.plan);
-  if (!plan) return null;
-
-  const durationDays = plan.duration?.[cycle] || plan.duration?.month || 30;
-
-  const start = new Date(user.planStartDate);
-  const end = new Date(start);
-  end.setDate(start.getDate() + durationDays);
-
-  return end;
-}
-
-// =====================================================
-// DAYS LEFT
-// =====================================================
-
-function getDaysLeft(user, cycle = "month") {
-  const end = getPlanEndDate(user, cycle);
-  if (!end) return 0;
-
-  const now = new Date();
-  const diff = end - now;
-
-  return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
-}
-
-// =====================================================
-// PURCHASE FLAGS
-// =====================================================
-
-function getPurchaseFlags(user) {
-  const plan = normalizePlanKey(user?.plan) || "free";
-
-  return {
-    canPurchasePro: plan === "free",
-    canPurchaseVip: plan !== "vip"
-  };
-}
-
-// =====================================================
-// PRICE CALC
-// =====================================================
-
-function getPlanPrice(planKey, cycle = "month") {
-  const plan = getPlan(planKey);
-  if (!plan) return null;
-
-  let price = plan.price;
-
-  if (cycle === "year" && plan.yearlyDiscount) {
-    price = Math.round(price * 12 * (1 - plan.yearlyDiscount));
-  }
-
-  return price;
 }
 
 // =====================================================
@@ -139,64 +72,30 @@ function getPlanPrice(planKey, cycle = "month") {
 // =====================================================
 
 router.get("/plans", (req, res) => {
-  const allPlans = Object.values(PLANS).map(plan => ({
-    id: plan.id,
-    name: plan.name,
-    shortName: plan.shortName,
-    price: plan.price,
-    currency: plan.currency,
-    displayPrice: plan.displayPrice,
-    level: plan.level,
-    cycles: plan.cycles,
-    duration: plan.duration,
-    yearlyDiscount: plan.yearlyDiscount || 0
-  }));
-
-  res.json(
-    allPlans.reduce((obj, plan) => {
-      obj[plan.id] = plan;
-      return obj;
-    }, {})
-  );
+  res.json(PLANS);
 });
 
 // =====================================================
-// API: PLAN STATUS (REAL USER STATUS)
+// PLAN STATUS (USE expire_at ONLY)
 // =====================================================
 
 router.get("/plan-status", (req, res) => {
   const user = {
     plan: req.query.plan || "free",
-    planStartDate: req.query.startDate || new Date().toISOString(),
-    cycle: req.query.cycle || "month"
+    expire_at: req.query.expire_at || new Date().toISOString()
   };
 
-  const planData = getPlan(user.plan);
-  const endDate = getPlanEndDate(user, user.cycle);
-  const daysLeft = getDaysLeft(user, user.cycle);
-  const price = getPlanPrice(user.plan, user.cycle);
+  const end = new Date(user.expire_at);
+  const daysLeft = Math.ceil((end - new Date()) / 86400000);
 
   res.json({
-    plan: planData,
-    planStartDate: user.planStartDate,
-    planEndDate: endDate,
-    daysLeft,
-    cycle: user.cycle,
-    price,
-    ...getPurchaseFlags(user)
+    plan: user.plan,
+    expire_at: user.expire_at,
+    daysLeft: daysLeft > 0 ? daysLeft : 0
   });
 });
 
-// =====================================================
-// EXPORTS
-// =====================================================
-
 module.exports = router;
-
 module.exports.PLANS = PLANS;
-module.exports.getPlans = getPlans;
 module.exports.getPlan = getPlan;
-module.exports.getPlanEndDate = getPlanEndDate;
-module.exports.getDaysLeft = getDaysLeft;
-module.exports.getPurchaseFlags = getPurchaseFlags;
-module.exports.getPlanPrice = getPlanPrice;
+module.exports.getPlans = getPlans;

@@ -5,76 +5,52 @@ const authMiddleware = require("../middleware/auth");
 const { getPlan } = require("./plans");
 
 // =====================================================
-// UPGRADE PLAN (MONTH / YEAR SUPPORT)
+// UPGRADE PLAN (CLEAN LOGIC)
 // =====================================================
 
 router.post("/upgrade", authMiddleware, async (req, res) => {
-  const { plan, cycle = "month" } = req.body;
-
   try {
-    // =====================================================
-    // 1. VALIDATE PLAN
-    // =====================================================
-    const planData = getPlan(plan?.toLowerCase());
+    const plan = String(req.body.plan || "").toLowerCase();
+    const cycle = String(req.body.cycle || "month").toLowerCase();
 
-    if (!planData) {
-      return res.status(400).json({ error: "Plan not found" });
+    const planData = getPlan(plan);
+
+    if (!planData || !["pro", "vip"].includes(plan)) {
+      return res.status(400).json({ error: "Invalid plan" });
     }
 
-    if (!["pro", "vip"].includes(planData.id)) {
-      return res.status(400).json({ error: "Invalid upgrade plan" });
-    }
-
-    // =====================================================
-    // 2. VALIDATE CYCLE
-    // =====================================================
     const validCycle = planData.cycles.includes(cycle)
       ? cycle
-      : planData.cycles[0];
+      : "month";
 
     // =====================================================
-    // 3. CALCULATE START + EXPIRE (SOURCE OF TRUTH)
+    // SOURCE OF TRUTH: expire_at ONLY
     // =====================================================
-    const now = new Date();
 
-    const durationDays =
-      planData.duration?.[validCycle] || 30;
+    const now = Date.now();
+    const durationDays = planData.duration[validCycle];
 
-    const expireAt = new Date(now);
-    expireAt.setDate(now.getDate() + durationDays);
+    const expireAt = new Date(now + durationDays * 86400000);
 
-    // =====================================================
-    // 4. UPDATE USER
-    // =====================================================
     await db.query(
-      `
-      UPDATE users 
-      SET 
-        plan = ?, 
-        planStartDate = ?, 
-        expire_at = ?, 
-        plan_cycle = ?
-      WHERE id = ?
-      `,
+      `UPDATE users 
+       SET plan=?, plan_cycle=?, plan_start_date=?, expire_at=? 
+       WHERE id=?`,
       [
-        planData.id,
-        now.toISOString(),
-        expireAt.toISOString(),
+        plan,
         validCycle,
+        new Date(now).toISOString(),
+        expireAt.toISOString(),
         req.user.id
       ]
     );
 
-    // =====================================================
-    // 5. RESPONSE
-    // =====================================================
     res.json({
       success: true,
-      plan: planData.id,
+      plan,
       cycle: validCycle,
-      planStartDate: now,
-      expireAt,
-      durationDays
+      expire_at: expireAt.toISOString(),
+      days: durationDays
     });
 
   } catch (err) {
