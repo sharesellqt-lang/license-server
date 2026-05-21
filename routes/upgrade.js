@@ -2,56 +2,55 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const auth = require("../middleware/auth");
-const { getPlan } = require("./plans");
+const { getPlan, normalizeCycle } = require("./plans");
 
 router.post("/upgrade", auth, async (req, res) => {
   try {
-    const plan = String(req.body.plan || "").toLowerCase();
-    const cycle = String(req.body.cycle || "month").toLowerCase();
-
+    // 🔒 FORCE SAFE INPUT
+    const plan = String(req.body.plan || "free").toLowerCase();
     const planData = getPlan(plan);
 
-    if (!planData || !["pro", "vip"].includes(plan)) {
-      return res.status(400).json({ error: "Invalid plan" });
-    }
+    const cycle = normalizeCycle(planData, req.body.cycle);
 
-    const validCycle = planData.cycles.includes(cycle)
-      ? cycle
-      : "month";
-
-    // 🔥 CHỐT 1: LUÔN LUÔN LẤY DURATION AN TOÀN
+    // 🔒 SAFE DURATION (NEVER undefined)
     const durationDays =
-      planData.duration[validCycle] ??
-      planData.duration.month;
+      planData.duration?.[cycle] ??
+      planData.duration?.month ??
+      30;
 
-    // 🔥 CHỐT 2: KHÔNG DÙNG setDate (tránh lỗi tháng 30/31)
     const now = Date.now();
+
+    // 🔥 ONLY SOURCE OF TRUTH
     const expireAt = new Date(now + durationDays * 86400000);
 
-    // 🔥 UPDATE USERS (SOURCE OF TRUTH)
+    // =====================================================
+    // UPDATE USERS (STATE)
+    // =====================================================
     await db.query(
       `UPDATE users 
        SET plan=?, plan_cycle=?, plan_start_date=?, expire_at=? 
        WHERE id=?`,
       [
-        plan,
-        validCycle,
+        planData.id,
+        cycle,
         new Date(now).toISOString(),
         expireAt.toISOString(),
         req.user.id
       ]
     );
 
-    // 🔥 LOG PAYMENT (KHÔNG ĐƯỢC TÍNH LẠI NGÀY Ở ĐÂY)
+    // =====================================================
+    // PAYMENT LOG (HISTORY ONLY)
+    // =====================================================
     await db.query(
       `INSERT INTO payments 
       (user_id, plan, amount, cycle, status, expire_at, plan_start_date)
       VALUES (?, ?, ?, ?, 'paid', ?, ?)`,
       [
         req.user.id,
-        plan,
+        planData.id,
         planData.price,
-        validCycle,
+        cycle,
         expireAt.toISOString(),
         new Date(now).toISOString()
       ]
@@ -59,13 +58,14 @@ router.post("/upgrade", auth, async (req, res) => {
 
     res.json({
       success: true,
-      plan,
-      cycle: validCycle,
-      expire_at: expireAt.toISOString()
+      plan: planData.id,
+      cycle,
+      expire_at: expireAt.toISOString(),
+      days: durationDays
     });
 
   } catch (err) {
-    console.log(err);
+    console.log("UPGRADE ERROR:", err);
     res.status(500).json({ error: "server error" });
   }
 });

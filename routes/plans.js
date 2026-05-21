@@ -29,26 +29,22 @@ const PLANS = {
   }
 };
 
-const norm = v => String(v || "").toLowerCase();
-
+// 🔒 SAFE GET PLAN (KHÔNG BAO GIỜ undefined)
 function getPlan(plan) {
-  return PLANS[norm(plan)] || null;
+  return PLANS[String(plan || "free").toLowerCase()] || PLANS.free;
+}
+
+// 🔒 SAFE CYCLE
+function normalizeCycle(planData, cycle) {
+  const c = String(cycle || "month").toLowerCase();
+  return planData.cycles.includes(c) ? c : "month";
 }
 
 router.get("/plans", (req, res) => {
   res.json(PLANS);
 });
 
-// CHỈ DEBUG - KHÔNG TÍNH LOGIC Ở ĐÂY
-router.get("/plan-status", (req, res) => {
-  const { expire_at } = req.query;
-
-  const end = new Date(expire_at);
-  const daysLeft = Math.max(0, Math.ceil((end - Date.now()) / 86400000));
-
-  res.json({ expire_at, daysLeft });
-});
-
 module.exports = router;
 module.exports.PLANS = PLANS;
 module.exports.getPlan = getPlan;
+module.exports.normalizeCycle = normalizeCycle;
