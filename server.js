@@ -592,6 +592,27 @@ app.get("/me", authMiddleware, async (req, res) => {
       plan = "free";
     }
 
+const now = new Date();
+
+const expireAt =
+  user.expire_at
+    ? new Date(user.expire_at)
+    : null;
+
+const isActive =
+  expireAt && expireAt > now;
+
+const daysLeft =
+  expireAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (expireAt - now)
+          / (1000 * 60 * 60 * 24)
+        )
+      )
+    : 0;
+
     return res.json({
 
       id: user.id,
