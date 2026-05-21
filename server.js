@@ -599,6 +599,8 @@ app.get("/me", authMiddleware, async (req, res) => {
 
       plan: plan,
 
+      cycle: user.cycle || "month",
+
       planStartDate:
         plan !== "free"
           ? user.created_at
