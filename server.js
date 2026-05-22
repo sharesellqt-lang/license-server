@@ -12,6 +12,7 @@ const plansRoute = require("./routes/plans");
 const authRoutes = require("./routes/auth");
 const uploadBillRoutes = require("./routes/uploadBill");
 //const adminPayment = require("./routes/adminPayment");
+// updated require path for authMiddleware
 
 const db = require("./db");
 
