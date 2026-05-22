@@ -15,8 +15,6 @@ const uploadBillRoutes = require("./routes/uploadBill");
 
 const db = require("./db");
 
-
-
 const app = express();
 
 // =========================
@@ -32,6 +30,11 @@ app.use(cors({
 
 // 🔥 parse json trước
 app.use(express.json());
+app.use(express.urlencoded({extended:true}));
+app.use("/uploads", express.static("api/upload"));
+// auth middleware + db connection giống search-bot
+const datingApi = require('./api/dating');
+app.use('/api/dating', datingApi);
 app.use(
   "/uploads",
   express.static("uploads")
