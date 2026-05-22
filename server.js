@@ -33,7 +33,8 @@ app.use(cors({
 // 🔥 parse json trước
 app.use(express.json());
 app.use(express.urlencoded({extended:true}));
-app.use("/api/uploads/avatars", express.static(path.join(__dirname, "api/uploads/avatars")));
+// Expose folder để trình duyệt lấy ảnh
+app.use('/uploads', express.static(path.join(__dirname, 'api', 'uploads')));
 // auth middleware + db connection giống search-bot
 const datingApi = require('./api/dating');
 const datingRouter = require("./api/dating"); // đường dẫn chính xác tới dating.js

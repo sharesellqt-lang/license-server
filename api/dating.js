@@ -4,34 +4,31 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const db = require('../db'); // MySQL connection
-const authMiddleware = require('../routes/auth'); // token check
+const db = require('../db');
+const authMiddleware = require('../routes/auth');
 
 // ================== UPLOAD AVATAR ==================
 const avatarDir = path.join(__dirname, 'uploads', 'avatars');
-if (!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
+if(!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, avatarDir);
-  },
-  filename: function (req, file, cb) {
+  destination: (req, file, cb) => cb(null, avatarDir),
+  filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
     cb(null, `avatar_${req.user.id}_${Date.now()}${ext}`);
   }
 });
+
 const upload = multer({ storage });
 
 router.post('/upload-avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
-  try {
-    if (!req.file) return res.json({ success: false });
-    const avatarUrl = `/api/uploads/avatars/${req.file.filename}`; // path mới
-    res.json({ success: true, avatar: avatarUrl });
-  } catch (err) {
-    console.error(err);
-    res.json({ success: false, error: err.message });
-  }
+  if(!req.file) return res.json({success:false});
+  // URL dùng cho frontend hiển thị
+  const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+  res.json({success:true, avatar: avatarUrl});
 });
+
+// ... Phần save profile, search, follow/comment giữ nguyên
 
 // ================== SAVE PROFILE ==================
 router.post('/profile', authMiddleware, async (req, res) => {
