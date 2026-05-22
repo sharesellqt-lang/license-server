@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db'); // file kết nối MySQL giống search-bot
-const authMiddleware = require('../../routes/auth'); // nếu dating.js ở src/api
+const authMiddleware = require('../routes/auth'); // middleware check token
 
 // ================== UPLOAD AVATAR ==================
 const storage = multer.diskStorage({
