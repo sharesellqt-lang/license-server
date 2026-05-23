@@ -31,7 +31,7 @@ router.get("/test", (req, res) => {
 
 });
 
-router.post('/upload-avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
+router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
   if(!req.file) return res.json({success:false});
   // URL dùng cho frontend hiển thị
   const avatarUrl = `/uploads/avatars/${req.file.filename}`;
@@ -66,7 +66,7 @@ router.post('/profile', authMiddleware, async (req, res) => {
 });
 
 // ================== SEARCH ==================
-router.post('/search', authMiddleware, async (req, res) => {
+router.post('/search', async (req, res) => {
   try {
     const { gender, age, job, location, interest, intent } = req.body;
     let sql = 'SELECT * FROM dating_profiles WHERE 1';
