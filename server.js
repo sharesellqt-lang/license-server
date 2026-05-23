@@ -16,6 +16,21 @@ const uploadBillRoutes = require("./routes/uploadBill");
 
 const db = require("./db");
 const app = express();
+const fs = require("fs");
+
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+// =========================
+// MIDDLEWARE (CORS FIX TEMP)
+// =========================
+app.use(cors({
+  origin: function (origin, cb) {
+    cb(null, true);
+  },
+  credentials: true
+}));
 const datingRouter =
   require("./api/dating");
 

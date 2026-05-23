@@ -31,12 +31,21 @@ router.get("/test", (req, res) => {
 
 });
 
-router.post('/upload-avatar', upload.single('avatar'), async (req, res) => {
-  if(!req.file) return res.json({success:false});
-  // URL dùng cho frontend hiển thị
-  const avatarUrl = `/uploads/avatars/${req.file.filename}`;
-  res.json({success:true, avatar: avatarUrl});
-});
+router.post("/upload-avatar",
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file" });
+      }
+
+      return res.json({ ok: true });
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
 
 // ... Phần save profile, search, follow/comment giữ nguyên
 
