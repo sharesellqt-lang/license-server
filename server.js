@@ -115,14 +115,6 @@ app.use((req, res) => {
 });
 
 // =========================
-// EXPORT / LISTEN
-// =========================
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-// =========================
 // CONFIG
 // =========================
 
@@ -883,8 +875,14 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
 // =========================
 // START SERVER
 // =========================
-initDB().then(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log("🚀 Server chạy port", PORT);
+const PORT = process.env.PORT || 3000;
+
+initDB()
+  .then(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log("🚀 Server chạy port", PORT);
+    });
+  })
+  .catch(err => {
+    console.error("❌ DB init failed:", err);
   });
-});
