@@ -87,7 +87,6 @@ app.get("/api/test", (req, res) => {
 
 // AUTH + CORE
 app.use("/api", authRoutes);
-app.use("/", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
 app.use("/api", userRoutes);
