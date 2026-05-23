@@ -1,4 +1,5 @@
 // File: src/api/dating.js
+console.log("🔥 dating router LOADED");
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
