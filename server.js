@@ -64,6 +64,7 @@ app.use(
 );
 
 app.use("/api/dating", datingRouter);
+console.log("🔥 DATING ROUTE MOUNTED");
 // =========================
 // ROUTES
 // =========================

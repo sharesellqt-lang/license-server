@@ -8,6 +8,7 @@ const fs = require('fs');
 const db = require('../db');
 const authMiddleware = require('../routes/auth');
 
+
 // ================== UPLOAD AVATAR ==================
 const avatarDir = path.join(__dirname, 'uploads', 'avatars');
 if(!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
@@ -21,6 +22,14 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
+router.get("/test", (req, res) => {
+
+  res.json({
+    success: true,
+    message: "dating router working"
+  });
+
+});
 
 router.post('/upload-avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
   if(!req.file) return res.json({success:false});
