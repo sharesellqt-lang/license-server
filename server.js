@@ -16,6 +16,17 @@ const uploadBillRoutes = require("./routes/uploadBill");
 
 const db = require("./db");
 const app = express();
+app.use(cors({
+  origin: [
+    "https://sharesell.net",
+    "http://localhost:3000"
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-admin"]
+}));
+
+app.options("*", cors());
 const fs = require("fs");
 
 const uploadDir = "uploads";
@@ -25,25 +36,12 @@ if (!fs.existsSync(uploadDir)) {
 // =========================
 // MIDDLEWARE (CORS FIX TEMP)
 // =========================
-app.use(cors({
-  origin: function (origin, cb) {
-    cb(null, true);
-  },
-  credentials: true
-}));
 const datingRouter =
   require("./api/dating");
 
 // =========================
 // MIDDLEWARE
 // =========================
-app.use(cors({
-  origin: [
-    "https://sharesell.net",
-    "http://localhost:3000"
-  ],
-  credentials: true
-}));
 
 // 🔥 parse json trước
 app.use(express.json());
@@ -148,14 +146,7 @@ console.log("🔥 JWT_SECRET:", JWT_SECRET ? "OK" : "MISSING");
 
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
-// =========================
-// MIDDLEWARE
-// =========================
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-admin"]
-}));
+
 app.options("*", cors());
 app.use(express.json());
 
