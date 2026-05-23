@@ -38,6 +38,7 @@ app.use(express.urlencoded({extended:true}));
 app.use('/api/uploads/avatars', express.static(path.join(__dirname, 'api', 'uploads/avatars')));
 // auth middleware + db connection giống search-bot
 const datingRouter = require("./api/dating");
+console.log("datingRouter =", datingRouter);
 app.use("/api/dating", datingRouter);
 
 //
