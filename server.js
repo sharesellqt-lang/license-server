@@ -14,10 +14,9 @@ const uploadBillRoutes = require("./routes/uploadBill");
 //const adminPayment = require("./routes/adminPayment");
 
 const db = require("./db");
-
-
-
 const app = express();
+const datingRouter =
+  require("./api/dating");
 
 // =========================
 // MIDDLEWARE
@@ -34,8 +33,14 @@ app.use(cors({
 app.use(express.json());
 app.use(
   "/uploads",
-  express.static("uploads")
+  express.static(
+    path.join(__dirname, "uploads")
+  )
 );
+//
+app.use(express.urlencoded({
+  extended: true
+}));
 //
 app.use(
   "/api",
@@ -46,6 +51,18 @@ app.use(
   "/api/admin",
   require("./routes/admin")
 );
+//
+app.use(
+  "/api/uploads/avatars",
+  express.static(
+    path.join(
+      __dirname,
+      "api/uploads/avatars"
+    )
+  )
+);
+
+app.use("/api/dating", datingRouter);
 // =========================
 // ROUTES
 // =========================
