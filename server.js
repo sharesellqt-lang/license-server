@@ -49,6 +49,11 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.use((req, res, next) => {
+  console.log("UNKNOWN ROUTE:", req.originalUrl);
+  res.status(404).send("NOT FOUND");
+});
+
 //
 app.use(
   "/api",
