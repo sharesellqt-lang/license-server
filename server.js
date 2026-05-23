@@ -126,7 +126,6 @@ app.listen(PORT, () => {
 // CONFIG
 // =========================
 
-// 🔥 THÊM
 require("dotenv").config();
 console.log("ENV TEST:", {
   BANK_NAME: process.env.BANK_NAME,
