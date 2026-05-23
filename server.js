@@ -125,7 +125,7 @@ app.listen(PORT, () => {
 // =========================
 // CONFIG
 // =========================
-const PORT = process.env.PORT || 10000;
+
 // 🔥 THÊM
 require("dotenv").config();
 console.log("ENV TEST:", {
