@@ -6,11 +6,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const db = require('../db');
-const authMiddleware = require('../routes/auth');
+const authMiddleware = require('../middleware/auth');
 
 
 // ================== UPLOAD AVATAR ==================
-const avatarDir = path.join(__dirname, 'uploads', 'avatars');
+const avatarDir = path.join(__dirname, '../uploads/avatars');
 if(!fs.existsSync(avatarDir)) fs.mkdirSync(avatarDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -22,16 +22,10 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-router.get("/test", (req, res) => {
 
-  res.json({
-    success: true,
-    message: "dating router working"
-  });
-
-});
-
-router.post("/upload-avatar",
+router.post(
+  "/upload-avatar",
+  authMiddleware,
   upload.single("avatar"),
   async (req, res) => {
     try {
@@ -55,7 +49,7 @@ router.post('/profile', authMiddleware, async (req, res) => {
     const { name, gender, age, job, interests, seeking_gender, intent, location, avatar } = req.body;
     const user_id = req.user.id;
 
-    const existing = await db.query('SELECT * FROM dating_profiles WHERE user_id=?', [user_id]);
+    const [existing] = await db.query('SELECT * FROM dating_profiles WHERE user_id=?', [user_id]);
     if (existing.length > 0) {
       await db.query(
         `UPDATE dating_profiles SET name=?, gender=?, age=?, job=?, interests=?, seeking_gender=?, intent=?, location=?, avatar=? WHERE user_id=?`,
