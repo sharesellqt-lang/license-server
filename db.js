@@ -6,6 +6,12 @@ const db = mysql.createPool({
   user: "igoiiqkjhosting_bot-license",
   password: "Kythuattoancau@179",
   database: "igoiiqkjhosting_bot-license"
+
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
 });
 
 module.exports = db;

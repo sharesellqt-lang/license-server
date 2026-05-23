@@ -46,18 +46,24 @@ module.exports = async (req, res, next) => {
     // =========================
     // GET USER REALTIME
     // =========================
-    const [rows] =
-      await db.query(
+      let rows = [];
+
+    try {
+      [rows] = await db.query(
         `
-        SELECT
-          id,
-          plan,
-          expire_at
+        SELECT id, plan, expire_at
         FROM users
         WHERE id = ?
         `,
         [decoded.id]
       );
+    } catch (err) {
+      console.error("❌ DB ERROR in auth:", err.message);
+
+      return res.status(500).json({
+        error: "Database connection failed"
+      });
+    }
 
     // =========================
     // USER NOT FOUND
