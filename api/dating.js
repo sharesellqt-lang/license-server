@@ -33,7 +33,10 @@ router.post(
         return res.status(400).json({ error: "No file" });
       }
 
-      return res.json({ ok: true });
+    return res.json({
+    success: true,
+    avatar: `/uploads/avatars/${req.file.filename}`
+  });
     } catch (e) {
       console.error(e);
       return res.status(500).json({ error: "Server error" });
@@ -82,7 +85,7 @@ router.post('/search', async (req, res) => {
     if (interest) { sql += ' AND interests LIKE ?'; params.push(`%${interest}%`); }
     if (intent) { sql += ' AND intent=?'; params.push(intent); }
 
-    const rows = await db.query(sql, params);
+    const [rows] = await db.query(sql, params);
 // 👇 ĐẶT Ở ĐÂY
     console.log("SEARCH RESULT:", rows.length);
     res.json(rows);
