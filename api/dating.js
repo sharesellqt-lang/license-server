@@ -83,6 +83,8 @@ router.post('/search', async (req, res) => {
     if (intent) { sql += ' AND intent=?'; params.push(intent); }
 
     const rows = await db.query(sql, params);
+// 👇 ĐẶT Ở ĐÂY
+    console.log("SEARCH RESULT:", rows.length);
     res.json(rows);
   } catch (err) {
     console.error(err);
