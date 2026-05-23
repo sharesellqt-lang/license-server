@@ -40,6 +40,14 @@ app.use('/api/uploads/avatars', express.static(path.join(__dirname, 'api', 'uplo
 const datingRouter = require("./api/dating");
 console.log("datingRouter =", datingRouter);
 app.use("/api/dating", datingRouter);
+/* ================= TEST ROUTE ================= */
+app.get("/api/test", (req, res) => {
+  res.json({
+    ok: true,
+    message: "server is working",
+    time: new Date()
+  });
+});
 
 //
 app.use(
