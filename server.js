@@ -1,27 +1,44 @@
-// File: server.js nè
+// =========================
+// ENV
+// =========================
 require("dotenv").config();
 
 // =========================
-// IMPORT
+// IMPORT CORE
 // =========================
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 
-const usageRoutes = require("./routes/usage");
-const plansRoute = require("./routes/plans");
-const authRoutes = require("./routes/auth");
-const uploadBillRoutes = require("./routes/uploadBill");
-//const adminPayment = require("./routes/adminPayment");
-// updated require path for authMiddleware
-
 const db = require("./db");
 
+// =========================
+// ROUTES IMPORT
+// =========================
+const authRoutes = require("./routes/auth");
+const plansRoute = require("./routes/plans");
+const usageRoutes = require("./routes/usage");
+const uploadBillRoutes = require("./routes/uploadBill");
+
+const paymentRoutes = require("./routes/payment");
+const paymentHistoryRoutes = require("./routes/paymentHistory");
+const paymentStatusRoutes = require("./routes/paymentStatus");
+
+const adminRoutes = require("./routes/admin");
+const upgradeRoutes = require("./routes/upgrade");
+const userRoutes = require("./routes/user");
+const webhookRoutes = require("./routes/webhook");
+
+const datingRouter = require("./api/dating");
+
+// =========================
+// APP INIT
+// =========================
 const app = express();
 
 // =========================
-// MIDDLEWARE
+// MIDDLEWARE CORE
 // =========================
 app.use(cors({
   origin: [
@@ -31,28 +48,19 @@ app.use(cors({
   credentials: true
 }));
 
-// 🔥 parse json trước
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
-// Expose folder để trình duyệt lấy ảnh
-app.use('/api/uploads/avatars', express.static(path.join(__dirname, 'api', 'uploads/avatars')));
-// auth middleware + db connection giống search-bot
-const datingRouter = require("./api/dating");
-console.log("datingRouter =", datingRouter);
-app.use("/api/dating", datingRouter);
-/* ================= TEST ROUTE ================= */
-app.get("/api/test", (req, res) => {
-  res.json({
-    ok: true,
-    message: "server is working",
-    time: new Date()
-  });
-});
+app.use(express.urlencoded({ extended: true }));
 
-app.get("/healthz", (req, res) => {
-  res.status(200).json({ ok: true });
-});
+// =========================
+// STATIC FILES
+// =========================
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/assets", express.static(path.join(__dirname, "assets")));
+app.use("/api/uploads/avatars", express.static(path.join(__dirname, "api/uploads/avatars")));
 
+// =========================
+// HEALTH CHECK
+// =========================
 app.get("/", (req, res) => {
   res.send("API server running");
 });
@@ -61,49 +69,58 @@ app.get("/ping", (req, res) => {
   res.send("pong");
 });
 
-app.use((req, res, next) => {
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.get("/api/test", (req, res) => {
+  res.json({
+    ok: true,
+    message: "server is working",
+    time: new Date()
+  });
+});
+
+// =========================
+// API ROUTES
+// =========================
+
+// AUTH + CORE
+app.use("/api", authRoutes);
+app.use("/api", plansRoute);
+app.use("/api", usageRoutes);
+app.use("/api", userRoutes);
+app.use("/api", upgradeRoutes);
+app.use("/api", webhookRoutes);
+
+// PAYMENT SYSTEM
+app.use("/api", paymentRoutes);
+app.use("/api", paymentHistoryRoutes);
+app.use("/api", paymentStatusRoutes);
+app.use("/api", uploadBillRoutes);
+
+// ADMIN
+app.use("/api/admin", adminRoutes);
+
+// DATING MODULE
+console.log("datingRouter =", datingRouter);
+app.use("/api/dating", datingRouter);
+
+// =========================
+// 404 HANDLER (PHẢI Ở CUỐI)
+// =========================
+app.use((req, res) => {
   console.log("UNKNOWN ROUTE:", req.originalUrl);
   res.status(404).send("NOT FOUND");
 });
 
-//
-app.use(
-  "/api",
-  require("./routes/paymentHistory")
-);
-//
-app.use(
-  "/api/admin",
-  require("./routes/admin")
-);
 // =========================
-// ROUTES
+// EXPORT / LISTEN
 // =========================
-const adminRoutes = require("./routes/admin");
-const paymentRoutes = require("./routes/payment");
-const userRoutes = require("./routes/user");
-const upgradeRoutes = require("./routes/upgrade");
-const webhookRoutes = require("./routes/webhook");
-const paymentHistoryRoutes = require("./routes/paymentHistory");
-const paymentStatusRoutes = require("./routes/paymentStatus");
-
-app.use("/api/admin", adminRoutes);
-app.use("/api", paymentRoutes);
-app.use(
-  "/api",
-  require("./routes/uploadBill")
-);
-app.use("/api", userRoutes);
-app.use("/api", upgradeRoutes);
-app.use("/api", webhookRoutes);
-app.use("/api", authRoutes);
-app.use("/api", plansRoute);
-app.use("/api", usageRoutes);
-app.use("/api", uploadBillRoutes);
-//app.use("/api/admin", adminPayment);
-app.use("/uploads", express.static("uploads"));
-app.use("/api", paymentStatusRoutes);
-app.use("/assets", express.static("assets"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
 
 // =========================
 // CONFIG
