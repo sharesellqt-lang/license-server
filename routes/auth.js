@@ -1,3 +1,4 @@
+const authMiddleware = require("../middleware/auth");
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
