@@ -49,6 +49,18 @@ app.get("/api/test", (req, res) => {
   });
 });
 
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.get("/", (req, res) => {
+  res.send("API server running");
+});
+
+app.get("/ping", (req, res) => {
+  res.send("pong");
+});
+
 app.use((req, res, next) => {
   console.log("UNKNOWN ROUTE:", req.originalUrl);
   res.status(404).send("NOT FOUND");
