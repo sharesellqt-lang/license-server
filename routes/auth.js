@@ -137,33 +137,24 @@ router.post(
 );
 
 router.get("/me", authMiddleware, async (req, res) => {
+
   try {
-
-    const rows = await db.query(
-      "SELECT id, email, name, plan FROM users WHERE id=?",
-      [req.user.id]
-    );
-
-    if (!rows.length) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
-      });
-    }
 
     res.json({
       success: true,
-      user: rows[0]
+      user: req.user
     });
 
   } catch (err) {
+
     console.error(err);
 
     res.status(500).json({
-      success: false,
-      error: err.message
+      success: false
     });
+
   }
+
 });
 
 module.exports = router;
