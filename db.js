@@ -5,7 +5,7 @@ const db = mysql.createPool({
   host: "onehost-amdcloudhn022602.000nethost.com",
   user: "igoiiqkjhosting_bot-license",
   password: "Kythuattoancau@179",
-  database: "igoiiqkjhosting_bot-license"
+  database: "igoiiqkjhosting_bot-license",
 
   waitForConnections: true,
   connectionLimit: 10,
