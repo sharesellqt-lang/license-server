@@ -151,9 +151,13 @@ app.options("*", cors());
 app.use(express.json());
 const OpenAI = require("openai");
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+let openai = null;
+
+if (process.env.OPENAI_API_KEY) {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+}
 
 // 🔥 LOGIN TEST (tạo token luôn)
 app.post("/api/login", (req, res) => {
@@ -175,43 +179,53 @@ app.post("/api/image", async (req, res) => {
 
   try {
 
+    if (!openai) {
+      return res.status(500).json({
+        error: "OPENAI_API_KEY missing"
+      });
+    }
+
     const { prompt } = req.body;
 
-    console.log("IMAGE:", prompt);
+    if (!prompt) {
+      return res.status(400).json({
+        error: "Prompt required"
+      });
+    }
 
-    res.json({
-      url: "https://picsum.photos/1024"
+    const result = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1024x1024"
+    });
+
+    return res.json({
+      success: true,
+      data: result
     });
 
   } catch (err) {
 
-    res.status(500).json({
+    console.error(err);
+
+    return res.status(500).json({
       error: err.message
     });
-
   }
 
 });
 
 app.post("/api/video", async (req, res) => {
 
-  try {
-
-    const { prompt } = req.body;
-
-    console.log("VIDEO:", prompt);
-
-    res.json({
-      url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4"
+  if (!openai) {
+    return res.status(500).json({
+      error: "OPENAI_API_KEY missing"
     });
-
-  } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    });
-
   }
+
+  return res.status(501).json({
+    error: "Video generation not implemented yet"
+  });
 
 });
 
