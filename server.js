@@ -149,6 +149,11 @@ const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
 app.options("*", cors());
 app.use(express.json());
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // 🔥 LOGIN TEST (tạo token luôn)
 app.post("/api/login", (req, res) => {
@@ -162,6 +167,51 @@ app.post("/api/login", (req, res) => {
   const token = jwt.sign(user, process.env.JWT_SECRET);
 
   res.json({ token });
+
+});
+
+
+app.post("/api/image", async (req, res) => {
+
+  try {
+
+    const { prompt } = req.body;
+
+    console.log("IMAGE:", prompt);
+
+    res.json({
+      url: "https://picsum.photos/1024"
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
+
+});
+
+app.post("/api/video", async (req, res) => {
+
+  try {
+
+    const { prompt } = req.body;
+
+    console.log("VIDEO:", prompt);
+
+    res.json({
+      url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4"
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message
+    });
+
+  }
 
 });
 
