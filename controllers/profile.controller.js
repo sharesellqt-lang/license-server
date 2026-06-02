@@ -1,8 +1,39 @@
 const db = require("../db");
-
 exports.getProfiles = async (req, res) => {
-  const [rows] = await db.query("SELECT * FROM dating_profiles LIMIT 50");
+
+  const user_id = req.user.id;
+
+  const {
+    gender,
+    minAge,
+    maxAge
+  } = req.query;
+
+  const [rows] =
+    await db.query(
+      `
+      SELECT *
+      FROM dating_profiles
+      WHERE user_id != ?
+      AND (
+        gender = ?
+        OR ? = ''
+      )
+      AND age >= ?
+      AND age <= ?
+      LIMIT 100
+      `,
+      [
+        user_id,
+        gender || "",
+        gender || "",
+        minAge || 18,
+        maxAge || 99
+      ]
+    );
+
   res.json(rows);
+
 };
 
 // =========================
@@ -46,7 +77,8 @@ exports.saveProfile = async (req, res) => {
     seeking_gender,
     intent,
     location,
-    avatar
+    avatar,
+    bio
   } = req.body;
 
   await db.query(
@@ -62,11 +94,12 @@ exports.saveProfile = async (req, res) => {
       seeking_gender,
       intent,
       location,
-      avatar
+      avatar,
+      bio
     )
     VALUES
     (
-      ?,?,?,?,?,?,?,?,?,?
+      ?,?,?,?,?,?,?,?,?,?,?
     )
     ON DUPLICATE KEY UPDATE
       name = VALUES(name),
@@ -77,7 +110,8 @@ exports.saveProfile = async (req, res) => {
       seeking_gender = VALUES(seeking_gender),
       intent = VALUES(intent),
       location = VALUES(location),
-      avatar = VALUES(avatar)
+      avatar = VALUES(avatar),
+      bio = VALUES(bio)
     `,
     [
       user_id,
@@ -89,7 +123,8 @@ exports.saveProfile = async (req, res) => {
       seeking_gender,
       intent,
       location,
-      avatar
+      avatar,
+      bio
     ]
   );
 
