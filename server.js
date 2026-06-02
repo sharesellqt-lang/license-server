@@ -62,11 +62,11 @@ app.use(
 );
 //
 app.use(
-  "/api/uploads/avatars",
+  "/uploads",
   express.static(
     path.join(
       __dirname,
-      "api/uploads/avatars"
+      "uploads"
     )
   )
 );
@@ -77,6 +77,20 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
+
+app.use(
+  "/uploads/avatars",
+  express.static(
+    path.join(
+      __dirname,
+      "uploads/avatars"
+    )
+  )
+);
+app.use(
+  "/api/avatar",
+  require("./routes/avatar.routes")
+);
 app.get("/", (req, res) => {
   res.send("Dating Hub API running...");
 });
