@@ -30,8 +30,14 @@ app.options("*", cors());
 const fs = require("fs");
 
 const uploadDir = "uploads";
+const avatarDir = "uploads/avatars";
+
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
+}
+
+if (!fs.existsSync(avatarDir)) {
+  fs.mkdirSync(avatarDir, { recursive: true });
 }
 
 // =========================
