@@ -5,3 +5,9 @@ const auth = require("../middleware/auth");
 router.post("/", auth, ctrl.addComment);
 
 module.exports = router;
+
+router.get(
+  "/:profile_id",
+  auth,
+  ctrl.getComments
+);

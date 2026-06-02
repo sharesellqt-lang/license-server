@@ -12,3 +12,20 @@ exports.follow = async (req, res) => {
 
   res.json({ success: true });
 };
+
+exports.getFollowers = async (req, res) => {
+
+  const { user_id } = req.params;
+
+  const [rows] = await db.query(
+    `
+    SELECT *
+    FROM dating_follow
+    WHERE following_id = ?
+    `,
+    [user_id]
+  );
+
+  res.json(rows);
+
+};

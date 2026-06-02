@@ -12,3 +12,21 @@ exports.addComment = async (req, res) => {
 
   res.json({ success: true });
 };
+
+exports.getComments = async (req, res) => {
+
+  const { profile_id } = req.params;
+
+  const [rows] = await db.query(
+    `
+    SELECT *
+    FROM dating_comments
+    WHERE profile_id = ?
+    ORDER BY created_at DESC
+    `,
+    [profile_id]
+  );
+
+  res.json(rows);
+
+};
