@@ -33,11 +33,6 @@ const uploadDir = "uploads";
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
-// =========================
-// MIDDLEWARE (CORS FIX TEMP)
-// =========================
-const datingRouter =
-  require("./api/dating");
 
 // =========================
 // MIDDLEWARE
@@ -76,7 +71,16 @@ app.use(
   )
 );
 
-app.use("/api/dating", datingRouter);
+app.use("/api/profile", require("./routes/profile.routes"));
+app.use("/api/swipe", require("./routes/swipe.routes"));
+app.use("/api/match", require("./routes/match.routes"));
+app.use("/api/message", require("./routes/message.routes"));
+app.use("/api/follow", require("./routes/follow.routes"));
+app.use("/api/comment", require("./routes/comment.routes"));
+app.get("/", (req, res) => {
+  res.send("Dating Hub API running...");
+});
+
 console.log("🔥 DATING ROUTE MOUNTED");
 // =========================
 // ROUTES
