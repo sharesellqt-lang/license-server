@@ -10,6 +10,8 @@ router.post("/undo", auth, ctrl.undoSwipe);
 // liked users
 router.get("/likes", auth, ctrl.getLikedUsers);
 
+router.get("/", auth, ctrl.getSwipes);
+
 router.delete(
   "/dislike/:id",
   auth,

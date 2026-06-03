@@ -144,3 +144,17 @@ exports.getDislikedUsers = async (req, res) => {
   res.json(rows);
 
 };
+
+exports.getSwipes = async (req, res) => {
+
+  const userId = req.user.id;
+
+  const [rows] = await db.query(
+    `SELECT target_id, type
+     FROM dating_swipes
+     WHERE user_id = ?`,
+    [userId]
+  );
+
+  res.json(rows);
+};
