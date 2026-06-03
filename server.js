@@ -28,8 +28,8 @@ app.use(cors({
 
 app.options("*", cors());
 const fs = require("fs");
-const uploadDir = path.join(__dirname, "uploads");
-const avatarDir = path.join(__dirname, "uploads/avatars");
+const baseUpload = path.join(__dirname, "uploads");
+const avatarDir = path.join(baseUpload, "avatars");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -39,18 +39,23 @@ if (!fs.existsSync(avatarDir)) {
   fs.mkdirSync(avatarDir, { recursive: true });
 }
 
-// =========================
-// MIDDLEWARE
-// =========================
-
-// 🔥 parse json trước
-app.use(express.json());
 app.use(
   "/uploads",
   express.static(
     path.join(__dirname, "uploads")
   )
 );
+
+// upload API
+app.use("/api/avatar", require("./routes/avatar.routes"));
+app.use("/api", require("./routes/avatar.routes"));
+app.use("/api/social", require("./routes/social.routes"));
+// =========================
+// MIDDLEWARE
+// =========================
+
+// 🔥 parse json trước
+app.use(express.json());
 //
 app.use(express.urlencoded({
   extended: true
@@ -74,9 +79,6 @@ app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
 
-// upload API
-app.use("/api", require("./routes/avatar.routes"));
-app.use("/api/social", require("./routes/social.routes"));
 app.get("/", (req, res) => {
   res.send("Dating Hub API running...");
 });
