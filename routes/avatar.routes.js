@@ -1,47 +1,35 @@
 const router = require("express").Router();
+
+const auth = require("../middleware/auth");
 const multer = require("multer");
 const path = require("path");
 
-const auth = require("../middleware/auth");
-
+// =========================
+// STORAGE CONFIG
+// =========================
 const storage = multer.diskStorage({
-
-  destination(req, file, cb) {
+  destination: function (req, file, cb) {
     cb(null, "uploads/avatars");
   },
-
-  filename(req, file, cb) {
-
-    const ext =
-      path.extname(file.originalname);
-
-    cb(
-      null,
-      `avatar_${req.user.id}_${Date.now()}${ext}`
-    );
-
+  filename: function (req, file, cb) {
+    const unique = Date.now() + "_" + Math.round(Math.random() * 1e9);
+    cb(null, "avatar_" + unique + path.extname(file.originalname));
   }
-
 });
 
-const upload =
-  multer({ storage });
+const upload = multer({ storage });
 
+// =========================
+// UPLOAD ROUTE
+// =========================
 router.post(
-  "/",
+  "/avatar",
   auth,
   upload.single("avatar"),
   (req, res) => {
-
     res.json({
-
-      success: true,
-
-      url:
-        `/uploads/avatars/${req.file.filename}`
-
+      url: "/uploads/avatars/" + req.file.filename
     });
-
   }
 );
 
