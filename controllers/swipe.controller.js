@@ -74,3 +74,24 @@ exports.unlikeUser = async (req, res) => {
   });
 
 };
+
+exports.undoDislike = async (req, res) => {
+
+  await db.query(
+    `
+    DELETE FROM dating_swipes
+    WHERE user_id = ?
+    AND target_id = ?
+    AND type = 'dislike'
+    `,
+    [
+      req.user.id,
+      req.params.id
+    ]
+  );
+
+  res.json({
+    success: true
+  });
+
+};

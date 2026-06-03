@@ -8,7 +8,15 @@ router.post("/", auth, ctrl.swipe);
 // liked users
 router.get("/likes", auth, ctrl.getLikedUsers);
 
+router.delete(
+  "/dislike/:id",
+  auth,
+  ctrl.undoDislike
+);
+
 // unlike
 router.delete("/:id", auth, ctrl.unlikeUser);
+
+
 
 module.exports = router;
