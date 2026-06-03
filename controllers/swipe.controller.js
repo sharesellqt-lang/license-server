@@ -95,3 +95,30 @@ exports.undoDislike = async (req, res) => {
   });
 
 };
+
+exports.getDislikedUsers = async (req, res) => {
+
+  const userId = req.user.id;
+
+  const [rows] = await db.query(
+    `
+    SELECT
+      ds.target_id,
+      dp.name,
+      dp.avatar,
+      dp.age,
+      dp.location
+    FROM dating_swipes ds
+
+    LEFT JOIN dating_profiles dp
+      ON dp.user_id = ds.target_id
+
+    WHERE ds.user_id = ?
+    AND ds.type = 'dislike'
+    `,
+    [userId]
+  );
+
+  res.json(rows);
+
+};

@@ -14,9 +14,13 @@ router.delete(
   ctrl.undoDislike
 );
 
+router.get(
+  "/disliked",
+  auth,
+  ctrl.getDislikedUsers
+);
+
 // unlike
 router.delete("/:id", auth, ctrl.unlikeUser);
-
-
 
 module.exports = router;
