@@ -23,10 +23,14 @@ const upload = multer({ storage });
 // UPLOAD ROUTE
 // =========================
 router.post(
-  "/avatar",
+  "/",
   auth,
   upload.single("avatar"),
   (req, res) => {
+       // 👇 ĐẶT Ở ĐÂY (NGAY ĐẦU HANDLER)
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
     res.json({
       url: "/uploads/avatars/" + req.file.filename
     });
