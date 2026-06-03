@@ -101,6 +101,22 @@ exports.undoDislike = async (req, res) => {
 
 };
 
+exports.undoSwipe = async (req, res) => {
+
+  const user_id = req.user.id;
+  const { target_id } = req.body;
+
+  await db.query(
+    `UPDATE dating_swipes
+     SET status = NULL
+     WHERE user_id = ?
+     AND target_id = ?`,
+    [user_id, target_id]
+  );
+
+  res.json({ success: true });
+};
+
 exports.getDislikedUsers = async (req, res) => {
 
   const userId = req.user.id;

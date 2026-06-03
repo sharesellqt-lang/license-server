@@ -5,6 +5,8 @@ const auth = require("../middleware/auth");
 // like / dislike
 router.post("/", auth, ctrl.swipe);
 
+router.post("/undo", auth, ctrl.undoSwipe);
+
 // liked users
 router.get("/likes", auth, ctrl.getLikedUsers);
 
