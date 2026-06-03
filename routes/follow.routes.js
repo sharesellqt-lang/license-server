@@ -11,3 +11,9 @@ router.get(
   auth,
   ctrl.getFollowers
 );
+
+router.delete(
+  "/:id",
+  auth,
+  ctrl.unfollowUser
+);

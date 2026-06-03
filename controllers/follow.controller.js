@@ -29,3 +29,23 @@ exports.getFollowers = async (req, res) => {
   res.json(rows);
 
 };
+
+exports.unfollowUser = async (req, res) => {
+
+  await db.query(
+    `
+    DELETE FROM dating_follow
+    WHERE follower_id = ?
+    AND following_id = ?
+    `,
+    [
+      req.user.id,
+      req.params.id
+    ]
+  );
+
+  res.json({
+    success: true
+  });
+
+};
