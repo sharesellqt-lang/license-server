@@ -4,7 +4,12 @@ const auth = require("../middleware/auth");
 
 router.post("/", auth, ctrl.follow);
 
-module.exports = router;
+// phải đặt trước /:user_id
+router.get(
+  "/following",
+  auth,
+  ctrl.getFollowingUsers
+);
 
 router.get(
   "/:user_id",
@@ -17,3 +22,5 @@ router.delete(
   auth,
   ctrl.unfollowUser
 );
+
+module.exports = router;

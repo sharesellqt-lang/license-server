@@ -54,7 +54,7 @@ app.use(
 
 app.use("/api/avatar", require("./routes/avatar.routes"));
 
-app.use("/api/social", require("./routes/social.routes"));
+
 // =========================
 // MIDDLEWARE
 // =========================

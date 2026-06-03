@@ -35,3 +35,42 @@ exports.swipe = async (req, res) => {
 
   res.json({ match: false });
 };
+
+exports.getLikedUsers = async (req, res) => {
+
+  const userId = req.user.id;
+
+  const [rows] = await db.query(
+    `
+    SELECT target_id
+    FROM dating_swipes
+    WHERE user_id = ?
+    AND type = 'like'
+    `,
+    [userId]
+  );
+
+  res.json(rows);
+
+};
+
+exports.unlikeUser = async (req, res) => {
+
+  await db.query(
+    `
+    DELETE FROM dating_swipes
+    WHERE user_id = ?
+    AND target_id = ?
+    AND type = 'like'
+    `,
+    [
+      req.user.id,
+      req.params.id
+    ]
+  );
+
+  res.json({
+    success: true
+  });
+
+};
