@@ -35,13 +35,13 @@ const fs = require("fs");
 // avatar folder
 //const avatarDir = path.join(uploadDir, "avatars");
 
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+//if (!fs.existsSync(uploadDir)) {
+//  fs.mkdirSync(uploadDir);
+//}
 
-if (!fs.existsSync(avatarDir)) {
-  fs.mkdirSync(avatarDir, { recursive: true });
-}
+//if (!fs.existsSync(avatarDir)) {
+//  fs.mkdirSync(avatarDir, { recursive: true });
+//}
 
 //app.use("/uploads", express.static( path.join(__dirname, "uploads")));
 
