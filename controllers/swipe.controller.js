@@ -115,6 +115,7 @@ exports.getDislikedUsers = async (req, res) => {
 
     WHERE ds.user_id = ?
     AND ds.type = 'dislike'
+    GROUP BY ds.target_id
     `,
     [userId]
   );

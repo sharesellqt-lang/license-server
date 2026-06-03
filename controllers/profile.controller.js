@@ -78,6 +78,30 @@ exports.getMyProfile = async (req, res) => {
 // =========================
 exports.saveProfile = async (req, res) => {
 
+const {
+  name,
+  age,
+  location
+} = req.body;
+
+if (!name?.trim()) {
+  return res.status(400).json({
+    error: "Name required"
+  });
+}
+
+if (!age) {
+  return res.status(400).json({
+    error: "Age required"
+  });
+}
+
+if (!location?.trim()) {
+  return res.status(400).json({
+    error: "Location required"
+  });
+}
+
   const user_id = req.user.id;
 
   const {
