@@ -86,9 +86,9 @@ app.use("/api/comment", require("./routes/comment.routes"));
 
 // serve image files
 app.use("/uploads", express.static("uploads"));
-
 // upload API
 app.use("/api", require("./routes/avatar.routes"));
+app.use("/api/social", require("./routes/social.routes"));
 app.get("/", (req, res) => {
   res.send("Dating Hub API running...");
 });
