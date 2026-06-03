@@ -30,10 +30,10 @@ app.options("*", cors());
 const fs = require("fs");
 
 // base folder
-const uploadDir = path.join(__dirname, "uploads");
+//const uploadDir = path.join(__dirname, "uploads");
 
 // avatar folder
-const avatarDir = path.join(uploadDir, "avatars");
+//const avatarDir = path.join(uploadDir, "avatars");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -43,12 +43,7 @@ if (!fs.existsSync(avatarDir)) {
   fs.mkdirSync(avatarDir, { recursive: true });
 }
 
-app.use(
-  "/uploads",
-  express.static(
-    path.join(__dirname, "uploads")
-  )
-);
+//app.use("/uploads", express.static( path.join(__dirname, "uploads")));
 
 // AUTH / PROFILE / SOCIAL / AVATAR
 
