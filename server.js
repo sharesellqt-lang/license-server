@@ -28,9 +28,8 @@ app.use(cors({
 
 app.options("*", cors());
 const fs = require("fs");
-
-const uploadDir = "uploads";
-const avatarDir = "uploads/avatars";
+const uploadDir = path.join(__dirname, "uploads");
+const avatarDir = path.join(__dirname, "uploads/avatars");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -66,16 +65,7 @@ app.use(
   "/api/admin",
   require("./routes/admin")
 );
-//
-app.use(
-  "/uploads",
-  express.static(
-    path.join(
-      __dirname,
-      "uploads"
-    )
-  )
-);
+
 
 app.use("/api/profile", require("./routes/profile.routes"));
 app.use("/api/swipe", require("./routes/swipe.routes"));
@@ -84,8 +74,6 @@ app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
 
-// serve image files
-app.use("/uploads", express.static("uploads"));
 // upload API
 app.use("/api", require("./routes/avatar.routes"));
 app.use("/api/social", require("./routes/social.routes"));
@@ -118,8 +106,6 @@ app.use("/api", authRoutes);
 app.use("/api", plansRoute);
 app.use("/api", usageRoutes);
 app.use("/api", uploadBillRoutes);
-//app.use("/api/admin", adminPayment);
-app.use("/uploads", express.static("uploads"));
 app.use("/api", paymentStatusRoutes);
 app.use("/assets", express.static("assets"));
 
