@@ -1,0 +1,2735 @@
+[
+  {
+    "id": "what-is-javascript",
+    "title": "What Is JavaScript",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "JavaScript là ngôn ngữ lập trình được sử dụng để tạo tính tương tác cho website và hiện nay còn được dùng để xây dựng backend, desktop application, mobile application và nhiều hệ thống khác. Hiểu JavaScript là nền tảng để học toàn bộ hệ sinh thái web hiện đại.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript là một ngôn ngữ lập trình bậc cao (high-level programming language) được thiết kế ban đầu để chạy bên trong trình duyệt nhằm tạo ra các trang web có khả năng tương tác.\n\nNếu HTML định nghĩa cấu trúc:\n\n\n\nNếu CSS định nghĩa giao diện:\n\n\n\nThì JavaScript định nghĩa hành vi:\n\n\n\nKhi người dùng click:\n\n\n\nNgày nay JavaScript không chỉ chạy trong trình duyệt mà còn chạy trên:\n\n- Server\n- Desktop\n- Mobile\n- IoT\n- Cloud Functions\n\nVí dụ:\n\n\n\nOutput:\n\n\n\n---",
+          "code": "<h1>Hello</h1>"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng một website giống như một chiếc xe.\n\nHTML:\n\n\n\nCSS:\n\n\n\nJavaScript:\n\n\n\nMột chiếc xe đẹp nhưng không có động cơ:\n\n\n\nMột website đẹp nhưng không có JavaScript:\n\n\n\nVí dụ:\n\n- Nút đăng nhập\n- Menu mở rộng\n- Form validation\n- Chat realtime\n- Infinite scroll\n\nTất cả đều cần JavaScript.\n\n---",
+          "code": "Khung xe"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Mental model đơn giản:\n\n\n\nVí dụ:\n\n\n\nCode:\n\n\n\nJavaScript đóng vai trò bộ não điều khiển luồng xử lý.\n\n---",
+          "code": "User Action\n  ↓\nJavaScript\n  ↓\nBusiness Logic\n  ↓\nUpdate UI"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "Những website đầu tiên gần như chỉ là tài liệu tĩnh.\n\nVí dụ:\n\n\n\nNgười dùng chỉ có thể:\n\n- Đọc\n- Click link\n- Chuyển trang\n\nKhông có:\n\n- Chat\n- Animation\n- Validation\n- Dynamic Content\n\nJavaScript được tạo ra để giải quyết vấn đề đó.\n\nVí dụ:\n\nThay vì gửi form lên server rồi reload toàn bộ trang:\n\n\n\nJavaScript cho phép:\n\n\n\nNhanh hơn rất nhiều.\n\n---",
+          "code": "<h1>Welcome</h1>"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Ví dụ đơn giản:\n\n\n\n\n\nOutput:\n\n\n\nĐiều gì xảy ra?\n\n\n\nĐây là ví dụ nhỏ nhất về tính tương tác của JavaScript.\n\n---",
+          "code": "<button id=\"btn\">Click Me</button>"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Khi trình duyệt tải file JavaScript:\n\n\n\nFlow:\n\n\n\nKết quả:\n\n\n\nVí dụ lớn hơn:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "const name = \"Phong\";\n\nconsole.log(name);"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Kiến trúc tổng quát:\n\n\n\nKhi website chạy:\n\n\n\nVí dụ:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "Browser\n│\n├── HTML\n├── CSS\n└── JavaScript"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "JavaScript là ngôn ngữ:\n\n### Dynamic Typing\n\nCó thể thay đổi kiểu dữ liệu.\n\n\n\nHợp lệ.\n\n---\n\n### Garbage Collected\n\nKhông cần tự giải phóng bộ nhớ.\n\n\n\nEngine sẽ tự thu hồi bộ nhớ khi cần.\n\n---\n\n### Prototype-Based\n\nKế thừa thông qua prototype.\n\n\n\nOutput:\n\n\n\n---\n\n### First-Class Functions\n\nFunction có thể được truyền như dữ liệu.\n\n\n\nOutput:\n\n\n\nĐây là nền tảng của:\n\n- React\n- Express\n- Node.js\n- Async Programming\n\n---",
+          "code": "let value = 10;\n\nvalue = \"hello\";"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "JavaScript từng bị xem là chậm.\n\nNgày nay các engine hiện đại sử dụng:\n\n\n\nđể tối ưu code trong quá trình chạy.\n\nVí dụ:\n\n\n\nEngine có thể tối ưu vòng lặp này.\n\nTuy nhiên JavaScript vẫn có chi phí:\n\n### Single Thread\n\n\n\nVí dụ:\n\n\n\nTrình duyệt sẽ bị treo.\n\n---\n\n### DOM Manipulation Cost\n\n\n\nThao tác DOM liên tục rất tốn kém.\n\n---",
+          "code": "JIT Compiler"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Undefined Errors\n\n\n\nOutput:\n\n\n\nVì:\n\n\n\nchưa tồn tại.\n\n---\n\n### Wrong Type\n\n\n\nOutput:\n\n\n\nNhiều người mong đợi:\n\n\n\n---\n\n### Async Confusion\n\n\n\nOutput:\n\n\n\nKhông phải:\n\n\n\n---",
+          "code": "console.log(user.name);"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### Học Framework Trước JavaScript\n\nNhiều người học:\n\n\n\ntrước khi hiểu JavaScript.\n\nKết quả:\n\n\n\n---\n\n### Lạm Dụng Global Variables\n\n\n\nxuất hiện khắp nơi.\n\nĐiều này làm code khó bảo trì.\n\n---\n\n### Không Hiểu Event Loop\n\n\n\nNhiều người nghĩ:\n\n\n\nThực tế JavaScript tiếp tục chạy các phần khác.\n\n---",
+          "code": "React\nVue\nAngular"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### Floating Point Problem\n\n\n\nOutput:\n\n\n\nKhông phải:\n\n\n\n---\n\n### Equality Confusion\n\n\n\nOutput:\n\n\n\nĐiều này thường gây bất ngờ.\n\n---\n\n### NaN\n\n\n\nOutput:\n\n\n\nDù NaN có nghĩa là:\n\n\n\n---",
+          "code": "console.log(0.1 + 0.2);"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "JavaScript hiện diện gần như mọi nơi.\n\n### Frontend\n\nVí dụ:\n\n- React\n- Vue\n- Svelte\n- Next.js\n\nWebsite:\n\n\n\n---\n\n### Backend\n\nNode.js cho phép:\n\n\n\nJavaScript chạy trên server.\n\n---\n\n### Mobile\n\nVí dụ:\n\n- React Native\n\nMột codebase có thể chạy trên:\n\n\n\n---\n\n### Desktop\n\nVí dụ:\n\n- VS Code\n- Discord\n- Slack\n\nđều sử dụng JavaScript trong một phần kiến trúc của chúng.\n\n---",
+          "code": "User\n ↓\nJavaScript\n ↓\nInteractive UI"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "JavaScript không tự chạy.\n\nNó cần một engine.\n\nVí dụ:\n\n\n\nQuá trình:\n\n\n\nVí dụ:\n\n\n\nEngine phải:\n\n\n\nmọi thứ đều diễn ra phía dưới runtime.\n\n---",
+          "code": "Chrome  → V8\nFirefox → SpiderMonkey\nSafari  → JavaScriptCore"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "### JavaScript Runtime\n\nMôi trường chạy JavaScript.\n\nBao gồm:\n\n\n\n---\n\n### Execution Context\n\nMỗi khi function chạy:\n\n\n\nEngine tạo Execution Context.\n\n---\n\n### Call Stack\n\nQuản lý function calls.\n\n\n\n---\n\n### Event Loop\n\nCho phép xử lý bất đồng bộ.\n\n\n\n---\n\n### Web APIs\n\nCung cấp:\n\n\n\n---",
+          "code": "Call Stack\nWeb APIs\nEvent Loop\nQueues"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau khi hiểu JavaScript là gì, nên học tiếp:\n\n1. JavaScript Runtime\n2. Execution Context\n3. Call Stack\n4. Memory Creation Phase\n5. Scope\n6. Lexical Environment\n7. Scope Chain\n8. Event Loop\n9. Web APIs\n10. Async/Await\n\nĐây là chuỗi kiến thức nền tảng giúp hiểu JavaScript ở mức runtime thay vì chỉ mức cú pháp.\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "JavaScript là ngôn ngữ lập trình được tạo ra để mang tính tương tác vào web và hiện nay đã phát triển thành một trong những ngôn ngữ phổ biến nhất thế giới. Nó cho phép xử lý sự kiện người dùng, cập nhật giao diện, giao tiếp với server, xây dựng backend, mobile app và nhiều loại hệ thống khác.\n\nĐiểm quan trọng của JavaScript không nằm ở cú pháp mà nằm ở runtime của nó. Khi chương trình chạy, JavaScript Engine sẽ parse code, tạo execution context, quản lý call stack và phối hợp với event loop để xử lý các tác vụ bất đồng bộ.\n\nHiểu JavaScript là hiểu cách code được thực thi, cách dữ liệu được quản lý và cách trình duyệt hoặc Node.js vận hành phía sau. Đây là nền tảng bắt buộc trước khi học các chủ đề nâng cao như Execution Context, Call Stack, Scope, Event Loop và các framework hiện đại.\n\nĐiều quan trọng nhất cần nhớ là JavaScript không chỉ là một ngôn ngữ để làm website động. Nó là ngôn ngữ trung tâm của hệ sinh thái web hiện đại, và việc hiểu rõ runtime của JavaScript sẽ quyết định khả năng xây dựng ứng dụng lớn, debug lỗi phức tạp và tối ưu hiệu năng trong thực tế."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [
+        "javascript-runtime",
+        "execution-context",
+        "call-stack",
+        "event-loop",
+        "web-apis"
+      ],
+      "next": [
+        "javascript-runtime",
+        "execution-context",
+        "call-stack",
+        "event-loop",
+        "scope"
+      ]
+    },
+    "meta": {
+      "order": 1,
+      "difficulty": "beginner",
+      "importance": "high",
+      "tags": [
+        "javascript",
+        "programming-language",
+        "browser",
+        "runtime",
+        "web-development",
+        "nodejs",
+        "frontend"
+      ],
+      "estimated_time": "25min"
+    }
+  },
+  {
+    "id": "how-js-executes-code",
+    "title": "How JS Executes Code",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "JavaScript execution is a multi-layer runtime process involving parsing, execution contexts, call stack, memory heap, and event loop coordination. It is critical because it defines how synchronous and asynchronous code actually runs, and understanding it prevents race conditions, stack overflows, and async bugs.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript execution is the full lifecycle of how code is transformed into executable instructions inside a JS engine (like V8). It includes parsing, creating execution contexts, managing memory, executing synchronous code via the call stack, and delegating asynchronous work to Web APIs or Node APIs.\n\nExample:\n\n`\n\nOutput:\n\n\n\nEven this simple code goes through parsing → memory allocation → execution context creation → stack execution → output.\n\nExample mental snapshot:\n\n\n\n---",
+          "code": "function add(a, b) {\n  return a + b;\n}\n\nconsole.log(add(2, 3));"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Imagine a single chef in a kitchen.\n\nOnly one dish is cooked at a time, and everything must go through the chef.\n\nExample:\n\n\n\nOutput:\n\n\n\nReal-world mapping:\n\n\n\nEven if multiple orders arrive at once, only one is processed at a time.\n\n---",
+          "code": "console.log(\"A\");\nconsole.log(\"B\");"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "JavaScript runtime is a coordinated system:\n\n\n\nExample:\n\n\n\nExecution model:\n\n\n\n---",
+          "code": "Source Code\n   ↓\nParser (AST)\n   ↓\nGlobal Execution Context\n   ↓\nCall Stack (sync execution)\n   ↓\nHeap (memory storage)\n   ↓\nWeb/Node APIs (async work)\n   ↓\nEvent Loop\n   ↓\nTask Queues"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "JavaScript runs in environments like browsers where blocking execution freezes UI.\n\nExample:\n\n\n\nOutput:\n\n\n\nWithout async delegation:\n\n\n\nSo JS offloads long tasks instead of blocking the call stack.\n\n---",
+          "code": "console.log(\"Start\");\n\nsetTimeout(() => {\n  console.log(\"Delayed\");\n}, 1000);\n\nconsole.log(\"End\");"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Output:\n\n\n\nExecution flow:\n\n\n\n---",
+          "code": "var a = 2;\n\nfunction square(n) {\n  var result = n * n;\n  return result;\n}\n\nconsole.log(square(a));"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Example:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "Parsing Phase\n   ↓\nMemory Creation Phase (hoisting)\n   ↓\nExecution Phase\n   ↓\nFunction Call → New Execution Context\n   ↓\nPush to Call Stack\n   ↓\nExecute function\n   ↓\nPop from Call Stack\n   ↓\nAsync tasks → Web APIs\n   ↓\nEvent Loop → Queue → Call Stack"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Call Stack:\n\n\n\nAfter execution:\n\n\n\nAsync system:\n\n\n\n---",
+          "code": "| console.log |\n| b()         |\n| a()         |\n| Global      |"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "### Memory Creation Phase\n\n\n\nMemory phase:\n\n\n\nExecution phase:\n\n\n\nOutput:\n\n\n\n---\n\n### Execution Context Structure\n\nEach function creates:\n\n- Variable environment\n- Lexical environment\n- This binding\n\nExample:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "console.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "Performance depends on:\n\n- Call stack depth\n- Heap allocations\n- Async queue pressure\n\nExample bad recursion:\n\n\n\nOutput:\n\n\n\nBetter:\n\n\n\nTrade-off:\n\n- recursion: expressive but risky\n- iteration: safer but less elegant\n\n---",
+          "code": "function crash() {\n  crash();\n}\n\ncrash();"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Hoisting bug\n\n\n\nOutput:\n\n\n\n---\n\n### Async timing bug\n\n\n\nOutput:\n\n\n\n---",
+          "code": "console.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "Assuming async is synchronous:\n\n\n\nOutput:\n\n\n\nMistake: expecting immediate execution.\n\n---",
+          "code": "let user;\n\nfetch(\"/api\").then(() => {\n  user = \"John\";\n});\n\nconsole.log(user);"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "Block scope behavior:\n\n\n\nError:\n\n\n\n---\n\nNested execution contexts:\n\n\n\nEach call creates a stack frame.\n\n---",
+          "code": "if (true) {\n  let x = 10;\n}\n\nconsole.log(x);"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "React rendering:\n\n\n\nEach render:\n\n- execution context created\n- function executed\n- UI returned\n\nNode.js server:\n\n\n\nEach request:\n\n- callback enters event loop\n- execution context created\n- response returned\n\n---",
+          "code": "function App() {\n  console.log(\"Render\");\n  return \"UI\";\n}\n\nApp();"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 pipeline:\n\n\n\nMemory model:\n\n\n\nExample:\n\n\n\n- object stored in heap\n- reference stored in stack\n\n---",
+          "code": "JS Code\n ↓\nParser → AST\n ↓\nIgnition (interpreter)\n ↓\nBytecode\n ↓\nTurboFan (compiler)\n ↓\nMachine Code"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context: runtime environment where code runs inside the call stack.\n- Call Stack: LIFO structure managing synchronous execution order.\n- Event Loop: system moving async callbacks into the call stack.\n- Memory Heap: storage for objects and dynamic allocations.\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Event Loop Deep Dive: learn microtasks vs macrotasks scheduling and priority.\n- Closures: understand how execution contexts persist after function return.\n- Garbage Collection: learn how V8 frees unused heap memory automatically.\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "JavaScript execution is a structured runtime system that transforms code into execution contexts managed by the call stack while using a heap for memory and an event loop for asynchronous operations. It is important because it determines how all JS programs behave in real environments. The key idea is that JavaScript is single-threaded but capable of async execution through delegation and scheduling mechanisms rather than parallel execution."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "variables-and-scope",
+        "functions-in-javascript",
+        "asynchronous-javascript"
+      ],
+      "related": [
+        "execution-context",
+        "call-stack",
+        "event-loop"
+      ],
+      "next": [
+        "event-loop-deep-dive"
+      ]
+    },
+    "meta": {
+      "order": 2,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "javascript",
+        "execution-context",
+        "call-stack",
+        "event-loop",
+        "v8"
+      ],
+      "estimated_time": "45min"
+    }
+  },
+  {
+    "id": "execution-context",
+    "title": "Execution Context",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Execution Context is the runtime environment where JavaScript code is evaluated. It defines how variables, functions, scope, and this binding are created, managed, and destroyed during execution. It is fundamental because every line of JavaScript runs inside an execution context, and understanding it explains hoisting, scope behavior, closures, and call stack execution.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Execution Context is the environment in which JavaScript code is evaluated and executed. Every function call, global script, or block (in modern JS semantics) runs inside an execution context that contains:\n\n- Variable environment\n- Lexical environment\n- This binding\n- Scope chain reference\n\nExample:\n\n`\n\nOutput:\n\n\n\nBehind this, a Function Execution Context is created when `greet()` is called, executed, and then destroyed.\n\n---",
+          "code": "function greet(name) {\n  return \"Hello \" + name;\n}\n\nconsole.log(greet(\"Alice\"));"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Think of execution context like a \"workspace bubble\" created every time you enter a function.\n\nExample:\n\n\n\nOutput:\n\n\n\nReal-world analogy:\n\n\n\nEach function call gets its own temporary workspace.\n\n---",
+          "code": "function work() {\n  let task = \"coding\";\n  console.log(task);\n}\n\nwork();"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "JavaScript execution can be modeled as stacked contexts:\n\n\n\nExample:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "Global Execution Context\n        ↓\nFunction Execution Context\n        ↓\nNested Function Execution Context"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "Execution Context exists to isolate scope, manage variables, and ensure predictable execution order.\n\nExample problem without it:\n\n\n\nOutput:\n\n\n\nBecause each function has its own isolated execution context.\n\nReal benefit:\n\n* Prevents variable collisions\n* Enables recursion\n* Enables closures\n* Enables call stack management\n\n---",
+          "code": "function one() {\n  var x = 10;\n}\n\nfunction two() {\n  console.log(x);\n}\n\none();\ntwo();"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Output:\n\n\n\nExecution:\n\n\n\n---",
+          "code": "var a = 1;\n\nfunction add(b) {\n  var c = a + b;\n  return c;\n}\n\nconsole.log(add(5));"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Example:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "Parsing Phase\n   ↓\nGlobal Execution Context created\n   ↓\nMemory Phase (hoisting)\n   ↓\nExecution Phase begins\n   ↓\nFunction call triggers new Execution Context\n   ↓\nPush to Call Stack\n   ↓\nExecute function body\n   ↓\nPop Execution Context\n   ↓\nRepeat"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Call Stack + Execution Context:\n\n\n\nAfter execution:\n\n\n\nMemory layout:\n\n\n\nExample:\n\n\n\n\n\n---",
+          "code": "| inner() EC  |\n| outer() EC  |\n| Global EC   |"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Execution Context has 2 phases:\n\n### 1. Creation Phase\n\nExample:\n\n\n\nMemory phase:\n\n\n\n---\n\n### 2. Execution Phase\n\n\n\nOutput:\n\n\n\n---\n\nFunction context example:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "console.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "Execution Context affects:\n\n* Stack depth (recursion cost)\n* Context switching overhead\n* Memory allocation pressure\n\nBad recursion:\n\n\n\nOutput:\n\n\n\nBetter:\n\n\n\nTrade-off:\n\n* recursion → readable but risky\n* iteration → stable but less expressive\n\n---",
+          "code": "function recurse() {\n  recurse();\n}\n\nrecurse();"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Hoisting confusion\n\n\n\nOutput:\n\n\n\n---\n\n### Scope leakage assumption\n\n\n\nOutput:\n\n\n\n---",
+          "code": "console.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "Assuming shared context:\n\n\n\nMistake: expecting x to persist across contexts.\n\n---",
+          "code": "function a() {\n  var x = 1;\n}\n\nfunction b() {\n  console.log(x);\n}"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "Nested execution contexts:\n\n\n\nFlow:\n\n\n\n---\n\nBlock scope interaction:\n\n\n\nOutput:\n\n\n\n---",
+          "code": "function outer() {\n  function inner() {\n    function deep() {\n      return \"deep\";\n    }\n    return deep();\n  }\n  return inner();\n}\n\nouter();"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "React render context:\n\n\n\nEach render:\n\n* new execution context created\n* state re-initialized\n\nNode.js request handling:\n\n\n\nEach request:\n\n* new function execution context\n* isolated request scope\n\n---",
+          "code": "function App() {\n  const state = 1;\n  console.log(state);\n  return \"UI\";\n}\n\nApp();"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 execution pipeline:\n\n\n\nExecution Context mapping:\n\n\n\nExample:\n\n\n\n* object in heap\n* reference in execution context stack frame\n\n---",
+          "code": "JavaScript Code\n   ↓\nParser → AST\n   ↓\nIgnition (Interpreter)\n   ↓\nBytecode Execution\n   ↓\nTurboFan (Compiler)\n   ↓\nMachine Code"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "* Call Stack: Execution Contexts are pushed and popped from the call stack during execution.\n* Memory Heap: Execution Contexts reference objects stored in heap memory.\n* Hoisting: Happens during the creation phase of execution context.\n* Scope Chain: Execution Context determines variable lookup order.\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "* Lexical Environment: Learn how scope chains are resolved inside execution contexts.\n* Call Stack: Understand how execution contexts are managed in LIFO order.\n* Closures: Learn how execution contexts are preserved after function execution.\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Execution Context is the core runtime structure in JavaScript that defines how code is executed, scoped, and managed. It is created for every global script and function call, goes through creation and execution phases, and is destroyed after completion. It is critical because it explains hoisting, scope behavior, closures, and call stack mechanics. The most important thing to understand is that every JavaScript behavior is ultimately a consequence of how execution contexts are created, stacked, and destroyed."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "variables-and-scope",
+        "functions-in-javascript",
+        "how-js-executes-code"
+      ],
+      "related": [
+        "call-stack",
+        "memory-heap",
+        "hoisting"
+      ],
+      "next": [
+        "lexical-environment",
+        "call-stack",
+        "closures"
+      ]
+    },
+    "meta": {
+      "order": 3,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "javascript",
+        "runtime",
+        "call-stack",
+        "scope",
+        "memory-model"
+      ],
+      "estimated_time": "50min"
+    }
+  },
+  {
+    "id": "global-execution-context",
+    "title": "Global Execution Context",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Global Execution Context is the first execution context created by JavaScript engine, establishing the global scope, memory allocation, and execution baseline before any code runs.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Global Execution Context (GEC) là execution context đầu tiên được tạo ra khi JavaScript bắt đầu chạy bất kỳ file script nào.\n\nNó là “môi trường gốc” chứa toàn bộ global variables, function declarations, và thiết lập `this` ở scope toàn cục.\n\nVí dụ:\n\n\n\nNgay khi file này chạy, JavaScript engine thực hiện:\n\n\n\nExecution flow:\n\n\n\n---",
+          "code": "var x = 10;\n\nfunction add(a, b) {\n  return a + b;\n}\n\nconsole.log(add(x, 5));"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng bạn mở một công ty.\n\nGlobal Execution Context chính là:\n\n> “Trụ sở chính” nơi mọi thứ được đăng ký trước khi vận hành.\n\nVí dụ đời thực:\n\n- Nhân sự được ghi danh (variables)\n- Bộ phận được tạo danh sách (functions)\n- Nhưng chưa ai bắt đầu làm việc ngay\n\nVí dụ code:\n\n\n\nKết quả:\n\n\n\nVì trong GEC:\n\n- `user` đã được tạo trước\n- nhưng chưa gán giá trị\n\n---",
+          "code": "console.log(user);\n\nvar user = \"Alice\";"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Global Execution Context có thể mô hình hóa như một object:\n\n\n\nVí dụ:\n\n\n\nMental model:\n\n\n\nStack visualization:\n\n\n\n---",
+          "code": "GEC = {\n  memory: {\n    variables: {},\n    functions: {}\n  },\n  code: [],\n  this: window (browser)\n}"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "### 1. Khởi tạo môi trường runtime\n\nVí dụ:\n\n\n\nNếu không có GEC:\n\n- Không có nơi lưu `name`\n- Không có scope global\n\n---\n\n### 2. Hỗ trợ hoisting\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nVì GEC memory phase đã tạo function trước khi chạy code.\n\n---\n\n### 3. Là nền cho call stack\n\nVí dụ:\n\n\n\nStack:\n\n\n\n---",
+          "code": "var name = \"JS\";\n\nfunction greet() {\n  console.log(name);\n}"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Output:\n\n\n\nMemory phase:\n\n\n\nExecution phase:\n\n\n\n---",
+          "code": "var x = 2;\n\nfunction square(n) {\n  return n * n;\n}\n\nfunction run() {\n  return square(x);\n}\n\nconsole.log(run());"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Diagram:\n\n\n\n---",
+          "code": "1. Create Global Execution Context\n2. Push GEC into Call Stack\n3. Memory Phase:\n   - allocate variables\n   - register functions\n4. Execution Phase:\n   - execute line by line\n5. Call function → create new execution context\n6. Return → pop context"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Memory + Stack:\n\n\n\n---",
+          "code": "CALL STACK\n---\n| square EC          |\n| run EC             |\n| Global EC          |\n---\n\nGLOBAL MEMORY\n---\nx = 2\nsquare = fn\nrun = fn\n---"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Global Execution Context bao gồm:\n\n### 1. Variable Environment\n\n\n\nStored as:\n\n\n\n---\n\n### 2. Lexical Environment\n\n\n\nOuter scope is linked:\n\n\n\n---\n\n### 3. This Binding\n\nBrowser:\n\n\n\nOutput:\n\n\n\nNode.js:\n\n\n\nOutput:\n\n\n\n---",
+          "code": "var a = 10;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### 1. Global pollution\n\n\n\nProblem:\n\n- tăng memory usage\n- dễ conflict global scope\n\n---\n\n### 2. Memory leaks via global variables\n\n\n\nProblem:\n\n- giữ memory lâu dài\n- khó garbage collect\n\n---\n\n### Fix:\n\n\n\n---",
+          "code": "var a = 1;\nvar b = 2;\nvar c = 3;"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Hoisting misunderstanding\n\n\n\nOutput:\n\n\n\n---\n\n### 2. Function vs variable hoisting\n\n\n\nOutput:\n\n\n\n---",
+          "code": "console.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### 1. Nghĩ code chạy line-by-line hoàn toàn\n\nSai:\n\n- JS luôn có memory phase trước execution phase\n\n---\n\n### 2. Nghĩ let/const giống var\n\n\n\nError:\n\n\n\n---",
+          "code": "console.log(a);\nlet a = 10;"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### 1. Temporal Dead Zone\n\n\n\na exists but not initialized.\n\n---\n\n### 2. Multiple script tags sharing global scope\n\n\n\nBoth share same GEC → window object.\n\n---",
+          "code": "console.log(a);\nlet a = 5;"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### Browser environment\n\n\n\nGEC = window object\n\n---\n\n### Node.js environment\n\n\n\nGEC = global object\n\n---\n\n### React app\n\n\n\nApp exists in module scope, not polluting global GEC.\n\n---",
+          "code": "window.user = \"admin\";"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 pipeline:\n\n\n\nStack frame:\n\n\n\n---",
+          "code": "Source Code\n   ↓\nParser\n   ↓\nAST\n   ↓\nBytecode\n   ↓\nCreate Global Execution Context\n   ↓\nPush to Call Stack\n   ↓\nExecute"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Call Stack → GEC is first frame\n- Execution Context → GEC is base context\n- Hoisting → happens during GEC creation\n- Lexical Scope → linked from GEC\n- Event Loop → handles async outside GEC\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Call Stack\n- Function Execution Context\n- Closure\n- Event Loop\n- Hoisting Deep Dive\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Global Execution Context là execution context đầu tiên được tạo bởi JavaScript engine để thiết lập môi trường chạy cho toàn bộ chương trình.\n\nNó quan trọng vì:\n\n- tạo global scope\n- xử lý hoisting\n- thiết lập call stack ban đầu\n\nHoạt động theo 2 phase:\n\n- Memory Creation Phase (hoisting)\n- Execution Phase (run code)\n\nĐiều quan trọng nhất: mọi JavaScript program luôn bắt đầu từ Global Execution Context, và mọi function execution đều được xây trên nền context này."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "javascript-basics",
+        "call-stack",
+        "lexical-scope"
+      ],
+      "related": [
+        "execution-context",
+        "call-stack",
+        "memory-heap",
+        "hoisting"
+      ],
+      "next": [
+        "function-execution-context",
+        "closure",
+        "event-loop"
+      ]
+    },
+    "meta": {
+      "order": 4,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "execution-context",
+        "call-stack",
+        "javascript-runtime",
+        "memory-model",
+        "hoisting"
+      ],
+      "estimated_time": "40min"
+    }
+  },
+  {
+    "id": "call-stack",
+    "title": "Call Stack",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Call Stack is a LIFO data structure used by JavaScript engines to manage execution contexts, function calls, and synchronous execution flow.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Call Stack là một cấu trúc dữ liệu LIFO (Last In First Out) được JavaScript engine sử dụng để quản lý toàn bộ **Execution Context** trong quá trình chạy chương trình.\n\nMỗi function call sẽ tạo một stack frame và được push vào Call Stack. Khi function hoàn thành, frame đó bị pop ra.\n\nVí dụ:\n\n\n\nFlow:\n\n\n\nStack:\n\n\n\n---",
+          "code": "id=\"cs1\"\nfunction a() {\n  console.log(\"A\");\n}\n\nfunction b() {\n  a();\n}\n\nb();"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng Call Stack như một chồng sách.\n\nVí dụ đời thực:\n\n- Bạn đặt sách lên → push\n- Bạn lấy sách trên cùng → pop\n\nJavaScript:\n\n\n\nTrực giác:\n\n\n\nStack:\n\n\n\n---",
+          "code": "id=\"cs4\"\nfunction first() {\n  second();\n}\n\nfunction second() {\n  third();\n}\n\nfunction third() {\n  console.log(\"end\");\n}\n\nfirst();"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Call Stack là “ngăn xếp trạng thái hiện tại của chương trình”.\n\n\n\nVí dụ:\n\n\n\nStack:\n\n\n\n---",
+          "code": "id=\"cs7\"\nCall Stack =\n[\n  Global Execution Context,\n  Function Execution Context,\n  Function Execution Context\n]"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "### 1. Quản lý luồng thực thi\n\nVí dụ:\n\n\n\nKhông có stack → không biết quay lại đâu sau khi c() kết thúc.\n\n---\n\n### 2. Đảm bảo return đúng context\n\nVí dụ:\n\n\n\nStack đảm bảo:\n\n- sum xong → quay về main\n- main xong → quay về global\n\n---\n\n### 3. Debug stack trace\n\nVí dụ lỗi:\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"cs10\"\nfunction a() {\n  b();\n}\n\nfunction b() {\n  c();\n}\n\nfunction c() {\n  console.log(\"done\");\n}\n\na();"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Output:\n\n\n\nStack:\n\n\n\n---",
+          "code": "id=\"cs14\"\nfunction multiply(a, b) {\n  return a * b;\n}\n\nfunction square(n) {\n  return multiply(n, n);\n}\n\nfunction start() {\n  return square(5);\n}\n\nconsole.log(start());"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Flow:\n\n\n\n---",
+          "code": "id=\"cs17\"\n1. Global Execution Context created\n2. start() called → push start\n3. square() called → push square\n4. multiply() called → push multiply\n5. return multiply → pop\n6. return square → pop\n7. return start → pop\n8. back to Global EC"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "---",
+          "code": "id=\"cs19\"\nCALL STACK\n---\n| multiply          |\n| square            |\n| start             |\n| Global EC         |\n---"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Mỗi stack frame là một Execution Context:\n\n\n\nVí dụ:\n\n\n\nStack frame:\n\n\n\n---",
+          "code": "id=\"cs20\"\n{\n  variableEnvironment,\n  lexicalEnvironment,\n  thisBinding,\n  codeState\n}"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### 1. Stack overflow\n\n\n\nError:\n\n\n\n---\n\n### 2. Blocking main thread\n\n\n\nResult:\n\n- UI freeze\n- event loop blocked\n\n---",
+          "code": "id=\"cs23\"\nfunction rec() {\n  rec();\n}\n\nrec();"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Infinite recursion\n\n\n\n---\n\n### 2. Missing base case\n\n\n\nFix:\n\n\n\n---",
+          "code": "id=\"cs26\"\nfunction loop() {\n  loop();\n}\n\nloop();"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### 1. Nghĩ JS chạy song song trong stack\n\nSai:\n\n\n\nJS chạy tuần tự.\n\n---\n\n### 2. Nhầm async nằm trong stack\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"cs29\"\nconsole.log(1);\nconsole.log(2);\nconsole.log(3);"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### 1. Stack limit khác nhau theo engine\n\n\n\n---\n\n### 2. Tail recursion không luôn optimize\n\n\n\n---",
+          "code": "id=\"cs32\"\nfunction deep(n) {\n  if (n === 0) return;\n  deep(n - 1);\n}\n\ndeep(100000);"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### React\n\n\n\nStack:\n\n\n\n---\n\n### Node.js\n\n\n\nMỗi request tạo stack frame riêng.\n\n---",
+          "code": "id=\"cs34\"\nfunction App() {\n  return Child();\n}\n\nfunction Child() {\n  return \"Hi\";\n}"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 pipeline:\n\n\n\nStack frame:\n\n\n\n---",
+          "code": "id=\"cs37\"\nSource Code\n  ↓\nParser\n  ↓\nAST\n  ↓\nBytecode\n  ↓\nExecution Context\n  ↓\nCall Stack Push"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context → đơn vị trong stack\n- Event Loop → xử lý async ngoài stack\n- Memory Heap → lưu object\n- Global Execution Context → frame đầu tiên\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Event Loop\n- Async JavaScript\n- Closures\n- Memory Heap\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Call Stack là cấu trúc LIFO quản lý toàn bộ execution flow của JavaScript, đảm bảo function được gọi và trả về đúng thứ tự, tạo nền tảng cho synchronous execution.\n\nQuan trọng nhất:\n\n- Mỗi function call tạo một stack frame\n- JS chạy single-thread trong stack\n- Stack overflow xảy ra khi recursion sai\n- Async không chạy trực tiếp trong stack mà thông qua event loop"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "global-execution-context",
+        "execution-context",
+        "functions-in-javascript"
+      ],
+      "related": [
+        "event-loop",
+        "memory-heap",
+        "async-javascript",
+        "execution-context"
+      ],
+      "next": [
+        "event-loop",
+        "closure",
+        "async-await"
+      ]
+    },
+    "meta": {
+      "order": 5,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "call-stack",
+        "execution-context",
+        "javascript-runtime",
+        "stack-overflow",
+        "event-loop"
+      ],
+      "estimated_time": "45min"
+    }
+  },
+  {
+    "id": "hoisting",
+    "title": "Hoisting",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Hoisting is JavaScript behavior where variable and function declarations are moved to the top of their scope during the memory creation phase before code execution.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Hoisting là cơ chế trong JavaScript nơi các **declarations (khai báo biến và hàm)** được “đưa lên đầu scope” trong giai đoạn **Memory Creation Phase** của Execution Context.\n\nQuan trọng: chỉ declaration được hoist, không phải initialization.\n\nVí dụ:\n\n\n\nKết quả:\n\n\n\nVì JS thực chất xử lý như:\n\n\n\n---",
+          "code": "id=\"h1\"\nconsole.log(a);\n\nvar a = 10;"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng bạn vào một lớp học.\n\nGiáo viên:\n\n- ghi danh sách học sinh trước (hoisting)\n- nhưng chưa gán điểm ngay\n\nVí dụ đời thực:\n\n\n\nTrực giác:\n\n- tên đã được “đăng ký”\n- nhưng chưa có giá trị\n\nOutput:\n\n\n\n---",
+          "code": "id=\"h4\"\nconsole.log(student);\nvar student = \"Alice\";"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Hoisting xảy ra trong **Memory Creation Phase** của Execution Context.\n\n\n\nMô hình:\n\n\n\nVí dụ:\n\n\n\nSau hoisting:\n\n\n\n---",
+          "code": "id=\"h6\"\nExecution Context\n  ↓\nMemory Creation Phase\n  ↓\nHoist declarations\n  ↓\nExecution Phase"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "### 1. JS cần biết trước “tất cả định danh”\n\nVí dụ:\n\n\n\nNếu không hoisting:\n\n- engine sẽ không biết x tồn tại\n\n---\n\n### 2. Cho phép gọi function trước khi khai báo\n\nVí dụ:\n\n\n\nOutput:\n\n\n\n---\n\n### 3. Giảm phụ thuộc thứ tự code\n\nVí dụ:\n\n\n\n---",
+          "code": "id=\"h10\"\nfunction run() {\n  console.log(x);\n  var x = 10;\n}\nrun();"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "### var hoisting\n\n\n\nOutput:\n\n\n\n---\n\n### function hoisting\n\n\n\nOutput:\n\n\n\n---\n\n### let/const (TDZ)\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"h14\"\nconsole.log(a);\nvar a = 10;\nconsole.log(a);"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Flow diagram:\n\n\n\n---",
+          "code": "id=\"h20\"\n1. Create Execution Context\n2. Memory Creation Phase:\n   - var → undefined\n   - function → full definition\n   - let/const → TDZ\n3. Execution Phase:\n   - run code line by line"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Memory table before execution:\n\n\n\nStack:\n\n\n\n---",
+          "code": "id=\"h22\"\nGLOBAL MEMORY\n---\na → undefined\nfoo → function()\n---"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "### 1. var hoisting\n\n\n\nBecomes:\n\n\n\n---\n\n### 2. function hoisting\n\n\n\nFully hoisted:\n\n\n\n---\n\n### 3. let/const TDZ\n\n\n\nMemory:\n\n\n\n---",
+          "code": "id=\"h24\"\nvar a = 10;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "Hoisting itself không gây overhead runtime lớn, nhưng ảnh hưởng tới:\n\n### 1. Debug confusion\n\n\n\n---\n\n### 2. Hidden bugs in large codebases\n\n\n\n---\n\n### 3. Memory phase complexity\n\nLarge scripts:\n\n- nhiều variables → memory allocation lớn upfront\n\n---",
+          "code": "id=\"h30\"\nconsole.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Unexpected undefined\n\n\n\n---\n\n### 2. Function overwrite\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"h32\"\nconsole.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### 1. Nghĩ JS chạy từ trên xuống 100%\n\nSai:\n\n- JS luôn có memory phase trước execution\n\n---\n\n### 2. Nhầm let/const hoisting giống var\n\n\n\n→ ReferenceError do TDZ\n\n---",
+          "code": "id=\"h35\"\nconsole.log(a);\nlet a = 10;"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### 1. Function expression không hoisted như function declaration\n\n\n\nOutput:\n\n\n\n---\n\n### 2. Mixed hoisting conflicts\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"h36\"\nsayHi();\n\nvar sayHi = function() {\n  console.log(\"hi\");\n};"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### Module bundlers\n\nWebpack/Vite:\n\n- wrap code trong function scope\n- reduce global hoisting issues\n\n\n\n---\n\n### React components\n\n\n\nHoisted safely as function declaration inside module scope.\n\n---",
+          "code": "id=\"h40\"\n(function () {\n  var a = 10;\n})();"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 execution phases:\n\n\n\nMemory allocation:\n\n\n\n---",
+          "code": "id=\"h42\"\nSource Code\n  ↓\nParser\n  ↓\nAST\n  ↓\nScope Analysis\n  ↓\nMemory Creation Phase (Hoisting)\n  ↓\nExecution Phase"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context → nơi hoisting xảy ra\n- Call Stack → chứa context sau hoisting\n- TDZ → trạng thái let/const\n- Lexical Environment → nơi lưu bindings\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Lexical Environment\n- Temporal Dead Zone\n- Closures\n- Execution Context Stack\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Hoisting là cơ chế JavaScript xử lý khai báo biến và hàm trong Memory Creation Phase trước khi code chạy, giúp engine biết trước toàn bộ identifiers trong scope.\n\nQuan trọng:\n\n- var → undefined\n- function → hoisted hoàn chỉnh\n- let/const → TDZ (không truy cập được trước khi khai báo)\n- Hoisting xảy ra trước execution, không phải runtime re-ordering thực sự\n\nHiểu hoisting giúp bạn tránh bug undefined, ReferenceError và hiểu chính xác cách JavaScript engine xử lý code từ bên trong."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "global-execution-context",
+        "call-stack",
+        "execution-context",
+        "lexical-scope"
+      ],
+      "related": [
+        "execution-context",
+        "global-execution-context",
+        "temporal-dead-zone",
+        "variable-environment"
+      ],
+      "next": [
+        "lexical-environment",
+        "closure",
+        "execution-context"
+      ]
+    },
+    "meta": {
+      "order": 6,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "hoisting",
+        "execution-context",
+        "javascript-runtime",
+        "memory-creation-phase",
+        "scope"
+      ],
+      "estimated_time": "45min"
+    }
+  },
+  {
+    "id": "lexical-environment",
+    "title": "Lexical Environment",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Lexical Environment is the internal structure used by JavaScript engines to store variable bindings and resolve identifiers based on where code is physically written.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Lexical Environment là cấu trúc nội bộ trong JavaScript engine dùng để quản lý **bindings (biến, function, const, let)** dựa trên **vị trí viết code (lexical position)**, không phải nơi hàm được gọi.\n\nMỗi Execution Context đều chứa một Lexical Environment.\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nGiải thích:\n\n- inner tìm `y` trong outer Lexical Environment\n- không có → đi ra global Lexical Environment để tìm `x`\n\n---",
+          "code": "id=\"le1\"\nlet x = 10;\n\nfunction outer() {\n  let y = 20;\n\n  function inner() {\n    console.log(x + y);\n  }\n\n  inner();\n}\n\nouter();"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng Lexical Environment như hệ thống “phòng làm việc có tủ hồ sơ riêng”.\n\nVí dụ đời thực:\n\n- mỗi phòng (function) có tài liệu riêng\n- nếu không có → đi sang phòng cha\n\n\n\nOutput:\n\n\n\nTrực giác:\n\n- roomB không có document\n- nhưng có thể “mượn” từ roomA\n\n---",
+          "code": "id=\"le3\"\nfunction roomA() {\n  let document = \"A\";\n\n  function roomB() {\n    console.log(document);\n  }\n\n  roomB();\n}\n\nroomA();"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Lexical Environment = 2 phần chính:\n\n\n\nVí dụ:\n\n\n\nMô hình:\n\n\n\nScope chain:\n\n\n\n---",
+          "code": "id=\"le5\"\nLexical Environment = {\n  Environment Record: {\n    bindings (variables, functions)\n  },\n  Outer Reference: <parent lexical environment>\n}"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "### 1. Variable resolution theo lexical scope\n\n\n\nNếu không có lexical environment → không biết x nằm ở đâu.\n\n---\n\n### 2. Hỗ trợ nested functions\n\n\n\n---\n\n### 3. Nền tảng của closure\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"le9\"\nlet x = 100;\n\nfunction test() {\n  console.log(x);\n}\n\ntest();"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Output:\n\n\n\n---",
+          "code": "id=\"le13\"\nfunction parent() {\n  let message = \"Hello Lexical Environment\";\n\n  function child() {\n    console.log(message);\n  }\n\n  child();\n}\n\nparent();"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Flow:\n\n\n\n---",
+          "code": "id=\"le15\"\n1. Create Global Execution Context\n2. Create Global Lexical Environment\n   - x = 10\n   - outer = function\n3. Call outer()\n4. Create outer Lexical Environment\n   - y = 20\n5. Call inner()\n6. Create inner Lexical Environment (empty bindings)\n7. Resolve variables:\n   - y found in outer LE\n   - x found in global LE\n8. Execute console.log"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Lexical Environment Chain:\n\n\n\nMemory view:\n\n\n\n---",
+          "code": "id=\"le17\"\nGLOBAL LE\n  ↓\nouter LE\n  ↓\ninner LE"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "### 1. Environment Record\n\n\n\nEnvironment Record:\n\n\n\n---\n\n### 2. Outer Lexical Reference\n\n\n\nChain:\n\n\n\n---\n\n### 3. Variable resolution algorithm\n\n\n\nSteps:\n\n\n\n---",
+          "code": "id=\"le19\"\nfunction test() {\n  let a = 1;\n  const b = 2;\n  var c = 3;\n}"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### 1. Deep scope chain cost\n\n\n\nCost:\n\n- lookup nhiều tầng → tăng overhead nhỏ\n\n---\n\n### 2. Closure memory retention\n\n\n\n---",
+          "code": "id=\"le25\"\nfunction a() {\n  function b() {\n    function c() {\n  function d() {\n  console.log(\"deep lookup\");\n  }\n    }\n  }\n}"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Unexpected ReferenceError\n\n\n\n---\n\n### 2. Shadowing variable\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"le27\"\nfunction test() {\n  console.log(x);\n}\ntest();"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### 1. Nghĩ JS tìm biến theo nơi gọi\n\nSai:\n\n\n\nOutput:\n\n\n\n---\n\n### 2. Nhầm lexical scope với dynamic scope\n\nJS KHÔNG dùng dynamic scope.\n\n---",
+          "code": "id=\"le30\"\nlet x = 10;\n\nfunction f() {\n  console.log(x);\n}\n\nfunction g() {\n  let x = 20;\n  f();\n}\n\ng();"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### 1. Block scope interaction\n\n\n\nError:\n\n\n\n---\n\n### 2. Closure giữ reference, không giữ snapshot\n\n\n\n---",
+          "code": "id=\"le32\"\n{\n  let x = 1;\n}\nconsole.log(x);"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### React hooks closure trap\n\n\n\n---\n\n### Event listeners\n\n\n\n---",
+          "code": "id=\"le35\"\nfunction Component() {\n  let count = 0;\n\n  setTimeout(() => {\n    console.log(count);\n  }, 1000);\n}"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 model:\n\n\n\nLookup process:\n\n\n\n---",
+          "code": "id=\"le37\"\nExecution Context\n  ↓\nLexical Environment\n  ↓\nEnvironment Record\n  ↓\nOuter Lexical Reference"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context → container của Lexical Environment\n- Scope Chain → chuỗi lookup\n- Closure → giữ Lexical Environment sau execution\n- Hoisting → ảnh hưởng initialization trong Environment Record\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Closure\n- Scope Chain\n- This Binding\n- Variable Environment\n- Event Loop\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Lexical Environment là cấu trúc cốt lõi của JavaScript dùng để lưu trữ bindings và thực hiện variable resolution dựa trên vị trí viết code.\n\nQuan trọng:\n\n- Mỗi execution context có lexical environment riêng\n- Lookup biến đi theo scope chain (outer references)\n- Là nền tảng của closures\n- Quyết định cách JavaScript resolve variables trong runtime\n\nĐiều quan trọng nhất: JavaScript luôn tìm biến theo **lexical position**, không phải theo nơi hàm được gọi."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "execution-context",
+        "global-execution-context",
+        "hoisting",
+        "scope-chain-basics"
+      ],
+      "related": [
+        "execution-context",
+        "variable-environment",
+        "scope-chain",
+        "closure"
+      ],
+      "next": [
+        "closure",
+        "scope-chain",
+        "this-binding"
+      ]
+    },
+    "meta": {
+      "order": 7,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "lexical-scope",
+        "execution-context",
+        "scope-chain",
+        "javascript-runtime",
+        "closure",
+        "variable-resolution"
+      ],
+      "estimated_time": "50min"
+    }
+  },
+  {
+    "id": "scope-chain",
+    "title": "Scope Chain",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Scope Chain is the mechanism JavaScript uses to resolve variable lookups through nested lexical environments.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Scope Chain là cơ chế JavaScript dùng để tìm và resolve biến khi code được thực thi. Khi một biến được truy cập, JavaScript sẽ tìm trong scope hiện tại trước, nếu không thấy thì tiếp tục tìm trong scope cha, rồi tiếp tục đi lên global scope cho đến khi tìm thấy hoặc kết thúc.\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nFlow lookup:\n\n\n\n---",
+          "code": "const a = 10;\n\nfunction outer() {\n  const b = 20;\n\n  function inner() {\n    const c = 30;\n\n    console.log(a); // global scope\n    console.log(b); // outer scope\n    console.log(c); // inner scope\n  }\n\n  inner();\n}\n\nouter();"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng bạn đang tìm một đồ vật trong nhà nhiều tầng.\n\nVí dụ đời thực:\n\n\n\nJavaScript hoạt động giống hệt:\n\n\n\nOutput:\n\n\n\n---",
+          "code": "Phòng ngủ (inner scope)\n  ↓ không thấy remote\nPhòng khách (outer scope)\n  ↓ không thấy\nNhà kho (global scope)\n  ↓ tìm thấy"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Scope Chain = chuỗi các Lexical Environment liên kết với nhau.\n\n\n\nVí dụ:\n\n\n\nLookup flow:\n\n\n\n---",
+          "code": "[Inner Scope]\n  ↓\n[Outer Scope]\n  ↓\n[Global Scope]\n  ↓\nnull"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "Scope Chain tồn tại để giải quyết bài toán variable resolution trong nested functions mà không cần copy toàn bộ biến.\n\nVí dụ vấn đề nếu không có scope chain:\n\n\n\nNếu không có scope chain:\n\n- inner phải copy bigData → cực kỳ tốn bộ nhớ\n\nNhờ scope chain:\n\n- inner chỉ giữ reference tới outer scope\n\n---",
+          "code": "function outer() {\n  const bigData = new Array(1000000).fill(1);\n\n  function inner() {\n    console.log(bigData.length);\n  }\n\n  inner();\n}"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "Shadowing + scope chain:\n\n\n\nOutput:\n\n\n\nGiải thích:\n\n- third không có value\n- tìm lên second trước\n- dừng tại match đầu tiên\n\n---",
+          "code": "const value = \"global\";\n\nfunction first() {\n  const value = \"first\";\n\n  function second() {\n    const value = \"second\";\n\n    function third() {\n  console.log(value);\n    }\n\n    third();\n  }\n\n  second();\n}\n\nfirst();"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "JavaScript tạo execution context cho mỗi function:\n\n\n\nLookup flow:\n\n\n\n---",
+          "code": "Global Context\n  value = \"global\"\n\nfirst()\n  Context:\n    value = \"first\"\n\nsecond()\n  Context:\n    value = \"second\"\n\nthird()\n  Context:\n    (no value)"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Scope tree:\n\n\n\nVariable lookup:\n\n\n\n---",
+          "code": "Global\n └── first\n  └── second\n  └── third"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Scope Chain thực chất là chain của Lexical Environment objects.\n\n\n\nInternal structure:\n\n\n\nLookup algorithm:\n\n\n\n---",
+          "code": "function outer() {\n  let a = 10;\n\n  function inner() {\n    let b = 20;\n    console.log(a + b);\n  }\n\n  inner();\n}"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "Scope chain lookup cost depends on depth.\n\nExample deep nesting:\n\n\n\nLookup path:\n\n\n\nImpact:\n\n- deeper chain = slower lookup\n- modern engines optimize via inline caching\n\n---",
+          "code": "let a = 1;\n\nfunction l1() {\n  function l2() {\n    function l3() {\n  function l4() {\n  console.log(a);\n  }\n  l4();\n    }\n    l3();\n  }\n  l2();\n}\n\nl1();"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Shadowing confusion\n\n\n\n### 2. Accidental global leak\n\n\n\n---",
+          "code": "const x = 10;\n\nfunction test() {\n  const x = 20;\n  console.log(x);\n}\n\ntest(); // 20"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### Thinking function uses caller scope\n\n\n\n---",
+          "code": "const a = 1;\n\nfunction A() {\n  console.log(a);\n}\n\nfunction B() {\n  const a = 999;\n  A();\n}\n\nB(); // 1, not 999"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### Block scope vs function scope\n\n\n\n### Temporal Dead Zone\n\n\n\n---",
+          "code": "{\n  let a = 10;\n}\n\nconsole.log(a); // ReferenceError"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "Closure example (React-like hook):\n\n\n\nNode.js middleware:\n\n\n\n---",
+          "code": "function useCounter() {\n  let count = 0;\n\n  return function increment() {\n    count++;\n    console.log(count);\n  };\n}\n\nconst inc = useCounter();\n\ninc(); // 1\ninc(); // 2"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 engine representation:\n\n\n\nOptimization techniques:\n\n- inline caching\n- hidden classes\n- scope flattening\n\nExample optimized function:\n\n\n\nEngine may store `a`, `b` in registers instead of chain lookup.\n\n---",
+          "code": "Call Stack\n  ↓\nExecution Context\n  ↓\nLexical Environment\n  ↓\nOuter Reference Chain"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- **Closures**: scope chain enables functions to remember outer variables.\n- **Lexical Scope**: defines how scope chain is formed.\n- **Execution Context**: creates scope environments.\n- **Hoisting**: affects visibility inside scope chain.\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Closures\n- Execution Context deep dive\n- Hoisting mechanics\n- This binding rules\n- Call stack vs scope chain\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Scope Chain là cơ chế JavaScript dùng để resolve biến bằng cách đi qua chuỗi lexical environments từ scope hiện tại lên scope cha cho đến global scope. Nó quan trọng vì quyết định cách variable lookup hoạt động, là nền tảng cho closures và lexical scoping, và ảnh hưởng trực tiếp đến hành vi runtime của code. Điều quan trọng nhất cần nhớ là JavaScript luôn tìm biến theo nơi khai báo (lexical scope), không phải nơi gọi, và scope chain chính là cơ chế thực thi điều đó."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "execution-context",
+        "lexical-scope",
+        "call-stack"
+      ],
+      "related": [
+        "closures",
+        "hoisting",
+        "variable-environment"
+      ],
+      "next": [
+        "closures",
+        "this-binding"
+      ]
+    },
+    "meta": {
+      "order": 8,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "javascript",
+        "scope",
+        "lexical-scope",
+        "closures",
+        "execution-context"
+      ],
+      "estimated_time": "40min"
+    }
+  },
+  {
+    "id": "memory-creation-phase",
+    "title": "Memory Creation Phase",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Memory Creation Phase is the stage where JavaScript sets up variables, functions, and scope before code execution begins.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Memory Creation Phase là giai đoạn đầu tiên khi JavaScript tạo Execution Context. Trong giai đoạn này, engine chưa chạy code dòng lệnh, mà chỉ “chuẩn bị bộ nhớ” cho biến, function và scope.\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nGiải thích:\n\n- `a` được tạo trong memory phase với giá trị `undefined`\n- function `foo` được hoist toàn bộ\n\nFlow:\n\n\n\n---",
+          "code": "id=\"mc1\"\nconsole.log(a);\nvar a = 10;\n\nfunction foo() {\n  return \"hello\";\n}"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng bạn mở một nhà hàng.\n\nTrước khi phục vụ khách:\n\n- bạn đặt bàn\n- chuẩn bị menu\n- setup bếp\n\nVí dụ đời thực:\n\n\n\nJavaScript cũng vậy:\n\n\n\nBạn chưa “nấu”, chỉ mới “setup”.\n\n---",
+          "code": "id=\"int1\"\nChuẩn bị (memory creation)\n  ↓\nPhục vụ khách (execution)"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Execution Context gồm 2 phase:\n\n\n\nMemory layout:\n\n\n\nVí dụ:\n\n\n\nMemory phase:\n\n\n\n---",
+          "code": "id=\"mm1\"\n1. Memory Creation Phase\n2. Execution Phase"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "JavaScript cần Memory Creation Phase để:\n\n### 1. Đảm bảo hoisting behavior\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nNếu không có memory phase → code sẽ crash.\n\n---\n\n### 2. Setup function availability\n\n\n\nOutput:\n\n\n\nFunction được lưu hoàn chỉnh ngay từ memory phase.\n\n---",
+          "code": "id=\"why1\"\nconsole.log(a);\nvar a = 5;"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "### var vs let trong memory phase\n\n\n\nOutput:\n\n\n\nMemory behavior:\n\n\n\n---",
+          "code": "id=\"ex1\"\nconsole.log(a);\n// console.log(b); // TDZ error\n\nvar a = 10;\nlet b = 20;"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "JavaScript chạy qua 2 bước:\n\n\n\nChi tiết:\n\n\n\nVí dụ:\n\n\n\nFlow:\n\n\n\n---",
+          "code": "id=\"flow1\"\n1. Memory Creation Phase\n2. Execution Phase"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Memory table:\n\n\n\nStack view:\n\n\n\n---",
+          "code": "id=\"vis1\"\nBefore execution:\n\nx → undefined\nfoo → function()\ny → TDZ"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Memory Creation Phase tạo ra Lexical Environment:\n\n\n\nInternal structure:\n\n\n\nHoisting rules:\n\n| Type     | Memory Phase Behavior |\n| -------- | --------------------- |\n| var      | undefined             |\n| let      | TDZ                   |\n| const    | TDZ                   |\n| function | fully initialized     |\n\n---",
+          "code": "id=\"deep1\"\nfunction outer() {\n  var a = 10;\n  let b = 20;\n}"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "Memory Creation Phase ảnh hưởng:\n\n### 1. Startup cost\n\n\n\nMemory allocation upfront.\n\n### 2. Optimization by engines\n\nV8 tối ưu bằng:\n\n- lazy initialization\n- register allocation\n\n---",
+          "code": "id=\"perf1\"\nfunction heavy() {\n  var a = new Array(1000000);\n}"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Using var before assignment\n\n\n\nOutput:\n\n\n\n---\n\n### 2. TDZ error\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"bug1\"\nconsole.log(x);\nvar x = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### Thinking let behaves like var\n\n\n\nWrong expectation:\n\n- expect undefined\n\nReality:\n\n- ReferenceError due to TDZ\n\n---",
+          "code": "id=\"mist1\"\nconsole.log(a);\nlet a = 5;"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### Function inside block\n\n\n\nBehavior depends on strict mode and engine.\n\n---\n\n### Multiple declarations\n\n\n\nMemory phase merges declarations.\n\n---",
+          "code": "id=\"edge1\"\n{\n  function test() {\n    return \"ok\";\n  }\n}"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### React rendering phase\n\n\n\nBefore render:\n\n- memory setup for hooks\n\n---\n\n### Node.js module loading\n\n\n\nMemory phase:\n\n- module scope initialized before execution\n\n---",
+          "code": "id=\"real1\"\nfunction Component() {\n  const state = useState(0);\n  return <div />;\n}"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 execution model:\n\n\n\nMemory layout:\n\n\n\n---",
+          "code": "id=\"engine1\"\nParsing\n  ↓\nAST Creation\n  ↓\nExecution Context Creation\n  ↓\nMemory Creation Phase\n  ↓\nExecution Phase"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context: Memory phase là bước đầu tiên\n- Hoisting: kết quả của memory creation\n- Scope Chain: dùng trong resolution sau khi memory setup\n- TDZ: trạng thái chưa khởi tạo của let/const\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Execution Phase\n- Hoisting deep dive\n- TDZ mechanics\n- Lexical Environment\n- Call Stack behavior\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Memory Creation Phase là giai đoạn JavaScript engine chuẩn bị toàn bộ bộ nhớ cho variables, functions và scope trước khi code chạy. Nó quan trọng vì giải thích hoisting, TDZ, và cách execution context hoạt động. JavaScript không chạy code ngay lập tức mà luôn setup memory trước, và điều này quyết định cách biến được truy cập trong toàn bộ runtime."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "execution-context",
+        "call-stack",
+        "hoisting"
+      ],
+      "related": [
+        "execution-context",
+        "scope-chain",
+        "hoisting"
+      ],
+      "next": [
+        "execution-phase",
+        "lexical-environment"
+      ]
+    },
+    "meta": {
+      "order": 9,
+      "difficulty": "intermediate",
+      "importance": "high",
+      "tags": [
+        "javascript",
+        "execution-context",
+        "hoisting",
+        "memory-model",
+        "variable-environment"
+      ],
+      "estimated_time": "40min"
+    }
+  },
+  {
+    "id": "execution-phase",
+    "title": "Execution Phase",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "execution-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Execution Phase is the stage in JavaScript execution context where code is executed line-by-line after memory creation, using already allocated variables and functions.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Execution Phase là giai đoạn thứ hai trong Execution Context lifecycle của JavaScript, nơi code được chạy **từng dòng một (line-by-line execution)** sau khi Memory Creation Phase đã hoàn tất.\n\nỞ giai đoạn này:\n\n- biến đã được hoist\n- function đã được lưu trong memory\n- engine bắt đầu “thực thi logic”\n\nVí dụ:\n\n\n\nOutput:\n\n\n\nExecution Phase là nơi JavaScript “thực sự chạy”.\n\n---",
+          "code": "id=\"ep1\"\nvar a = 10;\nvar b = 20;\n\nfunction sum(x, y) {\n  return x + y;\n}\n\nvar result = sum(a, b);\nconsole.log(result);"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Hãy tưởng tượng 2 giai đoạn:\n\n- Memory Phase: chuẩn bị nguyên liệu\n- Execution Phase: nấu ăn\n\nVí dụ đời thực:\n\n\n\nTrực giác:\n\n- Memory Phase: chuẩn bị gạo + nước + công thức\n- Execution Phase: bắt đầu nấu\n\nOutput:\n\n\n\n---",
+          "code": "id=\"ep3\"\nlet rice = \"raw\";\nlet water = \"available\";\n\nfunction cook() {\n  return \"cooked rice\";\n}\n\nlet meal = cook();\nconsole.log(meal);"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Execution Phase hoạt động như một **instruction runner**:\n\n\n\nMô hình runtime:\n\n\n\nVí dụ:\n\n\n\nExecution order:\n\n\n\n---",
+          "code": "id=\"ep5\"\nExecution Context\n  ↓\nMemory Phase (setup)\n  ↓\nExecution Phase (run code line by line)"
+        },
+        {
+          "type": "text",
+          "title": "Why It Exists",
+          "body": "### 1. Tách setup và execution\n\nVí dụ:\n\n\n\nNếu không tách phase:\n\n- engine không biết a tồn tại\n\n---\n\n### 2. Cho phép hoisting hoạt động\n\n\n\nMemory Phase:\n\n- sayHi tồn tại\n\nExecution Phase:\n\n- gọi function\n\n---\n\n### 3. Đảm bảo deterministic execution order\n\n\n\n---",
+          "code": "id=\"ep9\"\nconsole.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "### Basic execution flow\n\n\n\nOutput:\n\n\n\n---\n\n### Function execution\n\n\n\nOutput:\n\n\n\n---",
+          "code": "id=\"ep12\"\nlet a = 5;\nlet b = 10;\nlet sum = a + b;\n\nconsole.log(sum);"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "Ví dụ:\n\n\n\nFlow:\n\n\n\nRuntime flow:\n\n\n\n---",
+          "code": "id=\"ep16\"\nlet x = 2;\nlet y = 3;\nlet z = x * y;"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "Stack + execution:\n\n\n\nMemory vs Execution:\n\n\n\n---",
+          "code": "id=\"ep19\"\nCall Stack\n---\nGlobal Execution Context\n---\n\nExecution Phase:\na = 10\nb = 20\nsum = a + b"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "### 1. Variable assignment happens here\n\n\n\n---\n\n### 2. Function invocation happens here\n\n\n\nExecution Phase:\n\n- function call triggered\n- new execution context created\n\n---\n\n### 3. Expression evaluation\n\n\n\nEngine:\n\n\n\n---",
+          "code": "id=\"ep21\"\nvar a;\na = 10;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### 1. Execution cost depends on operations\n\n\n\nCost:\n\n- loop execution heavy\n\n---\n\n### 2. Function call overhead\n\n\n\n---",
+          "code": "id=\"ep25\"\nfor (let i = 0; i < 1000000; i++) {\n  let x = i * 2;\n}"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### 1. Using variable before assignment\n\n\n\nOutput:\n\n\n\n---\n\n### 2. Wrong execution order assumption\n\n\n\nError:\n\n\n\n---",
+          "code": "id=\"ep27\"\nconsole.log(a);\nvar a = 10;"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### 1. Nghĩ JS chạy “all at once”\n\nSai:\n\n- JS không chạy toàn bộ code cùng lúc\n\n---\n\n### 2. Nhầm Memory Phase là execution\n\nSai:\n\n- Memory Phase chỉ setup\n- Execution Phase mới chạy logic\n\n---"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### 1. Function hoisting + execution mismatch\n\n\n\nOutput:\n\n\n\n---\n\n### 2. Temporal Dead Zone interaction\n\n\n\nError:\n\n\n\n---",
+          "code": "id=\"ep31\"\nsayHi();\n\nvar sayHi = function () {\n  console.log(\"hi\");\n};"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### React rendering flow\n\n\n\nExecution Phase:\n\n- component function runs line-by-line\n\n---\n\n### Node.js script execution\n\n\n\n---",
+          "code": "id=\"ep35\"\nfunction App() {\n  let state = 0;\n  state++;\n  return state;\n}"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 pipeline:\n\n\n\nExecution engine:\n\n\n\nCall stack:\n\n\n\n---",
+          "code": "id=\"ep37\"\nParsing\n  ↓\nMemory Creation Phase\n  ↓\nExecution Phase\n  ↓\nBytecode execution"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- Execution Context → container of execution phase\n- Memory Creation Phase → setup before execution\n- Call Stack → manages execution contexts\n- Event Loop → schedules execution phases\n- Lexical Environment → variable resolution during execution\n\n---"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Call Stack\n- Event Loop\n- Closure\n- Microtask Queue\n- Execution Context Lifecycle\n\n---"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Execution Phase là giai đoạn JavaScript thực thi code sau khi Memory Creation Phase đã hoàn tất, nơi tất cả statements được chạy theo thứ tự từ trên xuống dưới.\n\nQuan trọng:\n\n- Code chạy line-by-line\n- Biến đã được chuẩn bị từ Memory Phase\n- Function calls tạo execution context mới\n- Đây là giai đoạn quyết định hành vi runtime thực tế\n\nĐiều quan trọng nhất: JavaScript không “chạy cùng lúc”, mà chạy từng dòng trong Execution Phase dựa trên trạng thái đã được thiết lập trước đó."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [
+        "execution-context",
+        "memory-creation-phase",
+        "hoisting",
+        "lexical-environment"
+      ],
+      "related": [
+        "call-stack",
+        "execution-context",
+        "memory-creation-phase",
+        "event-loop"
+      ],
+      "next": [
+        "call-stack",
+        "event-loop",
+        "closure"
+      ]
+    },
+    "meta": {
+      "order": 10,
+      "difficulty": "beginner",
+      "importance": "high",
+      "tags": [
+        "execution-context",
+        "javascript-runtime",
+        "call-stack",
+        "runtime-phase",
+        "memory-vs-execution"
+      ],
+      "estimated_time": "40min"
+    }
+  },
+  {
+    "id": "garbage-collection",
+    "title": "Garbage Collection in JavaScript",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Hiểu cách JavaScript Garbage Collection hoạt động, mark-and-sweep, generational GC, memory leaks và cách engine quản lý memory.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Garbage Collection (GC) là cơ chế tự động quản lý memory trong JavaScript.\n\nGC chịu trách nhiệm:\n\n- tìm object không còn dùng\n- reclaim memory\n- giải phóng heap\n\nVí dụ:\n\n\nObject cũ không còn reachable.\n\nGC sẽ eventually cleanup memory đó.",
+          "code": "let user = {\n    name: \"Alex\"\n};\n\nuser = null;"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "JavaScript developer không cần:\n\n\nnhư C/C++.\n\nEngine tự làm việc đó.\n\nMental model:\n\n\n- object còn dùng → giữ lại\n- object không ai dùng → dọn",
+          "code": "free(pointer);"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "code": "Object Created\n      │\n      ▼\nReachable?\n ├── YES → Keep\n └── NO\n        │\n        ▼\n Garbage Collector\n        │\n        ▼\n Memory Freed"
+        },
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript memory thường gồm:\n\n| Area | Purpose |\n|---|---|\n| Stack | primitive + execution context |\n| Heap | objects, arrays, functions |\n\nVí dụ:\n\n\n`user` reference nằm stack.\n\nObject nằm heap.",
+          "code": "const user = {\n    name: \"Alex\"\n};"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "GC dựa trên:\n\n\nNếu object còn reachable:\n\n\nVí dụ:\n\n\n`user` còn reference.\n\nObject còn sống.\n\n### Unreachable Objects\n\n\nObject cũ:\n\n\n→ eligible for garbage collection.",
+          "code": "reachability"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Đây là core algorithm phổ biến.\n\nFlow:\n\n\n### Example — Mark Phase\n\n\nGC mark:\n\n\nTất cả reachable.\n\n### Example — Sweep Phase\n\n\nObject không reachable nữa.\n\nGC sweep memory đó.",
+          "code": "1. Mark reachable objects\n2. Sweep unreachable objects\n3. Free memory"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "### Deep Dive — Circular References\n\nNgày xưa một số GC fail với circular references.\n\nVí dụ:\n\n\nNếu không còn root reference:\n\n\nVì mark-and-sweep check reachability.\n\nKhông chỉ check reference count.",
+          "code": "Allocate Object\n      │\n      ▼\nObject Referenced\n      │\n      ▼\nReachability Analysis\n      │\n      ▼\nUnused?\n ├── No → Keep\n └── Yes → Collect"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes — Memory Leak",
+          "body": "Nếu cache không clear:\n\n\nGC không thể cleanup vì object vẫn reachable.",
+          "code": "const cache = [];\n\nfunction store() {\n    cache.push(new Array(1000000));\n}"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — Event Listener Leak",
+          "body": "Nếu element bị remove nhưng listener còn giữ reference:\n\n\n###### Example — Closure Leak\n\n\nClosure giữ lexical environment.\n\n`hugeData` có thể vẫn sống.\n\n###### Mental Model\n\nGC không quan tâm:\n\n\nGC chỉ quan tâm:\n\n\n###### V8 Generational GC\n\nV8 chia heap thành:\n\n\n###### Young Generation\n\nObject mới allocate ở đây.\n\nÝ tưởng:\n\n\nVí dụ:\n\n\nObject chỉ sống rất ngắn.\n\n###### Old Generation\n\nObject sống lâu sẽ được promote.\n\nVí dụ:\n\n\nSống suốt app lifecycle.\n\n###### Deep Dive — Minor vs Major GC\n\n###### Minor GC\n\n- nhanh\n- cleanup young generation\n- xảy ra thường xuyên\n\n###### Major GC\n\n- chậm hơn\n- cleanup old generation\n- expensive hơn\n\n###### Stop The World\n\nGC thường cần pause JavaScript execution.\n\nGọi là:\n\n\nNếu heap quá lớn:",
+          "code": "button.addEventListener(\"click\", handler);"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "###### Excessive Allocation\n\nKhông tốt:\n\n\nTạo:\n\n- allocation pressure\n- GC pressure\n\n###### Better Pattern\n\nReuse object nếu phù hợp.\n\n\n###### Common Mistakes\n\n###### Mistake 1 — Nghĩ GC chạy ngay\n\n\nKHÔNG có nghĩa:\n\n\nGC chạy khi engine quyết định.\n\n###### Mistake 2 — Global Variables\n\n\nGlobal references làm object sống mãi.\n\n###### Mistake 3 — Forgotten Timers\n\n\nInterval giữ closure reference.",
+          "code": "for (let i = 0; i < 1000000; i++) {\n    arr.push({});\n}"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "###### Detached DOM\n\n\nNếu DOM remove nhưng JS reference còn:\n\n\n###### WeakMap\n\nWeakMap cho phép key được GC.\n\nVí dụ:\n\n\nObject có thể được GC.\n\n###### WeakRef\n\nModern JavaScript có:\n\n\ncho weak references.\n\nNhưng dùng rất cẩn thận.",
+          "code": "const div = document.createElement(\"div\");"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "V8 dùng:\n\n- generational GC\n- incremental marking\n- concurrent sweeping\n- compaction\n\nđể giảm pause time.\n\n###### Real World\n\nGC ảnh hưởng:\n\n- React apps\n- games\n- Node.js servers\n- animation\n- large data apps\n\nMemory leak nhỏ nhưng lâu dài có thể crash app."
+        },
+        {
+          "type": "security",
+          "title": "Security",
+          "body": "###### Memory Exhaustion\n\nInfinite allocation:\n\n\nCó thể gây:\n\n- browser crash\n- tab kill\n- process out of memory",
+          "code": "const arr = [];\n\nwhile (true) {\n    arr.push(new Array(1000000));\n}"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- v8-basics.md\n- memory-management.md\n- closures.md\n- execution-context.md\n- heap-vs-stack.md\n- memory-leaks.md\n- weakmap.md"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau bài này nên học:\n\n1. heap-vs-stack.md\n2. memory-leaks.md\n3. closures.md\n4. weakmap.md\n5. weakref.md\n6. v8-basics.md\n7. event-loop.md"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Garbage Collection là cơ chế tự động cleanup memory trong JavaScript.\n\nCore idea:\n\n\nModern engines như V8 dùng:\n\n- mark and sweep\n- generational GC\n- incremental GC\n- concurrent GC\n\nĐiểm quan trọng nhất:",
+          "code": "reachable objects survive\nunreachable objects collected"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "intermediate",
+      "importance": "5",
+      "tags": [
+        "javascript",
+        "garbage-collection",
+        "memory",
+        "gc",
+        "v8",
+        "heap",
+        "memory-leak"
+      ],
+      "estimated_time": "50 min"
+    }
+  },
+  {
+    "id": "heap-vs-stack",
+    "title": "heap-vs-stack",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "text",
+          "title": "Heap vs Stack in JavaScript"
+        },
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript runtime thường quản lý memory bằng hai vùng chính:\n\n- Stack\n- Heap\n\nHiểu hai vùng này cực kỳ quan trọng để hiểu:\n\n- variables\n- references\n- closures\n- garbage collection\n- performance\n- memory leaks"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Mental model đơn giản:\n`\n\nStack:\n\n- rất nhanh\n- push/pop có thứ tự\n- dùng cho execution flow\n\nHeap:\n\n- dynamic\n- chứa data phức tạp\n- linh hoạt hơn",
+          "code": "Stack = bàn làm việc ngăn nắp\nHeap = kho chứa đồ linh hoạt"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### Stack Memory\n\nStack thường dùng cho:\n\n- execution contexts\n- function calls\n- local variables\n- primitive values\n- references\n\nStack hoạt động theo:",
+          "code": "STACK                          HEAP\n┌──────────────┐               ┌────────────────────┐\n│ x:10         │               │                    │\n├──────────────┤               │ {name:\"Alex\"}      │\n│ user ────────┼──────────────▶│                    │\n└──────────────┘               └────────────────────┘"
+        },
+        {
+          "type": "example",
+          "title": "Example — Call Stack",
+          "body": "Execution stack:\n\n\nKhi `b()` kết thúc:\n\n\n### Why Stack Fast?\n\nStack allocation rất nhanh vì runtime chỉ cần:\n\n\nVí dụ conceptually:\n\n\nKhông cần memory lookup phức tạp.",
+          "code": "function a() {\n    b();\n}\n\nfunction b() {\n    console.log(\"hello\");\n}\n\na();"
+        },
+        {
+          "type": "text",
+          "title": "Stack Characteristics",
+          "body": "| Property       | Stack      |\n| -------------- | ---------- |\n| Fast           | Yes        |\n| Ordered        | Yes        |\n| Small          | Usually    |\n| Cleanup        | Automatic  |\n| Access Pattern | Sequential |\n\n### Primitive Values\n\nVí dụ:\n\n\nVisualization:\n\n\nPrimitive thường:",
+          "code": "const a = 10;\nconst b = a;"
+        },
+        {
+          "type": "example",
+          "title": "Example — Primitive Independence",
+          "body": "Output:\n\n\nVì `b` nhận value copy riêng.\n\n### Heap Memory\n\nHeap dùng cho:\n\n- objects\n- arrays\n- functions\n- closures\n- dynamic structures\n\nVí dụ:\n\n\nObject thường allocate trong heap.",
+          "code": "let a = 10;\nlet b = a;\n\nb = 20;\n\nconsole.log(a);"
+        },
+        {
+          "type": "text",
+          "title": "Object References",
+          "body": "Visualization:\n\n\nVariable thường không chứa object trực tiếp.\n\nNó chứa:\n\n\n### Reference Copy\n\n\nVisualization:\n\n\nKhông copy object.\n\nChỉ copy reference.",
+          "code": "STACK                       HEAP\n┌────────────┐              ┌────────────────┐\n│ user ──────┼─────────────▶│ {name:\"Alex\"} │\n└────────────┘              └────────────────┘"
+        },
+        {
+          "type": "example",
+          "title": "Example — Shared Mutation",
+          "body": "Output:\n\n\nVì:\n\n\n### Mental Model\n\nPrimitive:\n\n\nObject:",
+          "code": "const a = {\n    value: 1\n};\n\nconst b = a;\n\nb.value = 999;\n\nconsole.log(a.value);"
+        },
+        {
+          "type": "text",
+          "title": "Execution Context and Stack",
+          "body": "Khi function gọi:\n\n\nruntime tạo:\n\n\nvà push vào stack.\n\nKhi function return:\n\n\n### Stack Overflow\n\n\nError:\n\n\nVì stack có giới hạn.",
+          "code": "function test() {\n    const x = 10;\n}"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive — Why Heap Exists?",
+          "body": "Object size dynamic.\n\nVí dụ:\n\n\nSau đó:\n\n\nRuntime không thể biết trước:\n\n\nHeap cho phép dynamic allocation.",
+          "code": "const user = {};"
+        },
+        {
+          "type": "text",
+          "title": "Heap Allocation",
+          "body": "Ví dụ:\n\n\nVisualization:\n\n\n### Garbage Collection\n\nHeap memory được cleanup bằng:\n\n\nNếu object không còn reachable:\n\n\nVí dụ:\n\n\nObject cũ eligible for GC.",
+          "code": "const arr = [1, 2, 3];"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "### Closures and Heap\n\n\n`data` vẫn sống sau khi `outer` kết thúc.\n\nVì closure giữ reference.",
+          "code": "Create Object\n     │\n     ▼\nAllocate in Heap\n     │\n     ▼\nReference Stored in Stack\n     │\n     ▼\nReference Lost?\n ├── No → Keep\n └── Yes\n        │\n        ▼\nGarbage Collection"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization — Closure",
+          "code": "Closure\n   │\n   ▼\nLexical Environment\n   │\n   ▼\nHeap Objects"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakess"
+        },
+        {
+          "type": "text",
+          "title": "Mistake 1 — Nghĩ object nằm trong variable",
+          "body": "Sai.\n\nVariable object thường chỉ giữ:",
+          "code": "reference"
+        },
+        {
+          "type": "text",
+          "title": "Mistake 2 — Confuse Reassignment",
+          "body": "Không xóa object nếu:",
+          "code": "let a = {\n    x: 1\n};\n\nlet b = a;\n\nb = null;"
+        },
+        {
+          "type": "text",
+          "title": "Mistake 3 — Shallow Copy",
+          "body": "Đây chỉ là:\n\n\nNested object vẫn shared.",
+          "code": "const a = {\n    nested: {\n        value: 1\n    }\n};\n\nconst b = {...a};"
+        },
+        {
+          "type": "example",
+          "title": "Example — Shallow Copy Problem",
+          "body": "Output:",
+          "code": "const a = {\n    nested: {\n        value: 1\n    }\n};\n\nconst b = {...a};\n\nb.nested.value = 999;\n\nconsole.log(a.nested.value);"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases"
+        },
+        {
+          "type": "text",
+          "title": "Detached DOM",
+          "body": "Nếu DOM remove nhưng JS reference còn:\n\n\n### Huge Arrays\n\n\nHeap usage tăng cực lớn.\n\nCó thể crash process.",
+          "code": "const div = document.createElement(\"div\");"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### Stack Faster Than Heap\n\nStack allocation:\n\n\nHeap allocation:\n\n- dynamic\n- cần GC\n- fragmentation\n- slower",
+          "code": "rất nhanh"
+        },
+        {
+          "type": "text",
+          "title": "Excessive Allocation",
+          "body": "Không tốt:\n\n\nTạo:\n\n- heap pressure\n- GC pressure",
+          "code": "for (let i = 0; i < 1000000; i++) {\n    arr.push({});\n}"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — React",
+          "body": "React rely heavily on:\n\n\nVí dụ:\n\n\nđể detect state changes.",
+          "code": "reference comparison"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — Memory Leak",
+          "body": "Global reference giữ heap object sống mãi.",
+          "code": "window.cache = hugeObject;"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "Modern engines như V8 optimize memory bằng:\n\n- hidden classes\n- inline caching\n- generational GC\n- pointer compression"
+        },
+        {
+          "type": "security",
+          "title": "Security"
+        },
+        {
+          "type": "text",
+          "title": "Memory Exhaustion",
+          "body": "Có thể gây:\n\n- browser crash\n- out-of-memory\n- denial of service\n\n### Deep Dive — Pointer Concept\n\nReference thực tế thường là:\n\n\nVí dụ conceptually:\n\n\nPointer trỏ tới heap location.",
+          "code": "const arr = [];\n\nwhile (true) {\n    arr.push({});\n}"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- memory-model.md\n- garbage-collection.md\n- closures.md\n- execution-context.md\n- call-stack.md\n- v8-basics.md\n- memory-leaks.md"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau bài này nên học:\n\n1. memory-model.md\n2. garbage-collection.md\n3. closures.md\n4. execution-context.md\n5. hidden-classes.md\n6. memory-leaks.md\n7. v8-basics.md"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "JavaScript memory model chủ yếu gồm:\n\n\nStack:\n\n- nhanh\n- ordered\n- execution contexts\n- primitives\n- references\n\nHeap:\n\n- dynamic\n- objects\n- arrays\n- functions\n- GC managed\n\nĐiểm quan trọng nhất:",
+          "code": "Stack\nHeap"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "beginner",
+      "importance": "medium",
+      "tags": [],
+      "estimated_time": ""
+    }
+  },
+  {
+    "id": "engine-overview",
+    "title": "JavaScript Engine Overview",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Tổng quan cách JavaScript Engine parse, compile, optimize và thực thi code bên trong runtime hiện đại như V8.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript Engine là hệ thống chịu trách nhiệm:\n\n- đọc source code JavaScript\n- parse code\n- tạo AST\n- compile code\n- thực thi chương trình\n- quản lý memory\n- tối ưu runtime performance\n\nNói đơn giản:\n\n> JavaScript Engine là bộ máy biến JavaScript source code thành thứ máy tính có thể chạy được.\n\nMột số engine phổ biến:\n\n- V8 trong Chrome và Node.js\n- SpiderMonkey trong Firefox\n- JavaScriptCore trong Safari"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Khi viết:\n\n\n\nComputer không hiểu JavaScript trực tiếp.\n\nEngine phải trải qua nhiều bước:\n\n\n\nJavaScript Engine giống như:\n\n- compiler\n- interpreter\n- memory manager\n- runtime coordinator\n\nTất cả hoạt động cùng nhau để chạy chương trình.",
+          "code": "const total = 10 + 20;\n\nconsole.log(total);"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Một mental model đơn giản:\n\n\n\nMỗi phần có nhiệm vụ riêng:\n\n- Parser đọc syntax\n- Compiler tạo executable code\n- Call Stack quản lý execution\n- Heap lưu objects và dynamic memory\n- Garbage Collector dọn memory\n- Optimizer tăng performance runtime",
+          "code": "JavaScript Engine\n│\n├── Parser\n├── Compiler\n├── Call Stack\n├── Heap Memory\n├── Garbage Collector\n└── Optimizer"
+        },
+        {
+          "type": "example",
+          "title": "Example",
+          "body": "### Simple execution\n\n\n\nEngine sẽ:\n\n1. Parse source code\n2. Tạo AST\n3. Compile function\n4. Push execution context vào Call Stack\n5. Thực thi function\n6. Return result",
+          "code": "function add(a, b) {\n  return a + b;\n}\n\nconst result = add(2, 3);\n\nconsole.log(result);"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### High-level engine pipeline",
+          "code": "JavaScript Source\n        ↓\n      Parser\n        ↓\n        AST\n        ↓\n   Interpreter\n        ↓\n Optimized Compiler\n        ↓\n   Machine Code\n        ↓\n     Execution"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "body": "### Step 1: Loading source code\n\nEngine nhận source code dạng text.\n\n\n\nLúc này code vẫn chưa chạy.",
+          "code": "const x = 10;"
+        },
+        {
+          "type": "text",
+          "title": "Step 2: Parsing",
+          "body": "Parser kiểm tra syntax và grammar.\n\nVí dụ syntax error:\n\n\n\nEngine sẽ throw error trước execution phase.",
+          "code": "const = x 10;"
+        },
+        {
+          "type": "text",
+          "title": "Step 3: AST generation",
+          "body": "Parser tạo Abstract Syntax Tree.\n\nVí dụ:\n\n\n\nCó thể được biểu diễn:\n\n\n\nAST giúp engine hiểu structure chương trình.",
+          "code": "const x = 10;"
+        },
+        {
+          "type": "text",
+          "title": "Step 4: Compilation",
+          "body": "Engine compile AST thành bytecode hoặc machine code.\n\nModern engines thường dùng:\n\n- interpreter\n- JIT compiler\n- optimizer"
+        },
+        {
+          "type": "text",
+          "title": "Step 5: Execution",
+          "body": "Code được thực thi thông qua:\n\n- Call Stack\n- Execution Context\n- Runtime Environment"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "### Interpreter vs Compiler\n\nJavaScript hiện đại không hoàn toàn interpreted.\n\nModern engines dùng hybrid model:\n\n\n\nVí dụ trong V8:\n\n- Ignition là interpreter\n- TurboFan là optimizing compiler\n\n### Just-In-Time Compilation\n\nJIT compilation nghĩa là:\n\n> compile code ngay trong lúc runtime.\n\nEngine theo dõi:\n\n- function nào chạy nhiều\n- type nào thường xuất hiện\n- execution path nào hot\n\nSau đó engine optimize machine code cho các trường hợp phổ biến.",
+          "code": "Source Code\n    ↓\nParser\n    ↓\nAST\n    ↓\nBytecode\n    ↓\nInterpreter\n    ↓\nProfiler\n    ↓\nOptimized Compiler"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "### Call Stack\n\nCall Stack quản lý execution contexts.\n\nVí dụ:\n\n\n\nRuntime state:\n\n\n\n### Heap Memory\n\nHeap là nơi lưu:\n\n- objects\n- arrays\n- functions\n- closures\n\nVí dụ:\n\n\n\nObject thường nằm trong heap memory.\n\n### Garbage Collector\n\nGarbage Collector tự động cleanup memory không còn được reference.\n\nVí dụ:\n\n\n\nObject cũ có thể bị collect sau đó.",
+          "code": "function a() {\n  b();\n}\n\nfunction b() {}\n\na();"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### Stable object shapes\n\nEngine optimize tốt hơn khi object có structure ổn định.\n\nTốt:\n\n\n\nKhông tốt:\n\n\n\nShape không ổn định khiến optimization khó hơn.\n\n### Avoid unnecessary allocations\n\nVí dụ gây memory pressure:\n\n\n\nTạo quá nhiều temporary objects làm tăng áp lực cho garbage collector.",
+          "code": "const user = {\n  name: \"Alex\",\n  age: 20\n};"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Memory leaks\n\n\n\nMemory tăng liên tục vì dữ liệu vẫn còn reference.\n\n### Stack overflow\n\n\n\nQuá nhiều execution frames gây crash runtime.",
+          "code": "const cache = [];\n\nsetInterval(() => {\n  cache.push(new Array(1000000));\n}, 100);"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes",
+          "body": "### Nghĩ JavaScript chỉ là interpreted language\n\nNhiều người nghĩ JavaScript chỉ đọc từng dòng rồi chạy.\n\nModern engines thực tế có:\n\n- parser\n- bytecode generation\n- JIT compilation\n- runtime optimization\n\n### Nghĩ garbage collection xảy ra ngay lập tức\n\nGarbage collection không deterministic.\n\nMemory có thể tồn tại thêm một thời gian trước khi được cleanup.\n\n### Nghĩ engine và runtime là một\n\nEngine chịu trách nhiệm:\n\n- parse\n- compile\n- execute\n\nRuntime environment cung cấp:\n\n- DOM APIs\n- timers\n- fetch\n- event loop integration"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### Deoptimization\n\nCode có thể bị deoptimize nếu runtime behavior thay đổi.\n\nVí dụ:\n\n\n\nType inconsistency có thể phá optimization assumptions.\n\n### Large allocations\n\n\n\nCó thể gây:\n\n- memory pressure\n- GC pauses\n- browser freeze",
+          "code": "function sum(a, b) {\n  return a + b;\n}\n\nsum(1, 2);\nsum(3, 4);\n\nsum(\"A\", \"B\");"
+        },
+        {
+          "type": "security",
+          "title": "Security",
+          "body": "JavaScript Engine thường chạy trong sandbox environment.\n\nBrowser engines cố gắng:\n\n- isolate tabs\n- hạn chế memory access\n- ngăn truy cập OS trực tiếp\n\nEngine bugs nghiêm trọng có thể dẫn tới:\n\n- memory corruption\n- sandbox escape\n- arbitrary code execution"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "JavaScript Engine ảnh hưởng trực tiếp tới:\n\n- startup speed\n- rendering performance\n- memory usage\n- battery consumption\n- Node.js throughput\n\nFramework performance thường phụ thuộc mạnh vào engine behavior."
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "### Foundation\n\n- Execution Context\n- Call Stack\n- Scope\n- Hoisting\n\n### Runtime\n\n- Event Loop\n- Web APIs\n- Task Queue\n- Microtask Queue\n\n### Memory\n\n- Heap\n- Garbage Collection\n- Closures"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "- JIT Compilation\n- Inline Caching\n- Hidden Classes\n- Deoptimization"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "- Execution Context\n- Call Stack\n- Event Loop\n- Stack vs Heap\n- Garbage Collection\n- JIT Compilation\n- Hidden Classes"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "JavaScript Engine là hệ thống chịu trách nhiệm:\n\n- parse source code\n- tạo AST\n- compile executable code\n- quản lý memory\n- optimize runtime execution\n\nModern engines như V8 rất phức tạp và gồm nhiều thành phần:\n\n- parser\n- interpreter\n- optimizing compiler\n- garbage collector\n- runtime integration\n\nHiểu JavaScript Engine giúp hiểu sâu hơn về:\n\n- performance\n- memory behavior\n- async execution\n- debugging\n- runtime internals"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "beginner",
+      "importance": "5",
+      "tags": [
+        "javascript",
+        "engine",
+        "runtime"
+      ],
+      "estimated_time": "20 min"
+    }
+  },
+  {
+    "id": "memory-model",
+    "title": "JavaScript Memory Model",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Hiểu cách JavaScript quản lý memory, stack vs heap, references, primitives, object identity và mental model của memory trong runtime.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Memory model là cách JavaScript runtime:\n\n- allocate memory\n- lưu variables\n- quản lý references\n- truy cập dữ liệu\n- cleanup memory\n\nĐể hiểu JavaScript thật sự hoạt động thế nào, phải hiểu:",
+          "code": "stack\nheap\nreferences"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Nhiều người nghĩ:\n\n\nchỉ là:\n\n\nNhưng runtime thực tế phức tạp hơn.\n\nMental model:\n\n\nVí dụ:\n\n\n`user` KHÔNG chứa object trực tiếp.\n\nNó thường chứa:",
+          "code": "const a = 10;"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### Two Main Memory Areas\n\n### Stack Memory\n\nDùng cho:\n\n- execution contexts\n- primitive values\n- local references\n- function calls\n\nStack:\n\n- nhanh\n- ordered\n- fixed structure\n\n### Heap Memory\n\nDùng cho:\n\n- objects\n- arrays\n- functions\n- complex data\n\nHeap:\n\n- dynamic\n- flexible\n- slower hơn stack\n\n### Primitive Values\n\nPrimitive gồm:\n\n- string\n- number\n- boolean\n- null\n- undefined\n- bigint\n- symbol\n\nVí dụ:\n\n\nVisualization:\n\n\nPrimitive thường copy by value.\n\n### Example — Primitive Independence\n\n\nOutput:\n\n\nVì:\n\n\n### Objects\n\nObjects behave khác.\n\nVí dụ:\n\n\nVisualization:\n\n\n### Reference Copy\n\n\nKhông copy object.\n\nNó copy:",
+          "code": "STACK                    HEAP\n┌──────────────┐         ┌────────────────┐\n│ user ────────┼────────▶│ {name:\"Alex\"} │\n└──────────────┘         └────────────────┘"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### Example — Shared Mutation\n\n\nOutput:\n\n\nVì:",
+          "code": "STACK\n┌────────────┐\n│ a ─────────┼────┐\n├────────────┤    │\n│ b ─────────┼────┘\n└────────────┘\n\nHEAP\n┌────────────────┐\n│ {count:1}      │\n└────────────────┘"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Primitive:\n\n\nObject:\n\n\n### Execution Context and Memory\n\nKhi function gọi:\n\n\nruntime tạo:\n\n\ntrong stack.\n\n### Call Stack Visualization\n\n\nKhi function return:\n\n\n### Heap Allocation\n\nObject thường allocate trong heap.\n\nVí dụ:\n\n\nVisualization:\n\n\n### Deep Dive — Why Heap?\n\nObject size dynamic.\n\nVí dụ:\n\n\nsau đó:\n\n\nRuntime không biết trước object sẽ lớn bao nhiêu.\n\nHeap giải quyết điều đó.\n\n### Stack vs Heap\n\n| Stack | Heap |\n|---|---|\n| Fast | Flexible |\n| Ordered | Dynamic |\n| Small | Large |\n| Primitive-heavy | Object-heavy |\n| Auto cleanup | GC managed |\n\n### Pass By Value vs Pass By Reference?\n\nJavaScript technically:\n\n\nNhưng với object:\n\n\nVí dụ:\n\n\nFunction nhận:\n\n\nkhông phải object copy.\n\n### Example — Reassignment\n\n\nOutput:\n\n\nVì:\n\n\n### Closures and Memory\n\nClosure giữ reference tới lexical environment.\n\nVí dụ:\n\n\n`data` vẫn sống sau khi outer kết thúc.",
+          "code": "copy value"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "code": "Closure\n   │\n   ▼\nLexical Environment\n   │\n   ▼\nHeap Objects"
+        },
+        {
+          "type": "text",
+          "title": "Garbage Collection",
+          "body": "Nếu object không còn reachable:\n\n\nVí dụ:\n\n\nObject cũ eligible for GC.",
+          "code": "GC cleanup memory"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakess",
+          "body": "### Mistake 1 — Nghĩ object được copy\n\n\nKhông copy object.\n\nCopy reference.\n\n### Mistake 2 — Deep Copy Confusion\n\n\nĐây chỉ là:\n\n\nNested object vẫn shared.\n\n### Example — Shallow Copy Problem\n\n\nOutput:\n\n\n### Deep Copy\n\nMột số cách:\n\n\nhoặc libraries như lodash.",
+          "code": "const a = {x:1};\nconst b = a;"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### typeof null\n\n\nOutput:\n\n\nHistorical memory tagging bug.\n\n### NaN\n\n\nOutput:",
+          "code": "typeof null"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — React State",
+          "body": "Sai:\n\n\nVì React rely on reference comparison.\n\nTốt hơn:",
+          "code": "state.user.name = \"Alex\";"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — Memory Leak",
+          "body": "Global reference giữ object sống mãi.",
+          "code": "window.cache = hugeObject;"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### Excessive Allocation\n\nKhông tốt:\n\n\nTạo:\n\n- heap pressure\n- GC pressure\n\n### Object Reuse\n\nMột số systems reuse object để giảm allocation.\n\nVí dụ game engines.",
+          "code": "for (let i = 0; i < 1000000; i++) {\n    arr.push({});\n}"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "Modern engines như V8 optimize bằng:\n\n- hidden classes\n- inline caching\n- generational GC\n- escape analysis\n\n### Escape Analysis\n\nNếu object không escape function:\n\n\nEngine đôi khi optimize allocation.",
+          "code": "function test() {\n    const point = {x:1,y:2};\n}"
+        },
+        {
+          "type": "security",
+          "title": "Security",
+          "body": "### Prototype Pollution\n\n\nCó thể mutate object behavior toàn hệ thống.",
+          "code": "obj[\"__proto__\"].admin = true;"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Quan trọng nhất:",
+          "code": "Variable object thường là reference holder.\nObject thật nằm heap."
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- garbage-collection.md\n- closures.md\n- execution-context.md\n- call-stack.md\n- hidden-classes.md\n- v8-basics.md\n- memory-leaks.md"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau bài này nên học:\n\n1. garbage-collection.md\n2. closures.md\n3. execution-context.md\n4. hidden-classes.md\n5. memory-leaks.md\n6. weakmap.md\n7. v8-basics.md"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "JavaScript memory model xoay quanh:\n\n\nPrimitive:\n\n\nObjects:\n\n\nĐiểm quan trọng nhất:",
+          "code": "stack\nheap\nreferences\nreachability"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "intermediate",
+      "importance": "5",
+      "tags": [
+        "javascript",
+        "memory",
+        "heap",
+        "stack",
+        "references",
+        "garbage-collection",
+        "execution-context"
+      ],
+      "estimated_time": "55 min"
+    }
+  },
+  {
+    "id": "javascript-runtime",
+    "title": "JavaScript Runtime",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Hiểu JavaScript Runtime hoạt động như thế nào phía sau engine, bao gồm Call Stack, Web APIs, Callback Queue, Microtask Queue và Event Loop.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "JavaScript Runtime là môi trường thực thi JavaScript.\n\nRuntime không chỉ là engine.\n\nNó là toàn bộ hệ thống giúp JavaScript có thể:\n\n- chạy code\n- thao tác DOM\n- gọi API\n- xử lý async\n- setTimeout\n- fetch\n- event listeners\n- promise\n- render UI\n\nVí dụ:\n```js\nconsole.log(\"A\");\n\nsetTimeout(() => {\n    console.log(\"B\");\n}, 0);\n\nconsole.log(\"C\");"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "intermediate",
+      "importance": "5",
+      "tags": [
+        "javascript",
+        "runtime",
+        "event-loop",
+        "call-stack",
+        "web-api",
+        "async",
+        "execution-model"
+      ],
+      "estimated_time": "40 min"
+    }
+  },
+  {
+    "id": "parsing-ast",
+    "title": "Parsing and AST in JavaScript",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "Hiểu cách JavaScript engine parse source code, tạo token và xây dựng AST.",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Trước khi JavaScript engine execute code:\n\n\nengine phải:\n\n1. đọc source code\n2. parse syntax\n3. tạo AST\n4. compile/execution\n\nAST là:\n\n\nNó là representation dạng cây của source code.",
+          "code": "const x = 1 + 2;"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "JavaScript source code chỉ là text.\n\nEngine không execute raw text trực tiếp.\n\nNó phải biến code thành structured data.\n\nMental model:",
+          "code": "Parser giống người đọc ngữ pháp"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### Tokenization\n\nVí dụ:\n\n\nTokens:\n\n\n### AST Example\n\nCode:\n\n\nAST simplified:",
+          "code": "Source Code\n     │\n     ▼\nTokenization\n     │\n     ▼\nParser\n     │\n     ▼\nAST\n     │\n     ▼\nCompilation / Execution"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "code": "Source Code\n→ Tokens\n→ AST\n→ Bytecode\n→ Execution"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World",
+          "body": "### Babel\n\nBabel parse JavaScript thành AST rồi transform AST.\n\n### ESLint\n\nESLint traverse AST để detect issues.\n\n### Prettier\n\nPrettier parse → AST → format lại code."
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakess",
+          "body": "### Nghĩ engine execute text trực tiếp\n\nSai.\n\nEngine execute internal structures.\n\n### Confuse AST với DOM\n\nAST là structure của JavaScript.\n\nDOM là structure của HTML."
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### Automatic Semicolon Insertion\n\n\nParser có thể insert semicolon sai expectation.",
+          "code": "return\n{\n    ok: true\n}"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Flow chính:\n\n\nĐiểm quan trọng nhất:",
+          "code": "Source Code\n→ Tokenization\n→ Parsing\n→ AST\n→ Compilation\n→ Execution"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "intermediate",
+      "importance": "5",
+      "tags": [
+        "javascript",
+        "parser",
+        "ast",
+        "tokenization",
+        "compiler",
+        "engine"
+      ],
+      "estimated_time": "45 min"
+    }
+  },
+  {
+    "id": "v8-basics",
+    "title": "v8-basics",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "V8 là JavaScript engine được phát triển bởi Google.\n\nNó dùng để:\n\n- parse JavaScript\n- compile JavaScript\n- execute JavaScript\n- optimize performance\n- manage memory\n\nV8 là engine của:\n\n- Google Chrome\n- Node.js\n- Electron\n- nhiều runtime hiện đại khác"
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "JavaScript chỉ là text:\n`\n\nCPU không hiểu JavaScript.\n\nCPU chỉ hiểu:\n\n\nV8 tồn tại để:\n\n\nMental model:\n\n\n### Why V8 quan trọng?\n\nTrước đây JavaScript rất chậm.\n\nNó chỉ được xem là:\n\n\nV8 thay đổi điều đó bằng:\n\n- JIT compilation\n- optimization pipeline\n- hidden classes\n- inline caching\n- efficient garbage collection\n\nĐó là lý do:",
+          "code": "const x = 10;"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### High Level Architecture\n\nV8 gồm nhiều subsystem:\n\n| Component         | Responsibility      |\n| ----------------- | ------------------- |\n| Parser            | Parse source code   |\n| Ignition          | Interpreter         |\n| TurboFan          | Optimizing compiler |\n| Heap              | Memory storage      |\n| Garbage Collector | Cleanup memory      |\n| Call Stack        | Function execution  |\n\n### Parsing\n\nVí dụ:\n\n\nV8 parse source code thành:\n\n\n### AST Visualization\n\n\nEngine không chạy raw text.\n\nNó chạy internal structures.\n\n### Ignition Interpreter\n\nSau parsing:\n\n\nV8 dùng:\n\n\nđể generate bytecode.\n\n### Bytecode\n\nVí dụ:\n\n\nBytecode simplified:\n\n\nBytecode giúp:\n\n- execute nhanh hơn AST\n- dễ optimize\n- portable hơn machine code",
+          "code": "id=\"8h2u0x\"\nJavaScript Source\n        │\n        ▼\n┌─────────────────┐\n│     Parser      │\n└────────┬────────┘\n         ▼\n┌─────────────────┐\n│       AST       │\n└────────┬────────┘\n         ▼\n┌─────────────────┐\n│    Ignition     │\n│  Interpreter    │\n└────────┬────────┘\n         ▼\n┌─────────────────┐\n│    Bytecode     │\n└────────┬────────┘\n         ▼\n┌─────────────────┐\n│     TurboFan    │\n│ Optimizing JIT  │\n└────────┬────────┘\n         ▼\nMachine Code"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "code": "id=\"0m2u1x\"\nSource Code\n→ Parse\n→ AST\n→ Bytecode\n→ Execute"
+        },
+        {
+          "type": "text",
+          "title": "JIT Compilation",
+          "body": "### Problem\n\nInterpreter rất flexible nhưng không cực nhanh.\n\nNếu code chạy nhiều lần:\n\n\nthì V8 muốn optimize.\n\n### TurboFan\n\nV8 dùng:\n\n\nđể optimize hot code.\n\nFlow:\n\n\n### Hot Functions\n\nFunction được gọi rất nhiều lần:\n\n\nVí dụ:\n\n\nNếu gọi hàng triệu lần:\n\n\n### Deep Dive — Speculative Optimization\n\nV8 optimize dựa trên assumption.\n\nVí dụ:\n\n\nV8 có thể assume:\n\n\nvà generate machine code riêng cho number.",
+          "code": "id=\"92g5xd\"\nfor (let i = 0; i < 1e6; i++) {\n    sum(1, 2);\n}"
+        },
+        {
+          "type": "text",
+          "title": "Deoptimization",
+          "body": "Nếu assumption sai:\n\n\nV8 phải:\n\n\nquay lại generic path.",
+          "code": "id=\"efocsy\"\nadd(\"a\", \"b\");"
+        },
+        {
+          "type": "mistakes",
+          "title": "Common Mistakes — Type Instability",
+          "body": "Không tốt:\n\n\nEngine khó optimize.\n\n### Better Pattern\n\nTốt hơn:\n\n\nStable types giúp optimization hiệu quả hơn.\n\n### Hidden Classes\n\nJavaScript object dynamic:\n\n\nNếu lookup dynamic hoàn toàn sẽ rất chậm.\n\nV8 tạo:\n\n\nđể optimize property access.\n\n### Example — Stable Object Shape\n\nTốt:\n\n\nCùng shape:\n\n\nV8 reuse optimization.\n\n### Common Mistake — Shape Pollution\n\n\nObject shape thay đổi liên tục.\n\nEngine deoptimize.",
+          "code": "id=\"zq4vq6\"\nsum(1, 2);\nsum(\"a\", \"b\");\nsum({}, []);"
+        },
+        {
+          "type": "text",
+          "title": "Inline Caching",
+          "body": "Ví dụ:\n\n\nNếu property luôn cùng vị trí:\n\n\nAccess nhanh hơn rất nhiều.\n\n### Call Stack\n\nVí dụ:\n\n\nStack:\n\n\n### Heap Memory\n\nPrimitive thường nằm stack.\n\nObject thường nằm heap.\n\nVí dụ:\n\n\nObject được allocate trong heap memory.",
+          "code": "id=\"jz0ybw\"\nuser.name"
+        },
+        {
+          "type": "text",
+          "title": "Garbage Collection",
+          "body": "V8 tự quản lý memory.\n\nNếu object không còn reachable:",
+          "code": "id=\"grxk7i\"\nGC sẽ reclaim memory"
+        },
+        {
+          "type": "deep_dive",
+          "title": "Deep Dive",
+          "body": "Simplified flow:\n\n\n### Example — Memory Leak\n\n\nNếu cache không clear:\n\n\n### Deep Dive — Generational GC\n\nV8 chia heap thành:\n\n\nÝ tưởng:\n\n\nObject mới:\n\n- allocate ở young gen\n- cleanup rất nhanh\n\nObject sống lâu:\n\n- promote sang old gen\n\n### Event Loop Relationship\n\nV8 KHÔNG tự xử lý:\n\n- timers\n- DOM\n- network\n- rendering\n\nNhững cái đó thuộc runtime.\n\nVí dụ browser runtime:\n\n\n### Runtime vs Engine\n\nSai lầm phổ biến:\n\n\nSai.\n\nV8 chỉ là:\n\n\nRuntime còn có:\n\n- Web APIs\n- event loop\n- rendering\n- networking",
+          "code": "id=\"0ptvfj\"\n1. Mark reachable objects\n2. Unmarked objects = garbage\n3. Free memory"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — Node.js",
+          "body": "Node.js dùng:\n\n\nV8 execute JavaScript.\n\nlibuv handle:\n\n- filesystem\n- networking\n- event loop\n- async IO",
+          "code": "id=\"ijb9zd\"\nV8 + libuv"
+        },
+        {
+          "type": "performance",
+          "title": "Performance Tips",
+          "body": "### 1. Stable Object Shapes\n\nTốt:\n\n\n### 2. Stable Types\n\nTốt:\n\n\nKhông tốt:\n\n\n### 3. Tránh Massive Allocation\n\nKhông tốt:\n\n\nGC pressure rất lớn.",
+          "code": "id=\"e7ebgj\"\nconst user = {\n    name: \"\",\n    age: 0\n};"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Bug 1 — Stack Overflow\n\n\nError:\n\n\n### Bug 2 — Memory Leak\n\n\nReference global giữ object sống mãi.",
+          "code": "id=\"3o4m0j\"\nfunction loop() {\n    loop();\n}\n\nloop();"
+        },
+        {
+          "type": "edge_cases",
+          "title": "Edge Cases",
+          "body": "### typeof null\n\n\nKết quả:\n\n\nHistorical engine bug.\n\n### NaN\n\n\nKết quả:",
+          "code": "id=\"qk4b7d\"\ntypeof null"
+        },
+        {
+          "type": "security",
+          "title": "Security",
+          "body": "### Prototype Pollution\n\n\nCó thể phá internal object behavior.",
+          "code": "id=\"ahvh3l\"\nobj[\"__proto__\"].admin = true;"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "Đó là lý do:\n\n- hidden classes\n- inline caching\n- speculative optimization\n- JIT compilation\n\ntồn tại.",
+          "code": "id=\"c0lqyr\"\nV8 cố biến JavaScript dynamic\nthành code gần giống static language"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- engine-overview.md\n- parser-and-ast.md\n- hidden-classes.md\n- jit-compilation.md\n- garbage-collection.md\n- event-loop.md\n- execution-context.md\n- call-stack.md"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau bài này nên học:\n\n1. parser-and-ast.md\n2. bytecode.md\n3. jit-compilation.md\n4. hidden-classes.md\n5. inline-caching.md\n6. garbage-collection.md\n7. deoptimization.md"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "V8 là modern JavaScript engine cực kỳ tối ưu.\n\nPipeline chính:\n\nSource\n→ Parser\n→ AST\n→ Bytecode\n→ Interpreter\n→ Optimizing Compiler\n→ Machine Code\ntxt id=\"1e3mny\"\nJavaScript dynamic\nnhưng V8 cố optimize như static language\n\n```",
+          "code": "Các kỹ thuật quan trọng:\n\n- Ignition Interpreter\n- TurboFan\n- Hidden Classes\n- Inline Caching\n- Generational GC\n- Speculative Optimization\n\nĐiểm quan trọng nhất:"
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "beginner",
+      "importance": "medium",
+      "tags": [],
+      "estimated_time": ""
+    }
+  },
+  {
+    "id": "web-apis",
+    "title": "web-apis",
+    "access": "pro",
+    "category": "javascript",
+    "path": [
+      {
+        "name": "javascript",
+        "type": "folder"
+      },
+      {
+        "name": "core",
+        "type": "folder"
+      },
+      {
+        "name": "runtime-model",
+        "type": "folder"
+      }
+    ],
+    "summary": {
+      "short": "",
+      "intuition": ""
+    },
+    "content": {
+      "blocks": [
+        {
+          "type": "text",
+          "title": "Web APIs in JavaScript"
+        },
+        {
+          "type": "definition",
+          "title": "Definition",
+          "body": "Web APIs là các APIs được browser cung cấp cho JavaScript.\n\nVí dụ:\n\n- `setTimeout`\n- `fetch`\n- `DOM APIs`\n- `localStorage`\n- `WebSocket`\n- `navigator`\n- `geolocation`\n\nQuan trọng:\n`\n\nChúng thuộc:",
+          "code": "Web APIs KHÔNG thuộc JavaScript language."
+        },
+        {
+          "type": "intuition",
+          "title": "Intuition",
+          "body": "Nhiều người nghĩ:\n\n\nlà JavaScript feature.\n\nSai.\n\nJavaScript engine chỉ execute JavaScript.\n\nNó không biết:\n\n- timer\n- network\n- DOM\n- rendering\n- mouse click\n\nMental model:",
+          "code": "setTimeout(() => {}, 1000);"
+        },
+        {
+          "type": "visualization",
+          "title": "Visualization",
+          "body": "### Important Insight\n\nJavaScript language:\n\n\nNhưng browser runtime không phải single-threaded.\n\nBrowser có:\n\n- networking threads\n- rendering engine\n- timer systems\n- IO systems\n\nWeb APIs tận dụng những systems đó.",
+          "code": "Browser Runtime\n┌───────────────────────────────────────┐\n│                                       │\n│  ┌──────────────┐                     │\n│  │ JavaScript   │                     │\n│  │ Engine       │                     │\n│  └──────┬───────┘                     │\n│         │                             │\n│         ▼                             │\n│  ┌──────────────┐                     │\n│  │   Web APIs   │                     │\n│  └──────┬───────┘                     │\n│         ▼                             │\n│  ┌──────────────┐                     │\n│  │ Callback     │                     │\n│  │ Queue        │                     │\n│  └──────┬───────┘                     │\n│         ▼                             │\n│  ┌──────────────┐                     │\n│  │ Event Loop   │                     │\n│  └──────────────┘                     │\n│                                       │\n└───────────────────────────────────────┘"
+        },
+        {
+          "type": "example",
+          "title": "Example — setTimeout",
+          "body": "Output:",
+          "code": "console.log(\"A\");\n\nsetTimeout(() => {\n    console.log(\"B\");\n}, 1000);\n\nconsole.log(\"C\");"
+        },
+        {
+          "type": "execution_flow",
+          "title": "Execution Flow",
+          "code": "1. JS engine execute console.log(\"A\")\n2. setTimeout được giao cho Web API\n3. Timer chạy bên ngoài JS engine\n4. console.log(\"C\") execute\n5. Timer xong → callback vào queue\n6. Event loop push callback vào call stack\n7. console.log(\"B\")"
+        },
+        {
+          "type": "mental_model",
+          "title": "Mental Model",
+          "body": "JavaScript:\n\n\n### setTimeout Is Not Precise\n\n\nKHÔNG có nghĩa:\n\n\nNó chỉ nghĩa:",
+          "code": "Web APIs giống background workers"
+        },
+        {
+          "type": "example",
+          "title": "Example — Blocking",
+          "body": "Output:\n\n\nVì main thread bị block.\n\n### DOM APIs\n\nBrowser expose DOM APIs:\n\n\nJavaScript engine không biết DOM là gì.\n\nDOM là Web API.",
+          "code": "setTimeout(() => {\n    console.log(\"timeout\");\n}, 0);\n\nwhile (true) {}"
+        },
+        {
+          "type": "example",
+          "title": "Example — Event Listener",
+          "body": "Flow:\n\n\n### Visualization — Event Listener",
+          "code": "button.addEventListener(\"click\", () => {\n    console.log(\"clicked\");\n});"
+        },
+        {
+          "type": "text",
+          "title": "Fetch API",
+          "body": "Networking không chạy trong JS engine.\n\nBrowser networking system handle request.\n\n### Deep Dive — Async Doesn't Mean Parallel JS\n\nNhiều người nghĩ:\n\n\nSai.\n\nJavaScript vẫn:\n\n\nAsync xảy ra vì:",
+          "code": "fetch(\"/api/users\")\n    .then(res => res.json())\n    .then(data => {\n        console.log(data);\n    });"
+        },
+        {
+          "type": "text",
+          "title": "Common Mistake — Confuse JavaScript với Browser",
+          "body": "Sai:\n\n\nĐúng:\n\n\n### Example — Node.js\n\nNode.js không có browser.\n\nNhưng vẫn có:\n\n\nVì Node runtime cung cấp API tương tự thông qua:",
+          "code": "setTimeout là JavaScript"
+        },
+        {
+          "type": "text",
+          "title": "Browser Runtime Components",
+          "body": "Browser runtime thường gồm:\n\n| Component        | Responsibility     |\n| ---------------- | ------------------ |\n| JS Engine        | Execute JS         |\n| Web APIs         | Timers, DOM, fetch |\n| Event Loop       | Scheduling         |\n| Rendering Engine | Paint UI           |\n| Networking       | HTTP requests      |\n\n### Callback Queue\n\nKhi Web API hoàn thành:\n\n\nVí dụ:\n\n\nSau 1 giây:",
+          "code": "callback được đưa vào queue"
+        },
+        {
+          "type": "text",
+          "title": "Event Loop",
+          "body": "Event loop liên tục check:\n\n\nNếu empty:\n\n\n### Visualization — Event Loop",
+          "code": "Call stack empty?"
+        },
+        {
+          "type": "text",
+          "title": "Microtasks vs Macrotasks",
+          "body": "Web APIs liên quan mạnh tới:\n\n- task queue\n- microtask queue\n\nVí dụ:\n\n| API          | Queue     |\n| ------------ | --------- |\n| setTimeout   | Macrotask |\n| Promise.then | Microtask |\n\n### Example — Promise Priority\n\n\nOutput:",
+          "code": "setTimeout(() => {\n    console.log(\"timeout\");\n});\n\nPromise.resolve().then(() => {\n    console.log(\"promise\");\n});\n\nconsole.log(\"sync\");"
+        },
+        {
+          "type": "text",
+          "title": "Why?",
+          "body": "Promise callbacks dùng:\n\n\nMicrotasks được ưu tiên trước macrotasks.",
+          "code": "microtask queue"
+        },
+        {
+          "type": "real_world",
+          "title": "Real World — UI Rendering",
+          "body": "Browser phải phối hợp:\n\n- JavaScript\n- rendering\n- layout\n- paint\n- animations\n\nNếu JS block quá lâu:\n\n\nBrowser không render được.\n\nUI freeze.",
+          "code": "while (true) {}"
+        },
+        {
+          "type": "common_bugs",
+          "title": "Common Bugs",
+          "body": "### Bug 1 — Blocking Main Thread\n\n\nToàn bộ browser UI bị freeze.",
+          "code": "while (true) {}"
+        },
+        {
+          "type": "text",
+          "title": "Bug 2 — Too Many Timers",
+          "body": "Có thể overload event loop.\n\n### Bug 3 — Memory Leaks\n\n\nNếu không remove listener đúng lúc:\n\n\ncó thể xảy ra.",
+          "code": "setInterval(() => {\n    heavyTask();\n}, 1);"
+        },
+        {
+          "type": "performance",
+          "title": "Performance",
+          "body": "### Expensive DOM Access\n\nKhông tốt:\n\n\nCó thể trigger:\n\n- reflow\n- layout thrashing",
+          "code": "for (let i = 0; i < 10000; i++) {\n    document.body.offsetHeight;\n}"
+        },
+        {
+          "type": "text",
+          "title": "Better Pattern",
+          "body": "Batch DOM updates.\n\nVí dụ:",
+          "code": "requestAnimationFrame(() => {\n    updateUI();\n});"
+        },
+        {
+          "type": "security",
+          "title": "Security"
+        },
+        {
+          "type": "text",
+          "title": "Dangerous APIs",
+          "body": "Ví dụ:\n\n\nNếu dùng sai:\n\n- XSS\n- data leak\n- injection\n\n### Example — XSS\n\n\nNguy hiểm nếu input không sanitize.",
+          "code": "localStorage\npostMessage\ninnerHTML"
+        },
+        {
+          "type": "engine_internals",
+          "title": "Engine Internals",
+          "body": "JavaScript engine:\n\n\nEngine chỉ execute JS.\n\nBrowser runtime mới:\n\n- manage APIs\n- manage event loop\n- manage rendering\n\n### Deep Dive — Why Browser APIs Separate?\n\nVì JavaScript originally được thiết kế:\n\n\nBrowser vendors thêm capabilities qua APIs.\n\nĐó là lý do:",
+          "code": "không quản lý timers hay DOM"
+        },
+        {
+          "type": "related_concepts",
+          "title": "Related Concepts",
+          "body": "- event-loop.md\n- callback-queue.md\n- microtask-vs-macrotask.md\n- runtime-environment.md\n- v8-basics.md\n- dom-basics.md\n- fetch-api.md"
+        },
+        {
+          "type": "learn_next",
+          "title": "Learn Next",
+          "body": "Sau bài này nên học:\n\n1. event-loop.md\n2. callback-queue.md\n3. microtask-vs-macrotask.md\n4. fetch-api.md\n5. dom-events.md\n6. async-await.md\n7. runtime-environment.md"
+        },
+        {
+          "type": "summary",
+          "title": "Summary",
+          "body": "Web APIs là APIs được runtime/browser cung cấp cho JavaScript.\n\nQuan trọng nhất:\n\n\nFlow chính:\n\n\nWeb APIs giúp JavaScript có khả năng:\n\n- async operations\n- DOM manipulation\n- networking\n- timers\n- browser interaction\n\nmà vẫn giữ:",
+          "code": "Web APIs không phải JavaScript language."
+        }
+      ]
+    },
+    "relations": {
+      "prerequisites": [],
+      "related": [],
+      "next": []
+    },
+    "meta": {
+      "order": 999999,
+      "difficulty": "beginner",
+      "importance": "medium",
+      "tags": [],
+      "estimated_time": ""
+    }
+  }
+]

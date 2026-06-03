@@ -1,0 +1,199 @@
+javascript/
+│
+├── core/                              ← JS ENGINE MINDSET (how JS runs)
+│   │
+│   ├── execution-model/
+│   │   ├── what-is-javascript.md
+│   │   ├── how-js-executes-code.md
+│   │   ├── execution-context.md
+│   │   ├── global-execution-context.md
+│   │   ├── call-stack.md
+│   │   ├── hoisting.md
+│   │   ├── lexical-environment.md
+│   │   ├── scope-chain.md
+│   │   ├── memory-creation-phase.md
+│   │   └── execution-phase.md
+│   │
+│   ├── runtime-model/
+│   │   ├── javascript-runtime.md
+│   │   ├── engine-overview.md
+│   │   ├── v8-basics.md
+│   │   ├── parsing-ast.md
+│   │   ├── garbage-collection.md
+│   │   ├── memory-model.md
+│   │   ├── heap-vs-stack.md
+│   │   └── web-apis.md
+│   │
+│   ├── event-loop/
+│   │   ├── event-loop.md
+│   │   ├── microtask-queue.md
+│   │   ├── macrotask-queue.md
+│   │   ├── render-queue.md
+│   │   ├── async-ordering.md
+│   │   ├── concurrency-model.md
+│   │   ├── worker-threads.md
+│   │   ├── web-workers.md
+│   │   ├── shared-array-buffer.md
+│   │   ├── atomic-operations.md
+│   │   ├── message-passing.md
+│   │   └── parallel-vs-concurrency.md
+│   │
+│   ├── type-system/
+│   │   ├── types.md
+│   │   ├── type-conversion.md
+│   │   ├── coercion.md
+│   │   ├── equality.md
+│   │   ├── truthy-falsy.md
+│   │   ├── typeof.md
+│   │   ├── nan.md
+│   │   └── bigint-symbol.md
+│   │
+│   ├── data-model/
+│   │   ├── reference-vs-value.md
+│   │   ├── immutability.md
+│   │   └── object-lifetime.md
+│   │
+│   └── engine-internals/               ← (V8 DEEP DIVE)
+│       ├── v8-overview.md
+│       ├── parsing-ast.md
+│       ├── jit-compilation.md
+│       ├── hidden-classes.md
+│       ├── inline-caching.md
+│       ├── garbage-collector-algorithms.md
+│       └── bytecode-vs-native-code.md
+│
+├── language/                          ← JS SYNTAX + SEMANTICS
+│   │
+│   ├── functions/
+│   │   ├── function-declaration.md
+│   │   ├── function-expression.md
+│   │   ├── arrow-functions.md
+│   │   ├── higher-order-functions.md
+│   │   ├── callback.md
+│   │   ├── recursion.md
+│   │   └── closure.md
+│   │
+│   ├── objects/
+│   │   ├── object-basics.md
+│   │   ├── property-descriptor.md
+│   │   ├── this.md
+│   │   ├── binding.md
+│   │   ├── call-apply-bind.md
+│   │   └── object-mutability.md
+│   │
+│   ├── prototype/
+│   │   ├── prototype.md
+│   │   ├── prototype-chain.md
+│   │   ├── inheritance.md
+│   │   └── object-create.md
+│   │
+│   ├── classes/
+│   │   ├── class-syntax.md
+│   │   ├── constructor.md
+│   │   ├── inheritance.md
+│   │   └── private-fields.md
+│   │
+│   ├── modules/
+│   │   ├── es-modules.md
+│   │   ├── commonjs.md
+│   │   ├── import-export.md
+│   │   ├── module-resolution.md
+│   │   └── circular-dependency.md
+│   │
+│   └── errors/
+│       ├── try-catch.md
+│       ├── error-types.md
+│       ├── async-errors.md
+│       └── promise-rejection.md
+│
+├── platform/                          ← JS RUNTIME ENVIRONMENT (browser)
+│   │
+│   ├── async/
+│   │   ├── promises.md
+│   │   ├── async-await.md
+│   │   ├── fetch-api.md
+│   │   ├── concurrency.md
+│   │   ├── parallel-vs-sequential.md
+│   │   ├── race-condition.md
+│   │   ├── abort-controller.md
+│   │   ├── debounce-throttle.md
+│   │   └── retry-pattern.md
+│   │
+│   ├── dom/
+│   │   ├── dom-tree.md
+│   │   ├── dom-querying.md
+│   │   ├── dom-manipulation.md
+│   │   ├── event-flow.md
+│   │   ├── rendering-cycle.md
+│   │   ├── reflow-repaint.md
+│   │   └── virtual-dom-basics.md
+│   │
+│   ├── events/
+│   │   ├── bubbling.md
+│   │   ├── capturing.md
+│   │   ├── delegation.md
+│   │   ├── event-loop-dom.md
+│   │   └── event-object.md
+│   │
+│   ├── browser/
+│   │   ├── browser-runtime.md
+│   │   ├── js-in-browser.md
+│   │   ├── networking.md
+│   │   │
+│   │   └── storage/
+│   │       ├── local-storage.md
+│   │       ├── session-storage.md
+│   │       ├── cookies.md
+│   │       └── indexeddb.md
+│   │
+│   └── tooling/                       ← JS ECOSYSTEM TOOLING
+│       ├── npm.md
+│       ├── package-json.md
+│       ├── module-bundlers.md
+│       ├── vite-vs-webpack.md
+│       ├── babel-transpilation.md
+│       ├── esm-cjs-resolution.md
+│       └── build-pipeline.md
+│
+├── system/                            ← HOW JS IS USED IN REAL SYSTEMS
+│   │
+│   ├── architecture/
+│   │   ├── design-patterns/
+│   │   │   ├── mvc.md
+│   │   │   ├── mvvm.md
+│   │   │   ├── observer.md
+│   │   │   ├── pub-sub.md
+│   │   │   └── dependency-injection.md
+│   │   │
+│   │   ├── state-management/
+│   │   │   ├── local-state.md
+│   │   │   ├── global-state.md
+│   │   │   ├── flux.md
+│   │   │   └── redux-principles.md
+│   │   │
+│   │   └── system-design/
+│   │       ├── modularity.md
+│   │       ├── separation-of-concerns.md
+│   │       └── scalability.md
+│   │
+│   ├── performance/
+│   │   ├── memory-leaks.md
+│   │   ├── rendering-performance.md
+│   │   ├── optimization-patterns.md
+│   │   ├── big-o-js.md
+│   │   └── event-loop-performance.md
+│   │
+│   ├── security/
+│   │   ├── xss.md
+│   │   ├── csrf.md
+│   │   ├── csp.md
+│   │   ├── prototype-pollution.md
+│   │   └── secure-cookies.md
+│   │
+│   └── advanced/                      ← DEEP JS BEHAVIOR (EXTRA DEPTH)
+│       ├── scope-deep-dive.md
+│       ├── closure-advanced.md
+│       ├── this-advanced.md
+│       ├── memory-deep-dive.md
+│       ├── engine-internals.md
+│       └── performance-internals.md

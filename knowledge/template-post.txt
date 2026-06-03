@@ -1,0 +1,498 @@
+# KNOWLEDGE ARTICLE GENERATION SPEC
+
+==================================================
+INPUT
+=====
+
+Người dùng có thể chỉ nhập:
+
+
+AI phải tự sinh:
+
+* id
+* title
+* category
+* tags
+* summary
+* difficulty
+* importance
+* estimated_time
+* prerequisites
+* related concepts
+* next concepts
+* toàn bộ nội dung bài viết
+
+Không hỏi lại.
+
+==================================================
+TITLE RULE
+==========
+
+id lấy từ tên file.
+
+title được sinh từ id.
+
+Ví dụ:
+
+what-is-javascript
+↓
+What Is JavaScript
+
+execution-context
+↓
+Execution Context
+
+memory-creation-phase
+↓
+Memory Creation Phase
+
+==================================================
+CATEGORY RULE
+=============
+
+Nếu không được chỉ định:
+
+category: javascript
+
+Nếu chủ đề thuộc lĩnh vực khác thì tự suy luận category phù hợp.
+
+Ví dụ:
+
+* html
+* css
+* browser
+* nodejs
+* database
+* networking
+* security
+
+==================================================
+FRONTMATTER
+===========
+
+Luôn sinh YAML hợp lệ.
+
+KHÔNG dùng markdown list:
+
+* item
+* item
+
+KHÔNG dùng:
+
+tags:
+
+* tag1
+* tag2
+
+KHÔNG dùng:
+
+prerequisites:
+
+* concept-a
+
+LUÔN dùng YAML list chuẩn:
+
+tags:
+
+* tag1
+* tag2
+
+prerequisites:
+
+* concept-a
+
+related:
+
+* concept-b
+
+next:
+
+* concept-c
+
+Format bắt buộc:
+
+---
+
+id: kebab-case-id
+title: Human Readable Title
+order: 999
+category: javascript
+
+tags:
+
+* tag1
+* tag2
+
+summary: Short summary.
+
+difficulty: beginner
+importance: high
+estimated_time: 25min
+
+prerequisites:
+
+* concept-a
+
+related:
+
+* concept-b
+
+next:
+
+* concept-c
+
+---
+
+==================================================
+STRICT YAML RULE
+================
+
+Frontmatter phải parse thành công bởi:
+
+* gray-matter
+* js-yaml
+
+Mọi danh sách trong frontmatter bắt buộc dùng:
+
+* item
+
+Không được dùng:
+
+* item
+
+ở bất kỳ field nào.
+
+Nếu vi phạm thì frontmatter được xem là lỗi.
+
+==================================================
+QUALITY RULES
+=============
+
+Bài viết phải:
+
+* Chính xác kỹ thuật
+* Có chiều sâu
+* Có mental model
+* Có intuition
+* Có execution flow
+* Có visualization
+* Có Giải thích từng nội dung
+* Có ví dụ thực tế
+* Có ví dụ code
+* Có production usage
+* Có mistakes
+* Có edge cases
+* Có trade-offs
+* Có framework examples khi phù hợp
+
+Không:
+
+* Marketing
+* Buzzwords
+* Giải thích hời hợt
+* Định nghĩa một dòng
+* Nội dung lặp lại
+* Lý thuyết suông
+* Nhồi nhét thuật ngữ
+
+==================================================
+SECTION DEPTH RULE
+==================
+
+Mỗi section phải trả lời được ít nhất một trong các câu hỏi:
+
+* Nó là gì?
+* Tại sao tồn tại?
+* Hoạt động thế nào?
+* Khi nào dùng?
+* Khi nào không nên dùng?
+* Sai ở đâu?
+* Chi phí là gì?
+* Framework dùng nó thế nào?
+
+Không được tạo section chỉ gồm định nghĩa ngắn.
+
+Mỗi section phải có nội dung đủ sâu để người đọc hiểu concept.
+
+==================================================
+EXAMPLE-FIRST RULE
+==================
+
+Mọi section đều phải có ít nhất một ví dụ minh họa.
+
+Sau mỗi concept quan trọng phải có ít nhất một trong các dạng:
+
+* Ví dụ đời thực
+* Ví dụ code
+* Ví dụ trực quan
+* Execution flow
+* Production example
+* Framework example
+
+Không để quá 150 từ liên tục mà không có:
+
+* Ví dụ
+* Code
+* Sơ đồ
+* Tình huống thực tế
+
+Ưu tiên:
+
+Concept
+↓
+Ví dụ
+↓
+Giải thích
+
+Không ưu tiên:
+
+Concept
+↓
+Lý thuyết dài
+↓
+Ví dụ cuối cùng
+
+==================================================
+CODE RULE
+=========
+
+Mọi code example phải:
+
+* Chạy được
+* Thực tế
+* Có giải thích
+* Có output nếu phù hợp
+
+Không dùng pseudo-code.
+
+Ưu tiên:
+
+* JavaScript thật
+* Browser API thật
+* Node.js thật
+* Production pattern thật
+
+Ví dụ code phải liên quan trực tiếp tới concept đang giải thích.
+
+==================================================
+VISUALIZATION RULE
+==================
+
+Ưu tiên sử dụng:
+
+* Flow diagrams
+* Runtime diagrams
+* Stack diagrams
+* Memory diagrams
+* Architecture diagrams
+
+Ví dụ:
+
+```text
+Input
+  ↓
+Parser
+  ↓
+Execution
+  ↓
+Output
+```
+
+Nếu concept liên quan runtime:
+
+* Phải có runtime flow
+
+Nếu concept liên quan memory:
+
+* Phải có memory diagram
+
+Nếu concept liên quan execution:
+
+* Phải có execution flow
+
+==================================================
+SECTION EXAMPLE REQUIREMENT
+===========================
+
+Các section sau bắt buộc có ít nhất một ví dụ:
+
+* Definition
+* Intuition
+* Mental Model
+* Why It Exists
+* Example
+* Execution Flow
+* Deep Dive
+* Performance
+* Common Bugs
+* Common Mistakes
+* Edge Cases
+* Real World
+* Engine Internals
+
+Không được để section chỉ có lý thuyết.
+
+==================================================
+MINIMUM LENGTH
+==============
+
+Tối thiểu:
+
+* Beginner: 1500 từ
+* Intermediate: 2000 từ
+* Advanced: 2500 từ
+
+Không tạo bài dạng note.
+
+Không tạo bài dạng cheat sheet.
+
+Không tạo bài dạng glossary.
+
+Mỗi bài phải là một knowledge article hoàn chỉnh.
+
+==================================================
+REQUIRED STRUCTURE
+==================
+
+# Title
+
+## Definition
+
+Giải thích concept là gì.
+
+Có ví dụ.
+
+## Intuition
+
+Ví dụ đời thực.
+
+Giúp hình thành trực giác.
+
+## Mental Model
+
+Mô hình tư duy.
+
+Có sơ đồ hoặc flow.
+
+## Why It Exists
+
+Vấn đề mà concept giải quyết.
+
+Có ví dụ thực tế.
+
+## Example
+
+Ví dụ code thực tế.
+
+Có output nếu phù hợp.
+
+## Execution Flow
+
+Mô tả cách concept hoạt động từng bước.
+
+Có flow diagram.
+
+## Visualization
+
+Sơ đồ trực quan.
+
+## Deep Dive
+
+Chi tiết kỹ thuật.
+
+Có ví dụ minh họa.
+
+## Performance
+
+Ảnh hưởng tới hiệu năng.
+
+Có ví dụ thực tế.
+
+## Common Bugs
+
+Các lỗi thường gặp.
+
+Có code minh họa.
+
+## Common Mistakes
+
+Các hiểu lầm phổ biến.
+
+Có ví dụ.
+
+## Edge Cases
+
+Các trường hợp đặc biệt.
+
+Có ví dụ.
+
+## Real World
+
+Framework hoặc production usage.
+
+Có ví dụ thực tế.
+
+## Engine Internals
+
+Giải thích ở mức runtime hoặc engine.
+
+Có sơ đồ hoặc flow nếu phù hợp.
+
+## Related Concepts
+
+Danh sách concept liên quan.
+
+Giải thích ngắn lý do liên quan.
+
+## Learn Next
+
+Các concept nên học tiếp.
+
+## Summary
+
+Bắt buộc gồm:
+
+* Concept là gì
+* Tại sao quan trọng
+* Hoạt động như thế nào
+* Điều quan trọng nhất cần nhớ
+
+Không viết dưới dạng một câu ngắn.
+
+==================================================
+OUTPUT RULE
+===========
+
+Trả về DUY NHẤT nội dung file markdown hoàn chỉnh.
+
+Không thêm:
+
+* Explanation
+* Intro text
+* Outro text
+* Comments
+* Markdown wrapper
+
+Output cuối cùng phải là:
+
+* Một file .md hoàn chỉnh
+* Frontmatter YAML hợp lệ
+* Nội dung đầy đủ theo structure chuẩn
+* Tương thích gray-matter
+* Tương thích build-keywords.js
+
+==================================================
+FINAL BEHAVIOR
+==============
+
+Khi người dùng nhập:
+
+tiêu đề trên
+
+AI phải:
+
+1. Tự sinh metadata.
+2. Tự sinh toàn bộ nội dung.
+3. Trả về trực tiếp file markdown hoàn chỉnh.
+4. Không hỏi lại.
+5. Không giải thích thêm ngoài nội dung file markdown.
