@@ -28,8 +28,12 @@ app.use(cors({
 
 app.options("*", cors());
 const fs = require("fs");
-const baseUpload = path.join(__dirname, "uploads");
-const avatarDir = path.join(baseUpload, "avatars");
+
+// base folder
+const uploadDir = path.join(__dirname, "uploads");
+
+// avatar folder
+const avatarDir = path.join(uploadDir, "avatars");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -46,9 +50,10 @@ app.use(
   )
 );
 
-// upload API
+// AUTH / PROFILE / SOCIAL / AVATAR
+
 app.use("/api/avatar", require("./routes/avatar.routes"));
-app.use("/api", require("./routes/avatar.routes"));
+
 app.use("/api/social", require("./routes/social.routes"));
 // =========================
 // MIDDLEWARE
