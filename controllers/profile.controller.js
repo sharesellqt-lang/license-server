@@ -14,16 +14,28 @@ exports.getProfiles = async (req, res) => {
       `
       SELECT *
       FROM dating_profiles
+
       WHERE user_id != ?
+
+      AND user_id NOT IN (
+        SELECT target_id
+        FROM dating_swipes
+        WHERE user_id = ?
+        AND type IN ('like','dislike')
+      )
+
       AND (
         gender = ?
         OR ? = ''
       )
+
       AND age >= ?
       AND age <= ?
+
       LIMIT 100
       `,
       [
+        user_id,
         user_id,
         gender || "",
         gender || "",
