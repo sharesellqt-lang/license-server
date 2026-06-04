@@ -106,13 +106,15 @@ exports.undoSwipe = async (req, res) => {
   const user_id = req.user.id;
   const { target_id } = req.body;
 
-  await db.query(
-    `UPDATE dating_swipes
-     SET status = NULL
-     WHERE user_id = ?
-     AND target_id = ?`,
-    [user_id, target_id]
-  );
+await db.query(
+  `
+  DELETE FROM dating_swipes
+  WHERE user_id = ?
+  AND target_id = ?
+  AND type = 'dislike'
+  `,
+  [user_id, target_id]
+);
 
   res.json({ success: true });
 };
