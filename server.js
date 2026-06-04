@@ -1,77 +1,55 @@
 require("dotenv").config();
 
 // =========================
-// IMPORT
+// IMPORT CORE
 // =========================
 const express = require("express");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const path = require("path");
+const fs = require("fs");
 
-const usageRoutes = require("./routes/usage");
-const plansRoute = require("./routes/plans");
-const authRoutes = require("./routes/auth");
-const uploadBillRoutes = require("./routes/uploadBill");
-//const adminPayment = require("./routes/adminPayment");
-
-const db = require("./db");
 const app = express();
-// 🔥 MUST BE FIRST
-app.use(cors({
+
+// =========================
+// CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
+// =========================
+const corsOptions = {
   origin: "https://sharesell.net",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
-}));
+};
 
-// 🔥 IMPORTANT: handle preflight
+// 👉 MUST BE FIRST MIDDLEWARE
+app.use(cors(corsOptions));
 
-app.options("*", cors());
-const fs = require("fs");
+// 👉 handle preflight
+app.options("*", cors(corsOptions));
 
-// base folder
-//const uploadDir = path.join(__dirname, "uploads");
+// =========================
+// DEBUG LOG (OPTIONAL)
+// =========================
+app.use((req, res, next) => {
+  console.log("REQ:", req.method, req.originalUrl);
+  next();
+});
 
-// avatar folder
-//const avatarDir = path.join(uploadDir, "avatars");
+// =========================
+// BODY PARSER
+// =========================
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-//if (!fs.existsSync(uploadDir)) {
-//  fs.mkdirSync(uploadDir);
-//}
-
-//if (!fs.existsSync(avatarDir)) {
-//  fs.mkdirSync(avatarDir, { recursive: true });
-//}
-
-//app.use("/uploads", express.static( path.join(__dirname, "uploads")));
-
-// AUTH / PROFILE / SOCIAL / AVATAR
-
+// =========================
+// STATIC FILES
+// =========================
+app.use("/assets", express.static("assets"));
 app.use("/api/avatar", require("./routes/avatar.routes"));
 
-
 // =========================
-// MIDDLEWARE
+// ROUTES (CORE DATING)
 // =========================
-
-// 🔥 parse json trước
-app.use(express.json());
-//
-app.use(express.urlencoded({
-  extended: true
-}));
-//
-app.use(
-  "/api",
-  require("./routes/paymentHistory")
-);
-//
-app.use(
-  "/api/admin",
-  require("./routes/admin")
-);
-
-
 app.use("/api/profile", require("./routes/profile.routes"));
 app.use("/api/swipe", require("./routes/swipe.routes"));
 app.use("/api/match", require("./routes/match.routes"));
@@ -79,37 +57,38 @@ app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
 
+// =========================
+// PAYMENT / USER SYSTEM
+// =========================
+app.use("/api", require("./routes/paymentHistory"));
+app.use("/api", require("./routes/payment"));
+app.use("/api", require("./routes/paymentStatus"));
+app.use("/api", require("./routes/uploadBill"));
+app.use("/api", require("./routes/user"));
+app.use("/api", require("./routes/upgrade"));
+app.use("/api", require("./routes/webhook"));
+app.use("/api", require("./routes/auth"));
+app.use("/api", require("./routes/plans"));
+app.use("/api", require("./routes/usage"));
+
+app.use("/api/admin", require("./routes/admin"));
+
+// =========================
+// ROOT
+// =========================
 app.get("/", (req, res) => {
   res.send("Dating Hub API running...");
 });
 
 console.log("🔥 DATING ROUTE MOUNTED");
-// =========================
-// ROUTES
-// =========================
-const adminRoutes = require("./routes/admin");
-const paymentRoutes = require("./routes/payment");
-const userRoutes = require("./routes/user");
-const upgradeRoutes = require("./routes/upgrade");
-const webhookRoutes = require("./routes/webhook");
-const paymentHistoryRoutes = require("./routes/paymentHistory");
-const paymentStatusRoutes = require("./routes/paymentStatus");
 
-app.use("/api/admin", adminRoutes);
-app.use("/api", paymentRoutes);
-app.use(
-  "/api",
-  require("./routes/uploadBill")
-);
-app.use("/api", userRoutes);
-app.use("/api", upgradeRoutes);
-app.use("/api", webhookRoutes);
-app.use("/api", authRoutes);
-app.use("/api", plansRoute);
-app.use("/api", usageRoutes);
-app.use("/api", uploadBillRoutes);
-app.use("/api", paymentStatusRoutes);
-app.use("/assets", express.static("assets"));
+// =========================
+// START SERVER
+// =========================
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
 
 // =========================
 // CONFIG
