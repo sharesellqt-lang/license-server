@@ -21,7 +21,7 @@ exports.getProfiles = async (req, res) => {
         SELECT target_id
         FROM dating_swipes
         WHERE user_id = ?
-        AND type IN ('like','dislike')
+        AND type = 'dislike'
       )
 
       AND (
