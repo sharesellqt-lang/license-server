@@ -37,16 +37,32 @@ exports.getFollowers = async (req, res) => {
 
 exports.getFollowingUsers = async (req, res) => {
 
-  const userId = req.user.id;
+  const userId =
+    req.user.id;
 
-  const [rows] = await db.query(
-    `
-    SELECT following_id
-    FROM dating_follow
-    WHERE follower_id = ?
-    `,
-    [userId]
-  );
+  const [rows] =
+    await db.query(
+      `
+      SELECT
+
+        p.user_id,
+        p.name,
+        p.avatar,
+        p.age,
+        p.location,
+        p.bio
+
+      FROM dating_follow f
+
+      JOIN dating_profile p
+      ON p.user_id =
+      f.following_id
+
+      WHERE
+      f.follower_id = ?
+      `,
+      [userId]
+    );
 
   res.json(rows);
 
