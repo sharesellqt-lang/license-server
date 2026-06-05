@@ -7,16 +7,11 @@ const router = express.Router();
 
 const PLANS = {
   free: {
-    id: "free",
-    name: "Free Trial",
-    shortName: "FREE",
-    price: 0,
-    currency: "VND",
-    displayPrice: "0đ",
-    level: 1,
-    durationDays: 7, // dùng thử 7 ngày
-    cycles: ["month"] // free chỉ dùng thử
-  },
+  id: "free",
+  name: "FREE",
+  level: 1,
+  permanent: true
+},
   pro: {
     id: "pro",
     name: "🔥 PRO PLAN",

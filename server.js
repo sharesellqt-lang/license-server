@@ -80,8 +80,8 @@ app.use("/api", require("./routes/upgrade"));
 app.use("/api", require("./routes/webhook"));
 app.use("/api", require("./routes/auth"));
 app.use("/api", require("./routes/plans"));
+app.use("/api", require("./routes/feature.routes"));
 app.use("/api", require("./routes/usage"));
-
 app.use("/api/admin", require("./routes/admin"));
 
 // =========================
