@@ -122,7 +122,6 @@ console.log("🔥 JWT_SECRET:", JWT_SECRET ? "OK" : "MISSING");
 const WP_API = "https://sharesell.net/wp-json/wp/v2/posts";
 
 
-app.options("*", cors());
 app.use(express.json());
 const OpenAI = require("openai");
 
