@@ -3,6 +3,9 @@ const router = express.Router();
 
 const db = require("../db");
 
+const authMiddleware =
+require("../middleware/auth");
+
 const PERMISSIONS =
 require("../permissions/tool.permissions");
 
