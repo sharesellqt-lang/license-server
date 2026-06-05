@@ -1,39 +1,31 @@
-module.exports = {
+// =====================================================
+// GLOBAL FEATURE PERMISSIONS
+// =====================================================
 
-  aida_generator: {
+const TOOL_PERMISSIONS = {
 
-    features: {
+  // FREE
+  free: [
 
-      proMode: {
-        requiredPlan: "pro",
-        freeTrialDays: 3
-      },
+    "basicMode"
 
-      vipMode: {
-        requiredPlan: "vip",
-        freeTrialDays: 1
-      }
+  ],
 
-    }
+  // PRO
+  pro: [
 
-  },
+    "proMode"
 
-  datinghub: {
+  ],
 
-    features: {
+  // VIP
+  vip: [
 
-      unlimitedSwipe: {
-        requiredPlan: "pro",
-        freeTrialDays: 3
-      },
+    "vipMode"
 
-      premiumMatch: {
-        requiredPlan: "vip",
-        freeTrialDays: 1
-      }
-
-    }
-
-  }
+  ]
 
 };
+
+module.exports =
+  TOOL_PERMISSIONS;
