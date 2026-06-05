@@ -15,9 +15,9 @@ require("../permissions/tool.permissions");
 
 router.get(
 "/feature-access",
-async(req,res)=>{
+async (req, res) => {
 
-try{
+try {
 
 const {
  userId,
@@ -25,11 +25,13 @@ const {
 } = req.query;
 
 const config =
-PERMISSIONS.global.features[
+PERMISSIONS
+?.global
+?.features?.[
  feature
 ];
 
-if(!config){
+if (!config) {
 
  return res.json({
    allowed:false
@@ -37,14 +39,25 @@ if(!config){
 
 }
 
-const [users] =
+// =======================
+// USER PLAN
+// =======================
+
+const [rows] =
 await db.query(
-"SELECT plan FROM users WHERE id=?",
+`
+SELECT plan
+FROM users
+WHERE id=?
+`,
 [userId]
 );
 
 const plan =
-(users?.plan || "free")
+(
+ rows[0]?.plan ||
+ "free"
+)
 .toLowerCase();
 
 const rank = {
@@ -53,125 +66,207 @@ const rank = {
  vip:2
 };
 
-if(
+// =======================
+// PLAN ACCESS
+// =======================
+
+if (
+
  rank[plan] >=
- rank[config.requiredPlan]
-){
+ rank[
+   config.requiredPlan
+ ]
+
+) {
 
  return res.json({
+
    allowed:true,
    source:"plan"
+
  });
 
 }
 
-const [trial] =
+// =======================
+// TRIAL ACCESS
+// =======================
+
+const [trialRows] =
 await db.query(
+
 `
 SELECT *
 FROM user_feature_trials
 WHERE user_id=?
 AND feature_key=?
-AND is_active=1
 AND expires_at > NOW()
 LIMIT 1
 `,
+
 [
  userId,
  feature
 ]
+
 );
 
-if(trial){
+if (
+
+ trialRows.length
+
+) {
 
  return res.json({
+
    allowed:true,
    source:"trial"
+
  });
 
 }
+
+// =======================
+// DENY
+// =======================
 
 return res.json({
+
  allowed:false
+
 });
 
-}catch(err){
+} catch (err) {
 
- console.log(err);
+ console.error(
+   "FEATURE ACCESS ERROR:",
+   err
+ );
 
- res.status(500).json({
+ return res
+ .status(500)
+ .json({
+
    allowed:false
+
  });
 
 }
 
 });
 
-module.exports = router;
+// =======================
+// ACTIVATE FEATURE TRIAL
+// =======================
+
 router.post(
+
 "/activate-feature-trial",
+
 authMiddleware,
+
 async (req,res)=>{
 
- try{
+try{
 
-   console.log(
-     "BODY:",
-     req.body
-   );
+console.log(
+"BODY:",
+req.body
+);
 
-   console.log(
-     "USER:",
-     req.user
-   );
+console.log(
+"USER:",
+req.user
+);
 
-   const userId =
-     req.user.userId ||
-     req.user.id;
+const userId =
+req.user.id;
 
-   console.log(
-     "USER ID:",
-     userId
-   );
+console.log(
+"USER ID:",
+userId
+);
 
-   const {
-     feature
-   } = req.body;
+const {
+ feature
+} = req.body;
 
-   const expires =
-     new Date();
+if(!feature){
 
-   if(feature==="proMode"){
+ return res
+ .status(400)
+ .json({
 
-     expires.setDate(
-       expires.getDate()+3
-     );
+   error:
+   "Feature required"
 
-   }else{
+ });
 
-     expires.setDate(
-       expires.getDate()+1
-     );
+}
 
-   }
+// =======================
+// EXPIRE TIME
+// =======================
 
-   await db.query(
+const expires =
+new Date();
+
+if(
+
+ feature ===
+ "proMode"
+
+){
+
+ expires.setDate(
+
+   expires.getDate()
+   + 3
+
+ );
+
+}else{
+
+ expires.setDate(
+
+   expires.getDate()
+   + 1
+
+ );
+
+}
+
+// =======================
+// UPSERT TRIAL
+// =======================
+
+await db.query(
 
 `
 INSERT INTO
 user_feature_trials
 (
- user_id,
- feature_key,
- expires_at
+
+user_id,
+feature_key,
+expires_at
+
 )
 
 VALUES
 (
- ?,
- ?,
- ?
+
+?,
+?,
+?
+
 )
+
+ON DUPLICATE KEY UPDATE
+
+expires_at =
+VALUES(expires_at)
+
 `,
 
 [
@@ -182,27 +277,43 @@ VALUES
 
 );
 
-   console.log(
-     "TRIAL INSERTED"
-   );
+console.log(
+"TRIAL INSERTED"
+);
 
-   res.json({
-     success:true
-   });
+return res.json({
 
- }catch(err){
+ success:true,
 
-   console.error(
-     "ACTIVATE ERROR:",
-     err
-   );
+ feature,
 
-   res.status(500)
-   .json({
-     error:
-       err.message
-   });
-
- }
+ expiresAt:
+ expires
 
 });
+
+}catch(err){
+
+console.error(
+
+"ACTIVATE ERROR:",
+
+err
+
+);
+
+return res
+.status(500)
+.json({
+
+ error:
+ err.message
+
+});
+
+}
+
+});
+
+module.exports =
+router;
