@@ -108,52 +108,70 @@ return res.json({
 });
 
 module.exports = router;
-
 router.post(
 "/activate-feature-trial",
 authMiddleware,
-async(req,res)=>{
+async (req,res)=>{
 
- const userId =
- req.user.id;
+ try{
 
- const feature =
- req.body.feature;
-
- const expires =
- new Date();
-
- if(feature==="proMode"){
-
-   expires.setDate(
-     expires.getDate()+3
+   console.log(
+     "BODY:",
+     req.body
    );
 
- }
-
- else if(
-   feature==="vipMode"
- ){
-
-   expires.setDate(
-     expires.getDate()+1
+   console.log(
+     "USER:",
+     req.user
    );
 
- }
+   const userId =
+     req.user.userId ||
+     req.user.id;
 
- await db.query(
+   console.log(
+     "USER ID:",
+     userId
+   );
+
+   const {
+     feature
+   } = req.body;
+
+   const expires =
+     new Date();
+
+   if(feature==="proMode"){
+
+     expires.setDate(
+       expires.getDate()+3
+     );
+
+   }else{
+
+     expires.setDate(
+       expires.getDate()+1
+     );
+
+   }
+
+   await db.query(
 
 `
 INSERT INTO
 user_feature_trials
 (
-user_id,
-feature_key,
-expires_at
+ user_id,
+ feature_key,
+ expires_at
 )
 
 VALUES
-(?,?,?)
+(
+ ?,
+ ?,
+ ?
+)
 `,
 
 [
@@ -164,8 +182,27 @@ VALUES
 
 );
 
- res.json({
-   success:true
- });
+   console.log(
+     "TRIAL INSERTED"
+   );
+
+   res.json({
+     success:true
+   });
+
+ }catch(err){
+
+   console.error(
+     "ACTIVATE ERROR:",
+     err
+   );
+
+   res.status(500)
+   .json({
+     error:
+       err.message
+   });
+
+ }
 
 });
