@@ -35,7 +35,17 @@ app.use((req, res, next) => {
   console.log("REQ:", req.method, req.originalUrl);
   next();
 });
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://sharesell.net");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
 
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
 // =========================
 // BODY PARSER
 // =========================
