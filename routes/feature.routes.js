@@ -154,44 +154,6 @@ async (req, res) => {
 
 );
 
-/* =====================================
-   FEATURE ACCESS -update
-===================================== */
-
-async function canAccessFeature(user, feature) {
-
-  const config =
-    permissions.features?.[feature];
-
-  if (!config) return false;
-
-  // 1. check plan
-  const userLevel =
-    PLANS[user.plan || "free"]?.level || 0;
-
-  const requiredLevel =
-    PLANS[config.requiredPlan]?.level || 0;
-
-  if (userLevel >= requiredLevel) {
-    return true;
-  }
-
-  // 2. check trial (IMPORTANT FIX)
-  const [rows] = await db.query(
-    `
-    SELECT id
-    FROM user_feature_trials
-    WHERE user_id = ?
-      AND feature_key = ?
-      AND is_active = 1
-      AND expires_at > NOW()
-    LIMIT 1
-    `,
-    [user.id, feature]
-  );
-
-  return rows.length > 0;
-}
 
 module.exports =
 router;
