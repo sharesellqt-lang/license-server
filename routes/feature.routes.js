@@ -141,20 +141,20 @@ router.post(
 
       });
 
-    } catch (err) {
+          } catch (err) {
 
-      console.error(err);
+        console.error(
+          "ACTIVATE TRIAL ERROR:",
+          err
+        );
 
-      return res
-        .status(500)
-        .json({
+        return res
+          .status(500)
+          .json({
+            error: err.message
+          });
 
-          error:
-            "Server error"
-
-        });
-
-    }
+      }
 
   }
 
