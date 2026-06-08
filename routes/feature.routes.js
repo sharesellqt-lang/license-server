@@ -5,8 +5,8 @@ const router = express.Router();
 const authMiddleware =
 require("../middleware/auth");
 
-const User =
-require("../models/User");
+const db =
+require("../db");
 
 const permissions =
 require("../permissions/tool.permissions");
@@ -50,9 +50,10 @@ router.post(
 
       }
 
-      const user =
-        await User.findById(
-          req.user.id
+      const [[user]] =
+        await db.query(
+          "SELECT * FROM users WHERE id = ?",
+          [req.user.id]
         );
 
       if (!user) {
@@ -68,18 +69,21 @@ router.post(
 
       }
 
-      const currentTrial =
-        user.activeTrial;
+      const currentTrialFeature =
+        user.active_trial_feature;
+
+      const currentTrialExpire =
+        user.active_trial_expire;
 
       const stillActive =
 
-        currentTrial?.feature ===
+        currentTrialFeature ===
           feature &&
 
-        currentTrial?.expiresAt &&
+        currentTrialExpire &&
 
         new Date(
-          currentTrial.expiresAt
+          currentTrialExpire
         ) > new Date();
 
       if (stillActive) {
@@ -112,15 +116,20 @@ router.post(
 
         );
 
-      user.activeTrial = {
-
-        feature,
-
-        expiresAt
-
-      };
-
-      await user.save();
+      await db.query(
+        `
+        UPDATE users
+        SET
+          active_trial_feature = ?,
+          active_trial_expire = ?
+        WHERE id = ?
+        `,
+        [
+          feature,
+          expiresAt,
+          req.user.id
+        ]
+      );
 
       return res.json({
 
@@ -156,17 +165,10 @@ router.post(
 ===================================== */
 
 router.get(
-
   "/feature-access",
-
   authMiddleware,
 
-  async (
-
-    req,
-    res
-
-  ) => {
+  async (req, res) => {
 
     try {
 
@@ -185,9 +187,10 @@ router.get(
 
       }
 
-      const user =
-        await User.findById(
-          req.user.id
+      const [[user]] =
+        await db.query(
+          "SELECT * FROM users WHERE id = ?",
+          [req.user.id]
         );
 
       if (!user) {
@@ -203,10 +206,8 @@ router.get(
       const allowed =
 
         canAccessFeature(
-
           user,
           feature
-
         );
 
       return res.json({
