@@ -29,138 +29,128 @@ router.post(
   "/activate-feature-trial",
   authMiddleware,
 
-  async (req, res) => {
+async (req, res) => {
 
-    try {
+  try {
 
-      const { feature } =
-        req.body;
+    const { feature } = req.body;
 
-      const config =
+    const config =
       permissions.features[
         feature
       ];
 
-      if (!config) {
+    if (!config) {
 
-        return res
-          .status(400)
-          .json({
+      return res
+        .status(400)
+        .json({
+          error: "Invalid feature"
+        });
 
-            error:
-              "Invalid feature"
+    }
 
-          });
+    const [[user]] =
+      await db.query(
+        "SELECT * FROM users WHERE id = ?",
+        [req.user.id]
+      );
 
-      }
+    if (!user) {
 
-      const [[user]] =
-        await db.query(
-          "SELECT * FROM users WHERE id = ?",
-          [req.user.id]
-        );
+      return res
+        .status(404)
+        .json({
+          error: "User not found"
+        });
 
-      if (!user) {
+    }
 
-        return res
-          .status(404)
-          .json({
-
-            error:
-              "User not found"
-
-          });
-
-      }
-
-      const currentTrialFeature =
-        user.active_trial_feature;
-
-      const currentTrialExpire =
-        user.active_trial_expire;
-
-      const stillActive =
-
-        currentTrialFeature ===
-          feature &&
-
-        currentTrialExpire &&
-
-        new Date(
-          currentTrialExpire
-        ) > new Date();
-
-      if (stillActive) {
-
-        return res
-          .status(400)
-          .json({
-
-            error:
-              "Trial already active"
-
-          });
-
-      }
-
-      const expiresAt =
-        new Date(
-
-          Date.now() +
-
-          config.trialDays *
-
-          24 *
-
-          60 *
-
-          60 *
-
-          1000
-
-        );
-
+    // Kiểm tra trial còn hiệu lực hay không
+    const [activeTrials] =
       await db.query(
         `
-        UPDATE users
-        SET
-          active_trial_feature = ?,
-          active_trial_expire = ?
-        WHERE id = ?
+        SELECT id
+        FROM user_feature_trials
+        WHERE user_id = ?
+          AND feature_key = ?
+          AND is_active = 1
+          AND expires_at > NOW()
+        LIMIT 1
         `,
         [
-          feature,
-          expiresAt,
-          req.user.id
+          req.user.id,
+          feature
         ]
       );
 
-      return res.json({
+    if (activeTrials.length > 0) {
 
-        success: true,
+      return res
+        .status(400)
+        .json({
+          error: "Trial already active"
+        });
 
+    }
+
+    const expiresAt =
+      new Date(
+        Date.now() +
+        config.trialDays *
+        24 *
+        60 *
+        60 *
+        1000
+      );
+
+    await db.query(
+      `
+      INSERT INTO user_feature_trials
+      (
+        user_id,
+        feature_key,
+        required_plan,
+        activated_at,
+        expires_at,
+        is_active
+      )
+      VALUES (?, ?, ?, NOW(), ?, 1)
+      `,
+      [
+        req.user.id,
         feature,
-
+        config.requiredPlan,
         expiresAt
+      ]
+    );
 
+    return res.json({
+
+      success: true,
+
+      feature,
+
+      expiresAt
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "ACTIVATE TRIAL ERROR:",
+      err
+    );
+
+    return res
+      .status(500)
+      .json({
+        error: err.message
       });
 
-          } catch (err) {
-
-        console.error(
-          "ACTIVATE TRIAL ERROR:",
-          err
-        );
-
-        return res
-          .status(500)
-          .json({
-            error: err.message
-          });
-
-      }
-
   }
+
+}
 
 );
 
