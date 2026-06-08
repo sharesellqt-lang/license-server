@@ -12,9 +12,30 @@ router.get("/me", auth, async (req, res) => {
       [req.user.id]
     );
 
+    const [trials] = await db.query(
+  `
+  SELECT *
+  FROM user_feature_trials
+  WHERE user_id = ?
+    AND is_active = 1
+    AND expires_at > NOW()
+  `,
+  [user.id]
+);
+
     if (!user) return res.status(404).json({ error: "User not found" });
 
-    const planKey = user.plan || "free";
+    const trialFeatures = trials.map(t => t.feature_key);
+
+    const hasProTrial = trialFeatures.includes("proMode");
+    const hasVipTrial = trialFeatures.includes("vipMode");
+
+    const planKey =
+      hasVipTrial
+        ? "vip"
+        : hasProTrial
+          ? "pro"
+          : (user.plan || "free");
     const planData = getPlan(planKey);
 
     // Tính planStartDate
@@ -43,18 +64,18 @@ const activePlan =
 return res.json({
   id: user.id,
 
-  // DB là source of truth
-  plan: activePlan,
+  plan: planKey,
 
   licensed: !!isLicensed,
 
-  // dùng biến đã tính đúng
+  trialFeatures,
+
   planStartDate:
-    activePlan === "free"
+    planKey === "free"
       ? null
       : planStartDate,
 
-  expireAt
+  expireAt: user.expire_at
 });
 
   } catch (err) {
