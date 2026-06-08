@@ -1,31 +1,23 @@
-// =====================================================
-// GLOBAL FEATURE PERMISSIONS
-// =====================================================
+module.exports = {
 
-const TOOL_PERMISSIONS = {
+  features: {
 
-  // FREE
-  free: [
+    proMode: {
 
-    "basicMode"
+      requiredPlan: "pro",
 
-  ],
+      trialDays: 3
 
-  // PRO
-  pro: [
+    },
 
-    "proMode"
+    vipMode: {
 
-  ],
+      requiredPlan: "vip",
 
-  // VIP
-  vip: [
+      trialDays: 1
 
-    "vipMode"
+    }
 
-  ]
+  }
 
 };
-
-module.exports =
-  TOOL_PERMISSIONS;

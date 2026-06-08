@@ -10,6 +10,10 @@ require("../db");
 
 const permissions =
 require("../permissions/tool.permissions");
+console.log(
+  "PERMISSIONS =",
+  permissions
+);
 
 const {
   canAccessFeature
