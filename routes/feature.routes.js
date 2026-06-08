@@ -1,319 +1,237 @@
 const express = require("express");
-const router = express.Router();
 
-const db = require("../db");
+const router = express.Router();
 
 const authMiddleware =
 require("../middleware/auth");
 
-const PERMISSIONS =
+const User =
+require("../models/User");
+
+const permissions =
 require("../permissions/tool.permissions");
 
-// =======================
-// CHECK FEATURE ACCESS
-// =======================
-
-router.get(
-"/feature-access",
-async (req, res) => {
-
-try {
-
 const {
- userId,
- feature
-} = req.query;
-
-const config =
-PERMISSIONS
-?.global
-?.features?.[
- feature
-];
-
-if (!config) {
-
- return res.json({
-   allowed:false
- });
-
-}
-
-// =======================
-// USER PLAN
-// =======================
-
-const [rows] =
-await db.query(
-`
-SELECT plan
-FROM users
-WHERE id=?
-`,
-[userId]
+  canAccessFeature
+} = require(
+  "../services/feature.service"
 );
 
-const plan =
-(
- rows[0]?.plan ||
- "free"
-)
-.toLowerCase();
-
-const rank = {
- free:0,
- pro:1,
- vip:2
-};
-
-// =======================
-// PLAN ACCESS
-// =======================
-
-if (
-
- rank[plan] >=
- rank[
-   config.requiredPlan
- ]
-
-) {
-
- return res.json({
-
-   allowed:true,
-   source:"plan"
-
- });
-
-}
-
-// =======================
-// TRIAL ACCESS
-// =======================
-
-const [trialRows] =
-await db.query(
-
-`
-SELECT *
-FROM user_feature_trials
-WHERE user_id=?
-AND feature_key=?
-AND expires_at > NOW()
-LIMIT 1
-`,
-
-[
- userId,
- feature
-]
-
-);
-
-if (
-
- trialRows.length
-
-) {
-
- return res.json({
-
-   allowed:true,
-   source:"trial"
-
- });
-
-}
-
-// =======================
-// DENY
-// =======================
-
-return res.json({
-
- allowed:false
-
-});
-
-} catch (err) {
-
- console.error(
-   "FEATURE ACCESS ERROR:",
-   err
- );
-
- return res
- .status(500)
- .json({
-
-   allowed:false
-
- });
-
-}
-
-});
-
-// =======================
-// ACTIVATE FEATURE TRIAL
-// =======================
+/* =====================================
+   ACTIVATE FEATURE TRIAL
+===================================== */
 
 router.post(
+  "/activate-feature-trial",
+  authMiddleware,
 
-"/activate-feature-trial",
+  async (req, res) => {
 
-authMiddleware,
+    try {
 
-async (req,res)=>{
+      const { feature } =
+        req.body;
 
-try{
+      const config =
+        permissions.features[
+          feature
+        ];
 
-console.log(
-"BODY:",
-req.body
-);
+      if (!config) {
 
-console.log(
-"USER:",
-req.user
-);
+        return res
+          .status(400)
+          .json({
 
-const userId =
-req.user.id;
+            error:
+              "Invalid feature"
 
-console.log(
-"USER ID:",
-userId
-);
+          });
 
-const {
- feature
-} = req.body;
+      }
 
-if(!feature){
+      const user =
+        await User.findById(
+          req.user.id
+        );
 
- return res
- .status(400)
- .json({
+      if (!user) {
 
-   error:
-   "Feature required"
+        return res
+          .status(404)
+          .json({
 
- });
+            error:
+              "User not found"
 
-}
+          });
 
-// =======================
-// EXPIRE TIME
-// =======================
+      }
 
-const expires =
-new Date();
+      const currentTrial =
+        user.activeTrial;
 
-if(
+      const stillActive =
 
- feature ===
- "proMode"
+        currentTrial?.feature ===
+          feature &&
 
-){
+        currentTrial?.expiresAt &&
 
- expires.setDate(
+        new Date(
+          currentTrial.expiresAt
+        ) > new Date();
 
-   expires.getDate()
-   + 3
+      if (stillActive) {
 
- );
+        return res
+          .status(400)
+          .json({
 
-}else{
+            error:
+              "Trial already active"
 
- expires.setDate(
+          });
 
-   expires.getDate()
-   + 1
+      }
 
- );
+      const expiresAt =
+        new Date(
 
-}
+          Date.now() +
 
-// =======================
-// UPSERT TRIAL
-// =======================
+          config.trialDays *
 
-await db.query(
+          24 *
 
-`
-INSERT INTO
-user_feature_trials
-(
+          60 *
 
-user_id,
-feature_key,
-expires_at
+          60 *
 
-)
+          1000
 
-VALUES
-(
+        );
 
-?,
-?,
-?
+      user.activeTrial = {
 
-)
+        feature,
 
-ON DUPLICATE KEY UPDATE
+        expiresAt
 
-expires_at =
-VALUES(expires_at)
+      };
 
-`,
+      await user.save();
 
-[
- userId,
- feature,
- expires
-]
+      return res.json({
 
-);
+        success: true,
 
-console.log(
-"TRIAL INSERTED"
-);
+        feature,
 
-return res.json({
+        expiresAt
 
- success:true,
+      });
 
- feature,
+    } catch (err) {
 
- expiresAt:
- expires
+      console.error(err);
 
-});
+      return res
+        .status(500)
+        .json({
 
-}catch(err){
+          error:
+            "Server error"
 
-console.error(
+        });
 
-"ACTIVATE ERROR:",
+    }
 
-err
+  }
 
 );
 
-return res
-.status(500)
-.json({
+/* =====================================
+   FEATURE ACCESS
+===================================== */
 
- error:
- err.message
+router.get(
 
-});
+  "/feature-access",
 
-}
+  authMiddleware,
 
-});
+  async (
+
+    req,
+    res
+
+  ) => {
+
+    try {
+
+      const feature =
+        req.query.feature;
+
+      if (!feature) {
+
+        return res
+          .status(400)
+          .json({
+
+            allowed: false
+
+          });
+
+      }
+
+      const user =
+        await User.findById(
+          req.user.id
+        );
+
+      if (!user) {
+
+        return res.json({
+
+          allowed: false
+
+        });
+
+      }
+
+      const allowed =
+
+        canAccessFeature(
+
+          user,
+          feature
+
+        );
+
+      return res.json({
+
+        allowed
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      return res
+        .status(500)
+        .json({
+
+          allowed: false
+
+        });
+
+    }
+
+  }
+
+);
 
 module.exports =
 router;
