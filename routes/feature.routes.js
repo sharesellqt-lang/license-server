@@ -98,59 +98,37 @@ router.post(
 );
 
 
-router.get(
-  "/feature-access",
-  authMiddleware,
-  async (req, res) => {
-    try {
-      const feature = req.query.feature;
 
-      if (!feature) {
-        return res.json({ allowed: false });
-      }
+router.get("/feature-access", authMiddleware, async (req, res) => {
+  try {
 
-      const [[user]] = await db.query(
-        "SELECT * FROM users WHERE id = ?",
-        [req.user.id]
-      );
+    const feature = req.query.feature;
 
-      if (!user) {
-        return res.json({ allowed: false });
-      }
-
-      // Lấy trial từ DB
-      const [rows] = await db.query(
-        `
-        SELECT *
-        FROM user_feature_trials
-        WHERE user_id = ?
-          AND feature_key = ?
-          AND is_active = 1
-          AND expires_at > NOW()
-        LIMIT 1
-        `,
-        [req.user.id, feature]
-      );
-
-      const hasTrial = rows.length > 0;
-
-      // check plan level
-      const userLevel = PLANS[user.plan || "free"]?.level || 0;
-      const requiredLevel =
-        PLANS[permissions.features?.[feature]?.requiredPlan || "free"]?.level || 0;
-
-      const hasPlanAccess = userLevel >= requiredLevel;
-
-      return res.json({
-        allowed: hasPlanAccess || hasTrial
-      });
-
-    } catch (err) {
-      console.error(err);
+    if (!feature) {
       return res.json({ allowed: false });
     }
+
+    // 🔥 LẤY USER TỪ AUTH (KHÔNG JWT NỮA)
+    const userId = req.user.id || req.user.userId;
+
+    const [[user]] = await db.query(
+      "SELECT * FROM users WHERE id = ?",
+      [userId]
+    );
+
+    if (!user) {
+      return res.json({ allowed: false });
+    }
+
+    const allowed = await canAccessFeature(user, feature);
+
+    return res.json({ allowed });
+
+  } catch (err) {
+    console.error("FEATURE ACCESS ERROR:", err);
+    return res.json({ allowed: false });
   }
-);
+});
 
 module.exports =
 router;
