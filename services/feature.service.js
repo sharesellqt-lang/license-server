@@ -3,7 +3,7 @@ require("../permissions/tool.permissions");
 
 const {
   PLANS
-} = require("../routes/plan");
+} = require("../routes/plans");
 
 function canAccessFeature(
   user,
