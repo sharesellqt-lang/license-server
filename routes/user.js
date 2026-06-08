@@ -30,6 +30,31 @@ router.get("/me", auth, async (req, res) => {
     const hasProTrial = trialFeatures.includes("proMode");
     const hasVipTrial = trialFeatures.includes("vipMode");
 
+    let trialExpireAt = null;
+
+if (hasVipTrial) {
+
+  const vipTrial =
+    trials.find(
+      t => t.feature_key === "vipMode"
+    );
+
+  trialExpireAt =
+    vipTrial?.expires_at || null;
+
+}
+else if (hasProTrial) {
+
+  const proTrial =
+    trials.find(
+      t => t.feature_key === "proMode"
+    );
+
+  trialExpireAt =
+    proTrial?.expires_at || null;
+
+}
+
     const planKey =
       hasVipTrial
         ? "vip"
@@ -48,9 +73,29 @@ router.get("/me", auth, async (req, res) => {
     }
 const now = Date.now();
 
-const expireAt = user.expire_at
-  ? new Date(user.expire_at)
-  : null;
+const effectiveExpireAt =
+  trialExpireAt ||
+  user.expire_at;
+
+const expireAt =
+  effectiveExpireAt
+    ? new Date(
+        effectiveExpireAt
+      )
+    : null;
+
+    const daysLeft =
+  expireAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (
+            expireAt.getTime() -
+            Date.now()
+          ) / 86400000
+        )
+      )
+    : 0;
 
 const isLicensed =
   expireAt &&
@@ -62,6 +107,7 @@ const activePlan =
     : "free";
 
 return res.json({
+
   id: user.id,
 
   plan: planKey,
@@ -70,12 +116,16 @@ return res.json({
 
   trialFeatures,
 
+  daysLeft,
+
   planStartDate:
     planKey === "free"
       ? null
       : planStartDate,
 
-  expireAt: user.expire_at
+  expireAt:
+    effectiveExpireAt
+
 });
 
   } catch (err) {
