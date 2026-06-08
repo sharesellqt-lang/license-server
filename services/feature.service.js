@@ -7,35 +7,15 @@ require("../routes/plans");
 const db =
 require("../db");
 
-async function canAccessFeature(
-  user,
-  feature
-) {
+async function canAccessFeature(user, feature) {
 
-  const config =
-    permissions.features?.[
-      feature
-    ];
-
+  const config = permissions.features?.[feature];
   if (!config) return false;
 
-  // =========================
-  // 1. CHECK PLAN LEVEL-update
-  // =========================
-  const userLevel =
-    PLANS[user.plan || "free"]?.level || 0;
-
-  const requiredLevel =
-    PLANS[config.requiredPlan]?.level || 0;
-
-  if (userLevel >= requiredLevel) {
-    return true;
-  }
-
-  // =========================
-  // 2. CHECK TRIAL TABLE (IMPORTANT FIX)
-  // =========================
-  const [rows] = await db.query(
+  // ======================
+  // 1. CHECK TRIAL FIRST (QUAN TRỌNG)
+  // ======================
+  const [trialRows] = await db.query(
     `
     SELECT id
     FROM user_feature_trials
@@ -48,11 +28,20 @@ async function canAccessFeature(
     [user.id, feature]
   );
 
-  if (rows.length > 0) {
-    return true;
+  if (trialRows.length > 0) {
+    return true; // 🔥 OVERRIDE PLAN
   }
 
-  return false;
+  // ======================
+  // 2. CHECK PLAN SAU
+  // ======================
+  const userLevel =
+    PLANS[user.plan || "free"]?.level || 0;
+
+  const requiredLevel =
+    PLANS[config.requiredPlan]?.level || 0;
+
+  return userLevel >= requiredLevel;
 }
 
 module.exports = {

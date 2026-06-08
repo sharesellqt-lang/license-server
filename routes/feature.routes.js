@@ -158,70 +158,40 @@ async (req, res) => {
    FEATURE ACCESS -update
 ===================================== */
 
-router.get(
-  "/feature-access",
-  authMiddleware,
+async function canAccessFeature(user, feature) {
 
-  async (req, res) => {
+  const config =
+    permissions.features?.[feature];
 
-    try {
+  if (!config) return false;
 
-      const feature =
-        req.query.feature;
+  // 1. check plan
+  const userLevel =
+    PLANS[user.plan || "free"]?.level || 0;
 
-      if (!feature) {
+  const requiredLevel =
+    PLANS[config.requiredPlan]?.level || 0;
 
-        return res
-          .status(400)
-          .json({
-
-            allowed: false
-
-          });
-
-      }
-
-      const [[user]] =
-        await db.query(
-          "SELECT * FROM users WHERE id = ?",
-          [req.user.id]
-        );
-
-      if (!user) {
-
-        return res.json({
-
-          allowed: false
-
-        });
-
-      }
-
-    const allowed = await canAccessFeature(user, feature);
-
-      return res.json({
-
-        allowed
-
-      });
-
-    } catch (err) {
-
-      console.error(err);
-
-      return res
-        .status(500)
-        .json({
-
-          allowed: false
-
-        });
-
-    }
-
+  if (userLevel >= requiredLevel) {
+    return true;
   }
 
-);
+  // 2. check trial (IMPORTANT FIX)
+  const [rows] = await db.query(
+    `
+    SELECT id
+    FROM user_feature_trials
+    WHERE user_id = ?
+      AND feature_key = ?
+      AND is_active = 1
+      AND expires_at > NOW()
+    LIMIT 1
+    `,
+    [user.id, feature]
+  );
+
+  return rows.length > 0;
+}
 
 module.exports =
 router;
