@@ -155,7 +155,7 @@ async (req, res) => {
 );
 
 /* =====================================
-   FEATURE ACCESS
+   FEATURE ACCESS -update
 ===================================== */
 
 router.get(
@@ -197,12 +197,7 @@ router.get(
 
       }
 
-      const allowed =
-
-        canAccessFeature(
-          user,
-          feature
-        );
+    const allowed = await canAccessFeature(user, feature);
 
       return res.json({
 

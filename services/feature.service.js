@@ -1,69 +1,60 @@
 const permissions =
 require("../permissions/tool.permissions");
 
-const {
-  PLANS
-} = require("../routes/plans");
+const { PLANS } =
+require("../routes/plans");
 
-function canAccessFeature(
+const db =
+require("../db");
+
+async function canAccessFeature(
   user,
   feature
 ) {
 
   const config =
-    permissions.features[
+    permissions.features?.[
       feature
     ];
 
-  if (!config) {
+  if (!config) return false;
 
-    return false;
-
-  }
-
+  // =========================
+  // 1. CHECK PLAN LEVEL-update
+  // =========================
   const userLevel =
-    PLANS[
-      user.plan || "free"
-    ]?.level || 0;
+    PLANS[user.plan || "free"]?.level || 0;
 
   const requiredLevel =
-    PLANS[
-      config.requiredPlan
-    ]?.level || 0;
+    PLANS[config.requiredPlan]?.level || 0;
 
-  if (
-    userLevel >=
-    requiredLevel
-  ) {
-
+  if (userLevel >= requiredLevel) {
     return true;
-
   }
 
-  const trial =
-    user.activeTrial;
+  // =========================
+  // 2. CHECK TRIAL TABLE (IMPORTANT FIX)
+  // =========================
+  const [rows] = await db.query(
+    `
+    SELECT id
+    FROM user_feature_trials
+    WHERE user_id = ?
+      AND feature_key = ?
+      AND is_active = 1
+      AND expires_at > NOW()
+    LIMIT 1
+    `,
+    [user.id, feature]
+  );
 
-  if (
-
-    trial?.feature ===
-      feature &&
-
-    new Date(
-      trial.expiresAt
-    ) > new Date()
-
-  ) {
-
+  if (rows.length > 0) {
     return true;
-
   }
 
   return false;
-
 }
 
 module.exports = {
-
   canAccessFeature
-
 };
