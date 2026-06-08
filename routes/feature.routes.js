@@ -37,7 +37,7 @@ router.post(
         req.body;
 
       const config =
-      permissions.global.features[
+      permissions.features[
         feature
       ];
 
