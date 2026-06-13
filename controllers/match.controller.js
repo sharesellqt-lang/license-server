@@ -1,3 +1,4 @@
+const db = require("../db");
 exports.getMatches = async (req, res) => {
 
   const user_id = req.user.id;
