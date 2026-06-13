@@ -12,6 +12,11 @@ const fs = require("fs");
 
 const app = express();
 
+app.use((req,res,next)=>{
+  console.log("HIT:",req.method,req.originalUrl);
+  next();
+});
+
 // =========================
 // CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
 // =========================
