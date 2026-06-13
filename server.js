@@ -12,25 +12,20 @@ const fs = require("fs");
 
 const app = express();
 
-app.use((req,res,next)=>{
-  console.log("HIT:",req.method,req.originalUrl);
-  next();
-});
-
 // =========================
 // CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
 // =========================
 const corsOptions = {
-  origin: [
-    "https://sharesell.net",
-    "https://www.sharesell.net"
-  ],
+  origin: "https://sharesell.net",
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 };
 
+// 👉 MUST BE FIRST MIDDLEWARE
 app.use(cors(corsOptions));
+
+// 👉 handle preflight
 app.options("*", cors(corsOptions));
 
 // =========================
