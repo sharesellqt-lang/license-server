@@ -16,16 +16,16 @@ const app = express();
 // CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
 // =========================
 const corsOptions = {
-  origin: "https://sharesell.net",
+  origin: [
+    "https://sharesell.net",
+    "https://www.sharesell.net"
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 };
 
-// 👉 MUST BE FIRST MIDDLEWARE
 app.use(cors(corsOptions));
-
-// 👉 handle preflight
 app.options("*", cors(corsOptions));
 
 // =========================
@@ -35,17 +35,7 @@ app.use((req, res, next) => {
   console.log("REQ:", req.method, req.originalUrl);
   next();
 });
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://sharesell.net");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
 
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
 // =========================
 // BODY PARSER
 // =========================
