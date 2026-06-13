@@ -26,9 +26,6 @@ const corsOptions = {
 // 👉 MUST BE FIRST MIDDLEWARE
 app.use(cors(corsOptions));
 
-// 👉 handle preflight
-app.options("*", cors(corsOptions));
-
 // =========================
 // DEBUG LOG (OPTIONAL)
 // =========================
