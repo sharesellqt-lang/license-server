@@ -1,15 +1,4 @@
-app.use((req,res,next)=>{
 
-  console.log(
-    "REQ",
-    req.method,
-    req.originalUrl,
-    req.headers.origin
-  );
-
-  next();
-
-});
 console.log("SERVER VERSION 2026-06-13-A");
 require("dotenv").config();
 
@@ -24,6 +13,19 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
+
+app.use((req,res,next)=>{
+
+  console.log(
+    "REQ",
+    req.method,
+    req.originalUrl,
+    req.headers.origin
+  );
+
+  next();
+
+});
 
 // =========================
 // CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
