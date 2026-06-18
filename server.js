@@ -99,6 +99,10 @@ app.use("/api", require("./routes/plans"));
 app.use("/api", require("./routes/feature.routes"));
 app.use("/api", require("./routes/usage"));
 app.use("/api/admin", require("./routes/admin"));
+app.use(
+  "/api/airhunter",
+  require("./routes/airhunter.routes")
+);
 
 // =========================
 // ROOT
