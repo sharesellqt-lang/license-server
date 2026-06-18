@@ -83,30 +83,37 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
-const airhunter =
-require("./routes/airhunter.routes");
-
-console.log("==== AIRHUNTER ====");
-console.log(airhunter);
-console.log(typeof airhunter);
-
-process.exit(0);
+app.use(
+  "/api/airhunter",
+  require("./routes/airhunter.routes")
+);
 
 // =========================
 // PAYMENT / USER SYSTEM
 // =========================
-app.use("/api", require("./routes/paymentHistory"));
-app.use("/api", require("./routes/payment"));
-app.use("/api", require("./routes/paymentStatus"));
-app.use("/api", require("./routes/uploadBill"));
-app.use("/api", require("./routes/user"));
-app.use("/api", require("./routes/upgrade"));
-app.use("/api", require("./routes/webhook"));
-app.use("/api", require("./routes/auth"));
-app.use("/api", require("./routes/plans"));
-app.use("/api", require("./routes/feature.routes"));
-app.use("/api", require("./routes/usage"));
-app.use("/api/admin", require("./routes/admin"));
+[
+  "./routes/paymentHistory",
+  "./routes/payment",
+  "./routes/paymentStatus",
+  "./routes/uploadBill",
+  "./routes/user",
+  "./routes/upgrade",
+  "./routes/webhook",
+  "./routes/auth",
+  "./routes/plans",
+  "./routes/feature.routes",
+  "./routes/usage",
+  "./routes/admin"
+].forEach(r=>{
+
+  const mod = require(r);
+
+  console.log(
+    r,
+    typeof mod
+  );
+
+});
 
 
 // =========================
