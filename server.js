@@ -83,6 +83,7 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
+app.use("/api/airhunter",require("./routes/airhunter.routes"));
 
 // =========================
 // PAYMENT / USER SYSTEM
@@ -99,22 +100,7 @@ app.use("/api", require("./routes/plans"));
 app.use("/api", require("./routes/feature.routes"));
 app.use("/api", require("./routes/usage"));
 app.use("/api/admin", require("./routes/admin"));
-const airhunterRoutes =
-require("./routes/airhunter.routes");
 
-console.log(
-  "AIRHUNTER TYPE:",
-  typeof airhunterRoutes
-);
-
-console.log(
-  airhunterRoutes
-);
-
-app.use(
-  "/api/airhunter",
-  airhunterRoutes
-);
 
 // =========================
 // ROOT
