@@ -1,193 +1,137 @@
-const SHEET_NAME = "Products";
+const express = require("express");
+const router = express.Router();
+const auth = require("../middleware/auth");
+const db = require("../db");
+const { getPlan } = require("../routes/plans");
 
-/* =====================================
-GET
-===================================== */
-
-function doGet(e) {
-
-const action =
-e?.parameter?.action || "list";
-
-switch (action) {
-
-case "list":
-  return getProducts();
-
-default:
-  return json({
-    success: false,
-    error: "Invalid action"
-  });
-
-}
-
-}
-
-/* =====================================
-GET PRODUCTS
-===================================== */
-
-function getProducts() {
-
-try {
-
-const sheet =
-  SpreadsheetApp
-    .getActive()
-    .getSheetByName(
-      SHEET_NAME
+router.get("/me", auth, async (req, res) => {
+  try {
+    // Lấy thông tin user
+    const [[user]] = await db.query(
+      "SELECT id, plan, created_at, expire_at FROM users WHERE id = ?",
+      [req.user.id]
     );
 
-if (!sheet) {
-
-  return json({
-    success: false,
-    error:
-      "Sheet not found: " +
-      SHEET_NAME
-  });
-
-}
-
-const values =
-  sheet
-    .getDataRange()
-    .getValues();
-
-if (
-  values.length <= 1
-) {
-
-  return json({
-    success: true,
-    total: 0,
-    products: []
-  });
-
-}
-
-const products = [];
-
-for (
-  let i = 1;
-  i < values.length;
-  i++
-) {
-
-  const row =
-    values[i];
-
-  const product = {
-
-    productId:
-      clean(row[0]),
-
-    skuId:
-      clean(row[1]),
-
-    title:
-      clean(row[2]),
-
-    price:
-      clean(row[3]),
-
-    currency:
-      clean(row[4]),
-
-    image:
-      clean(row[5]),
-
-    affiliateLink:
-      clean(row[6]),
-
-    finalUrl:
-      clean(row[7]),
-
-    youtubeStatus:
-      clean(row[8]),
-
-    facebookStatus:
-      clean(row[9])
-
-  };
-
-  if (
-    !product.productId &&
-    !product.title
-  ) {
-    continue;
-  }
-
-  products.push(
-    product
-  );
-
-}
-
-return json({
-
-  success: true,
-
-  total:
-    products.length,
-
-  lastUpdated:
-    new Date()
-      .toISOString(),
-
-  products
-
-});
-
-
-}
-catch (err) {
-
-return json({
-  success: false,
-  error:
-    err.message
-});
-
-
-}
-
-}
-
-/* =====================================
-HELPER
-===================================== */
-
-function clean(value) {
-
-if (
-value === null ||
-value === undefined
-) {
-return "";
-}
-
-return String(
-value
-).trim();
-
-}
-
-/* =====================================
-JSON
-===================================== */
-
-function json(data) {
-
-return ContentService
-.createTextOutput(
-JSON.stringify(data)
-)
-.setMimeType(
-ContentService
-.MimeType
-.JSON
+    const [trials] = await db.query(
+  `
+  SELECT *
+  FROM user_feature_trials
+  WHERE user_id = ?
+    AND is_active = 1
+    AND expires_at > NOW()
+  `,
+  [user.id]
 );
 
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const trialFeatures = trials.map(t => t.feature_key);
+
+    const hasProTrial = trialFeatures.includes("proMode");
+    const hasVipTrial = trialFeatures.includes("vipMode");
+
+    let trialExpireAt = null;
+
+if (hasVipTrial) {
+
+  const vipTrial =
+    trials.find(
+      t => t.feature_key === "vipMode"
+    );
+
+  trialExpireAt =
+    vipTrial?.expires_at || null;
+
 }
+else if (hasProTrial) {
+
+  const proTrial =
+    trials.find(
+      t => t.feature_key === "proMode"
+    );
+
+  trialExpireAt =
+    proTrial?.expires_at || null;
+
+}
+
+    const planKey =
+      hasVipTrial
+        ? "vip"
+        : hasProTrial
+          ? "pro"
+          : (user.plan || "free");
+    const planData = getPlan(planKey);
+
+    // Tính planStartDate
+    let planStartDate;
+    if (user.expire_at && planData) {
+      planStartDate = new Date(user.expire_at);
+      planStartDate.setDate(planStartDate.getDate() - (planData.durationDays || 0));
+    } else {
+      planStartDate = new Date(user.created_at);
+    }
+const now = Date.now();
+
+const effectiveExpireAt =
+  trialExpireAt ||
+  user.expire_at;
+
+const expireAt =
+  effectiveExpireAt
+    ? new Date(
+        effectiveExpireAt
+      )
+    : null;
+
+    const daysLeft =
+  expireAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (
+            expireAt.getTime() -
+            Date.now()
+          ) / 86400000
+        )
+      )
+    : 0;
+
+const isLicensed =
+  expireAt &&
+  expireAt.getTime() > now;
+
+const activePlan =
+  isLicensed
+    ? (user.plan || "free")
+    : "free";
+
+return res.json({
+
+  id: user.id,
+
+  plan: planKey,
+
+  licensed: !!isLicensed,
+
+  trialFeatures,
+
+  daysLeft,
+
+  planStartDate:
+    planKey === "free"
+      ? null
+      : planStartDate,
+
+  expireAt:
+    effectiveExpireAt
+
+});
+
+  } catch (err) {
+    console.error("Error in /me:", err);
+    return res.status(500).json({ error: "Failed to fetch user info" });
+  }
+});
+
+module.exports = router;

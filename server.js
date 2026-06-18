@@ -91,54 +91,19 @@ app.use(
 // =========================
 // PAYMENT / USER SYSTEM
 // =========================
-const routes = [
-  "./routes/paymentHistory",
-  "./routes/payment",
-  "./routes/paymentStatus",
-  "./routes/uploadBill",
-  "./routes/user",
-  "./routes/upgrade",
-  "./routes/webhook",
-  "./routes/auth",
-  "./routes/plans",
-  "./routes/feature.routes",
-  "./routes/usage",
- 
-  
-];
-
-routes.forEach(r => {
-
-  const mod = require(r);
-
-  console.log(
-    r,
-    typeof mod
-  );
-
-  try {
-
-    app.use("/api", mod);
-
-    console.log(
-      "MOUNT OK:",
-      r
-    );
-
-  } catch(err) {
-
-    console.error(
-      "MOUNT FAIL:",
-      r,
-      err.message
-    );
-
-    process.exit(1);
-
-  }
-
-});
+app.use("/api", require("./routes/paymentHistory"));
+app.use("/api", require("./routes/payment"));
+app.use("/api", require("./routes/paymentStatus"));
+app.use("/api", require("./routes/uploadBill"));
+app.use("/api", require("./routes/user"));
+app.use("/api", require("./routes/upgrade"));
+app.use("/api", require("./routes/webhook"));
+app.use("/api", require("./routes/auth"));
+app.use("/api", require("./routes/plans"));
+app.use("/api", require("./routes/feature.routes"));
+app.use("/api", require("./routes/usage"));
 app.use("/api/admin", require("./routes/admin"));
+
 
 // =========================
 // ROOT
