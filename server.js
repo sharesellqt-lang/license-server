@@ -83,12 +83,14 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
-const airhunter = require("./routes/airhunter.routes");
+const airhunter =
+require("./routes/airhunter.routes");
 
-console.log("AIRHUNTER =", airhunter);
-console.log("TYPE =", typeof airhunter);
+console.log("==== AIRHUNTER ====");
+console.log(airhunter);
+console.log(typeof airhunter);
 
-app.use("/api/airhunter", airhunter);
+process.exit(0);
 
 // =========================
 // PAYMENT / USER SYSTEM
