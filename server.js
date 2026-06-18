@@ -91,7 +91,7 @@ app.use(
 // =========================
 // PAYMENT / USER SYSTEM
 // =========================
-[
+const routes = [
   "./routes/paymentHistory",
   "./routes/payment",
   "./routes/paymentStatus",
@@ -103,8 +103,11 @@ app.use(
   "./routes/plans",
   "./routes/feature.routes",
   "./routes/usage",
-  "./routes/admin"
-].forEach(r=>{
+ 
+  
+];
+
+routes.forEach(r => {
 
   const mod = require(r);
 
@@ -113,8 +116,29 @@ app.use(
     typeof mod
   );
 
-});
+  try {
 
+    app.use("/api", mod);
+
+    console.log(
+      "MOUNT OK:",
+      r
+    );
+
+  } catch(err) {
+
+    console.error(
+      "MOUNT FAIL:",
+      r,
+      err.message
+    );
+
+    process.exit(1);
+
+  }
+
+});
+app.use("/api/admin", require("./routes/admin"));
 
 // =========================
 // ROOT
