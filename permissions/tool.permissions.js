@@ -75,10 +75,7 @@ module.exports = {
       trialDays: 3
     },
 
-    advancedMetrics: {
-      requiredPlan: "pro",
-      trialDays: 3
-    },
+   
 
     // csvExport đã tồn tại ở trên
     // KHÔNG khai báo lần thứ 2
