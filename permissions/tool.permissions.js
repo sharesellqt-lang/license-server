@@ -59,6 +59,52 @@ module.exports = {
     walletTracking: {
       requiredPlan: "vip",
       trialDays: 1
+    },
+
+    // =====================
+    // STOCK METRICS PRO
+    // =====================
+
+    saveHistory: {
+      requiredPlan: "pro",
+      trialDays: 3
+    },
+
+    batchCalculation: {
+      requiredPlan: "pro",
+      trialDays: 3
+    },
+
+    advancedMetrics: {
+      requiredPlan: "pro",
+      trialDays: 3
+    },
+
+    // csvExport đã tồn tại ở trên
+    // KHÔNG khai báo lần thứ 2
+
+    // =====================
+    // STOCK METRICS VIP
+    // =====================
+
+    aiInsight: {
+      requiredPlan: "vip",
+      trialDays: 1
+    },
+
+    smartEvaluation: {
+      requiredPlan: "vip",
+      trialDays: 1
+    },
+
+    compareMetrics: {
+      requiredPlan: "vip",
+      trialDays: 1
+    },
+
+    watchlistTemplates: {
+      requiredPlan: "vip",
+      trialDays: 1
     }
 
   }
