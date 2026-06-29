@@ -36,42 +36,55 @@ router.get(
       admin: 999
     };
 
-    function canView(post) {
+function canView(post) {
 
-      // =========================
-      // 1. ADMIN BYPASS ALL
-      // =========================
-      if (isAdmin) return true;
+  const plan = req.user?.plan || "free";
+  const isAdmin = req.user?.isAdmin || false;
 
-      const cats = post.categories || [];
+  const rank = {
+    free: 0,
+    pro: 1,
+    vip: 2,
+    admin: 999
+  };
 
-      // =========================
-      // 2. LOCKED POST (CẤM TẤT CẢ)
-      // =========================
-      // 👉 bạn tạo category "locked" trong WP
-      if (cats.includes("locked")) return false;
+  // =========================
+  // 1. ADMIN BYPASS ALL
+  // =========================
+  if (isAdmin) return true;
 
-      // =========================
-      // 3. MAP CATEGORY → REQUIRED PLAN
-      // =========================
-      let required = "free";
+  // =========================
+  // 2. GET CATEGORY SLUGS
+  // =========================
+  const cats = post.categories_slugs || [];
 
-      // ⚠️ WP category ID mapping
-      // 1 = free
-      // 2 = pro
-      // 3 = vip
-      // 999 = locked (KHÔNG phải WP mặc định, bạn tự dùng logic string OR custom id)
+  // =========================
+  // 3. LOCKED POST (CHẶN TẤT CẢ)
+  // =========================
+  if (cats.includes("locked")) {
+    return false;
+  }
 
-      if (cats.includes(3)) required = "vip";
-      else if (cats.includes(2)) required = "pro";
-      else if (cats.includes(1)) required = "free";
+  // =========================
+  // 4. DETERMINE REQUIRED PLAN
+  // =========================
+  let required = "free";
 
-      // =========================
-      // 4. CHECK PLAN RANK
-      // =========================
-      return rank[plan] >= rank[required];
+  if (cats.includes("vip")) {
+    required = "vip";
+  } 
+  else if (cats.includes("pro")) {
+    required = "pro";
+  } 
+  else if (cats.includes("free")) {
+    required = "free";
+  }
 
-    }
+  // =========================
+  // 5. CHECK PERMISSION
+  // =========================
+  return rank[plan] >= rank[required];
+}
 
     posts = posts.filter(canView);
 
