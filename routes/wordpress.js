@@ -5,7 +5,7 @@ router.get(
   async (req, res) => {
 
     const response = await fetch(
-      "https://sharesell.net/wp-json/wp/v2/posts"
+      "https://sharesell.net/wp-json/wp/v2/posts?per_page=100"
     );
 
     const posts = await response.json();
@@ -38,18 +38,39 @@ router.get(
 
     function canView(post) {
 
+      // =========================
+      // 1. ADMIN BYPASS ALL
+      // =========================
       if (isAdmin) return true;
 
       const cats = post.categories || [];
 
-      // map category → quyền
+      // =========================
+      // 2. LOCKED POST (CẤM TẤT CẢ)
+      // =========================
+      // 👉 bạn tạo category "locked" trong WP
+      if (cats.includes("locked")) return false;
+
+      // =========================
+      // 3. MAP CATEGORY → REQUIRED PLAN
+      // =========================
       let required = "free";
 
-      if (cats.includes(3)) required = "vip";
-      if (cats.includes(2)) required = "pro";
-      if (cats.includes(1)) required = "free";
+      // ⚠️ WP category ID mapping
+      // 1 = free
+      // 2 = pro
+      // 3 = vip
+      // 999 = locked (KHÔNG phải WP mặc định, bạn tự dùng logic string OR custom id)
 
+      if (cats.includes(3)) required = "vip";
+      else if (cats.includes(2)) required = "pro";
+      else if (cats.includes(1)) required = "free";
+
+      // =========================
+      // 4. CHECK PLAN RANK
+      // =========================
       return rank[plan] >= rank[required];
+
     }
 
     posts = posts.filter(canView);
