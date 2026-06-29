@@ -78,6 +78,28 @@ module.exports = async (req, res, next) => {
 
     const user = rows[0];
 
+    let isAdmin = false;
+
+try {
+
+  const [adminRows] = await db.query(
+    `
+    SELECT id
+    FROM admin
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [user.id]
+  );
+
+  isAdmin = adminRows.length > 0;
+
+} catch (err) {
+
+  console.error("ADMIN CHECK ERROR:", err.message);
+
+}
+
     // =========================
     // DEFAULT PLAN
     // =========================
@@ -116,8 +138,8 @@ module.exports = async (req, res, next) => {
       userId: user.id,
       id: user.id,
       plan,
-      expireAt:
-      user.expire_at
+      expireAt: user.expire_at,
+      isAdmin
     };
 
     next();
