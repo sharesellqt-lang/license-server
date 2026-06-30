@@ -50,22 +50,15 @@ function canView(post) {
     admin: 999
   };
 
-  // =========================
-  // 1. ADMIN BYPASS ALL
-  // =========================
-  if (isAdmin) return true;
+const cats = post.categories_slugs || [];
 
-  // =========================
-  // 2. GET CATEGORY SLUGS
-  // =========================
-  const cats = post.categories_slugs || [];
+// Admin bypass
+if (isAdmin) return true;
 
-  // =========================
-  // 3. LOCKED POST (CHẶN TẤT CẢ)
-  // =========================
-  if (cats.includes("locked")) {
+// Chỉ admin xem
+if (cats.includes("admin-only")) {
     return false;
-  }
+}
 
   // =========================
   // 4. DETERMINE REQUIRED PLAN

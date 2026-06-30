@@ -51,7 +51,11 @@ module.exports = async (req, res, next) => {
     try {
       [rows] = await db.query(
         `
-        SELECT id, plan, expire_at
+       SELECT
+          id,
+          email,
+          plan,
+          expire_at
         FROM users
         WHERE id = ?
         `,
@@ -86,17 +90,20 @@ try {
     `
     SELECT id
     FROM admin
-    WHERE id = ?
+    WHERE email = ?
     LIMIT 1
     `,
-    [user.id]
+    [user.email]
   );
 
   isAdmin = adminRows.length > 0;
 
 } catch (err) {
 
-  console.error("ADMIN CHECK ERROR:", err.message);
+  console.error(
+    "ADMIN CHECK ERROR:",
+    err.message
+  );
 
 }
 
@@ -137,6 +144,7 @@ try {
     req.user = {
       userId: user.id,
       id: user.id,
+      email: user.email,
       plan,
       expireAt: user.expire_at,
       isAdmin
