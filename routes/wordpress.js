@@ -26,6 +26,8 @@ router.get(
 
     let posts = await response.json();
 
+    console.log(JSON.stringify(posts[0], null, 2));
+
     const plan = req.user.plan;
     const isAdmin = req.user.isAdmin;
 
