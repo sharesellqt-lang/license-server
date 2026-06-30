@@ -21,13 +21,15 @@ router.get(
   async (req, res) => {
 
     const response = await fetch(
-      "https://sharesell.net/wp-json/wp/v2/posts?per_page=100&_embed"
+      "https://sharesell.net/wp-json/wp/v2/posts?per_page=100"
     );
 
     let posts = await response.json();
 
-    const plan = req.user?.plan || "free";
-    const isAdmin = req.user?.isAdmin || false;
+    console.log(JSON.stringify(posts[0], null, 2));
+
+    const plan = req.user.plan;
+    const isAdmin = req.user.isAdmin;
 
     const rank = {
       free: 0,
@@ -36,36 +38,50 @@ router.get(
       admin: 999
     };
 
-    const ADMIN_ONLY_CAT_ID = 99; // category admin-only trong WP
+function canView(post) {
 
-    posts = posts.filter(post => {
+  const plan = req.user?.plan || "free";
+  const isAdmin = req.user?.isAdmin || false;
 
-      const cats = post.categories || [];
+  const rank = {
+    free: 0,
+    pro: 1,
+    vip: 2,
+    admin: 999
+  };
 
-      // =========================
-      // ADMIN SEE ALL
-      // =========================
-      if (isAdmin) return true;
+const cats = post.categories_slugs || [];
 
-      // =========================
-      // HIDE ADMIN-ONLY POSTS
-      // =========================
-      if (cats.includes(ADMIN_ONLY_CAT_ID)) {
-        return false;
-      }
+// Admin bypass
+if (isAdmin) return true;
 
-      // =========================
-      // PLAN FILTER
-      // =========================
-      let required = "free";
+// Chỉ admin xem
+if (cats.includes("admin-only")) {
+    return false;
+}
 
-      if (cats.includes(3)) required = "vip";
-      else if (cats.includes(2)) required = "pro";
-      else if (cats.includes(1)) required = "free";
+  // =========================
+  // 4. DETERMINE REQUIRED PLAN
+  // =========================
+  let required = "free";
 
-      return rank[plan] >= rank[required];
+  if (cats.includes("vip")) {
+    required = "vip";
+  } 
+  else if (cats.includes("pro")) {
+    required = "pro";
+  } 
+  else if (cats.includes("free")) {
+    required = "free";
+  }
 
-    });
+  // =========================
+  // 5. CHECK PERMISSION
+  // =========================
+  return rank[plan] >= rank[required];
+}
+
+    posts = posts.filter(canView);
 
     res.json(posts);
 
