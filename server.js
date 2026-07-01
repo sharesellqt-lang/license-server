@@ -83,10 +83,7 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
-app.use(
-  "/api/airhunter",
-  require("./routes/airhunter.routes")
-);
+app.use("/api/airdrop", require("./routes/airdrop.routes"));
 
 // =========================
 // PAYMENT / USER SYSTEM
