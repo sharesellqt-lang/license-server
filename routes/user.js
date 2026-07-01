@@ -107,31 +107,23 @@ const activePlan =
     : "free";
 
 console.log("REQ.USER =", req.user);
-
 const isAdmin = !!req.user.isAdmin;
 
 return res.json({
-
   id: user.id,
-
   plan: planKey,
-
   licensed: !!isLicensed,
-
   trialFeatures,
-
   daysLeft,
 
-  isAdmin: req.user.isAdmin,
+  isAdmin, // ✅ dùng biến đã normalize
 
   planStartDate:
     planKey === "free"
       ? null
       : planStartDate,
 
-  expireAt:
-    effectiveExpireAt
-
+  expireAt: effectiveExpireAt
 });
 
   } catch (err) {
