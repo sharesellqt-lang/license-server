@@ -142,13 +142,12 @@ try {
     // ATTACH USER
     // =========================
     req.user = {
-      userId: user.id,
-      id: user.id,
-      email: user.email,
-      plan,
-      expireAt: user.expire_at,
-      isAdmin
-    };
+    id: user.id,
+    email: user.email,
+    plan,
+    expireAt: user.expire_at,
+    isAdmin: !!isAdmin
+  };
 
     next();
 
