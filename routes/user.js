@@ -106,6 +106,8 @@ const activePlan =
     ? (user.plan || "free")
     : "free";
 
+console.log("REQ.USER =", req.user);
+
 const isAdmin = !!req.user.isAdmin;
 
 return res.json({
