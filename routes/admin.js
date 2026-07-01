@@ -75,6 +75,9 @@ router.post("/login", async (req, res) => {
     res.status(500).json({ success: false, message: "Login failed" });
   }
 });
+
+// 🔒 lock từ đây trở xuống
+router.use(auth, requireAdmin);
 // =====================================
 // LIST USERS
 // =====================================
