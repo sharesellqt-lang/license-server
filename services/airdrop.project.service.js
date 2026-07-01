@@ -1,0 +1,440 @@
+// =========================================
+// services/airdrop.project.service.js
+// =========================================
+
+"use strict";
+
+const db = require("../db");
+
+/* =========================================
+   INIT TABLE (SAFE AUTO MIGRATION)
+========================================= */
+
+async function initTable() {
+
+    const sql = `
+        CREATE TABLE IF NOT EXISTS airdrop_projects (
+            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+
+            user_id BIGINT UNSIGNED NOT NULL,
+
+            name VARCHAR(255) NOT NULL,
+            url TEXT,
+
+            start_date DATE NULL,
+            end_date DATE NULL,
+
+            tasks TEXT,
+
+            interactions INT DEFAULT 0,
+
+            status ENUM('on','off') DEFAULT 'on',
+
+            result ENUM('pending','eligible','not-eligible') DEFAULT 'pending',
+
+            fees VARCHAR(50) DEFAULT NULL,
+
+            score INT DEFAULT 0,
+
+            source VARCHAR(100) DEFAULT NULL,
+
+            created_at BIGINT NOT NULL,
+            updated_at BIGINT NULL,
+
+            INDEX idx_user_id (user_id),
+            INDEX idx_status (status),
+            INDEX idx_result (result),
+            INDEX idx_score (score),
+            INDEX idx_created_at (created_at)
+        );
+    `;
+
+    await db.execute(sql);
+}
+
+/* =========================================
+   VALIDATION
+========================================= */
+
+function validateProject(data) {
+
+    if (!data) {
+        throw new Error("Invalid project data");
+    }
+
+    if (!data.name || !String(data.name).trim()) {
+        throw new Error("Project name is required");
+    }
+
+    return true;
+}
+
+/* =========================================
+   NORMALIZE INPUT
+========================================= */
+
+function normalizeProjectInput(data = {}) {
+
+    return {
+
+        name: String(data.name || "").trim(),
+
+        url: String(data.url || "").trim(),
+
+        start_date: data.startDate || null,
+
+        end_date: data.endDate || null,
+
+        tasks: String(data.tasks || "").trim(),
+
+        interactions: Number(data.interactions || 0),
+
+        status: data.status || "on",
+
+        result: data.result || "pending",
+
+        fees: data.fees || null,
+
+        source: data.source || "manual"
+
+    };
+}
+
+/* =========================================
+   CREATE PROJECT
+========================================= */
+
+async function createProject(userId, data) {
+
+    validateProject(data);
+
+    const p = normalizeProjectInput(data);
+
+    const sql = `
+        INSERT INTO airdrop_projects (
+            user_id,
+            name,
+            url,
+            start_date,
+            end_date,
+            tasks,
+            interactions,
+            status,
+            result,
+            fees,
+            source,
+            created_at,
+            updated_at
+        )
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `;
+
+    const now = Date.now();
+
+    const values = [
+        userId,
+        p.name,
+        p.url,
+        p.start_date,
+        p.end_date,
+        p.tasks,
+        p.interactions,
+        p.status,
+        p.result,
+        p.fees,
+        p.source,
+        now,
+        now
+    ];
+
+    const [result] = await db.execute(sql, values);
+
+    return {
+        id: result.insertId,
+        user_id: userId,
+        ...p,
+        created_at: now,
+        updated_at: now
+    };
+}
+
+/* =========================================
+   UPDATE PROJECT
+========================================= */
+
+async function updateProject(userId, id, data) {
+
+    validateProject(data);
+
+    const p = normalizeProjectInput(data);
+
+    const sql = `
+        UPDATE airdrop_projects
+        SET
+            name=?,
+            url=?,
+            start_date=?,
+            end_date=?,
+            tasks=?,
+            interactions=?,
+            status=?,
+            result=?,
+            fees=?,
+            source=?,
+            updated_at=?
+        WHERE id=? AND user_id=?
+    `;
+
+    const now = Date.now();
+
+    const values = [
+        p.name,
+        p.url,
+        p.start_date,
+        p.end_date,
+        p.tasks,
+        p.interactions,
+        p.status,
+        p.result,
+        p.fees,
+        p.source,
+        now,
+        id,
+        userId
+    ];
+
+    const [result] = await db.execute(sql, values);
+
+    return result.affectedRows > 0;
+}
+
+/* =========================================
+   GET BY ID
+========================================= */
+
+async function getProjectById(userId, id) {
+
+    const sql = `
+        SELECT *
+        FROM airdrop_projects
+        WHERE id=? AND user_id=?
+        LIMIT 1
+    `;
+
+    const [rows] = await db.execute(sql, [id, userId]);
+
+    return rows[0] || null;
+}
+
+/* =========================================
+   DELETE PROJECT
+========================================= */
+
+async function deleteProject(userId, id) {
+
+    const sql = `
+        DELETE FROM airdrop_projects
+        WHERE id=? AND user_id=?
+    `;
+
+    const [result] = await db.execute(sql, [id, userId]);
+
+    return result.affectedRows > 0;
+}
+
+
+// =========================================
+// GET PROJECTS BY USER (LIST)
+// =========================================
+
+async function getProjectsByUser(userId) {
+
+    const sql = `
+        SELECT *
+        FROM airdrop_projects
+        WHERE user_id=?
+        ORDER BY created_at DESC
+    `;
+
+    const [rows] = await db.execute(sql, [userId]);
+
+    return rows || [];
+}
+
+// =========================================
+// SEARCH PROJECTS
+// =========================================
+
+async function searchProjects(userId, keyword = "") {
+
+    keyword = `%${String(keyword).trim()}%`;
+
+    const sql = `
+        SELECT *
+        FROM airdrop_projects
+        WHERE user_id=?
+        AND (
+            name LIKE ?
+            OR url LIKE ?
+            OR tasks LIKE ?
+        )
+        ORDER BY created_at DESC
+    `;
+
+    const [rows] = await db.execute(sql, [
+        userId,
+        keyword,
+        keyword,
+        keyword
+    ]);
+
+    return rows || [];
+}
+
+// =========================================
+// UPSERT PROJECT
+// (create if not exists, update if exists)
+// =========================================
+
+async function upsertProject(userId, id, data) {
+
+    if (!id) {
+        return await createProject(userId, data);
+    }
+
+    const existing = await getProjectById(userId, id);
+
+    if (!existing) {
+        return await createProject(userId, data);
+    }
+
+    await updateProject(userId, id, data);
+
+    return await getProjectById(userId, id);
+}
+
+// =========================================
+// EXPORT JSON
+// =========================================
+
+async function exportJson(userId) {
+
+    const projects = await getProjectsByUser(userId);
+
+    return JSON.stringify(projects, null, 2);
+}
+
+// =========================================
+// EXPORT CSV
+// =========================================
+
+async function exportCsv(userId) {
+
+    const projects = await getProjectsByUser(userId);
+
+    const headers = [
+        "id",
+        "name",
+        "url",
+        "start_date",
+        "end_date",
+        "tasks",
+        "interactions",
+        "status",
+        "result",
+        "fees",
+        "score",
+        "source",
+        "created_at"
+    ];
+
+    const rows = [headers];
+
+    for (const p of projects) {
+
+        rows.push([
+            p.id,
+            p.name,
+            p.url,
+            p.start_date,
+            p.end_date,
+            p.tasks,
+            p.interactions,
+            p.status,
+            p.result,
+            p.fees,
+            p.score,
+            p.source,
+            p.created_at
+        ]);
+    }
+
+    return rows
+        .map(row =>
+            row
+                .map(v =>
+                    `"${String(v ?? "").replace(/"/g, '""')}"`
+                )
+                .join(",")
+        )
+        .join("\n");
+}
+
+// =========================================
+// STATISTICS
+// =========================================
+
+async function getStatistics(userId) {
+
+    const sql = `
+        SELECT
+            COUNT(*) as total,
+            SUM(CASE WHEN result='eligible' THEN 1 ELSE 0 END) as eligible,
+            SUM(CASE WHEN result='not-eligible' THEN 1 ELSE 0 END) as not_eligible,
+            SUM(CASE WHEN result='pending' THEN 1 ELSE 0 END) as pending,
+            AVG(score) as avg_score
+        FROM airdrop_projects
+        WHERE user_id=?
+    `;
+
+    const [rows] = await db.execute(sql, [userId]);
+
+    return rows[0] || {
+        total: 0,
+        eligible: 0,
+        not_eligible: 0,
+        pending: 0,
+        avg_score: 0
+    };
+}
+
+// =========================================
+// MODULE EXPORTS
+// =========================================
+
+module.exports = {
+
+    // core
+    initTable,
+    validateProject,
+    normalizeProjectInput,
+
+    // CRUD
+    createProject,
+    updateProject,
+    deleteProject,
+    getProjectById,
+    getProjectsByUser,
+
+    // advanced
+    searchProjects,
+    upsertProject,
+
+    // export
+    exportJson,
+    exportCsv,
+
+    // analytics
+    getStatistics
+
+};
