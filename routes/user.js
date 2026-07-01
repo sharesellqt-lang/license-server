@@ -109,27 +109,17 @@ const activePlan =
 const isAdmin = !!req.user.isAdmin;
 
 return res.json({
-
-  id: user.id,
-
-  plan: planKey,
-
-  licensed: !!isLicensed,
-
-  trialFeatures,
-
-  daysLeft,
-
-  isAdmin,
-
-  planStartDate:
-    planKey === "free"
-      ? null
-      : planStartDate,
-
-  expireAt:
-    effectiveExpireAt
-
+  user: {
+    id: user.id,
+    plan: planKey,
+    licensed: !!isLicensed,
+    trialFeatures,
+    daysLeft,
+    isAdmin,
+    planStartDate:
+      planKey === "free" ? null : planStartDate,
+    expireAt: effectiveExpireAt
+  }
 });
 
   } catch (err) {
