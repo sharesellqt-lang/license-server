@@ -106,6 +106,8 @@ const activePlan =
     ? (user.plan || "free")
     : "free";
 
+const isAdmin = !!req.user.isAdmin;
+
 return res.json({
 
   id: user.id,
@@ -117,6 +119,8 @@ return res.json({
   trialFeatures,
 
   daysLeft,
+
+  isAdmin,
 
   planStartDate:
     planKey === "free"
