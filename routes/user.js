@@ -120,7 +120,7 @@ return res.json({
 
   daysLeft,
 
-  isAdmin,
+  isAdmin: req.user.isAdmin,
 
   planStartDate:
     planKey === "free"
