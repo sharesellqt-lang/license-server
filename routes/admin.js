@@ -3,6 +3,8 @@ const router = express.Router();
 const db = require("../db"); // Kết nối MySQL
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const auth = require("../middleware/auth");
+const requireAdmin = require("../middleware/requireAdmin");
 
 // ==============================
 // JWT TOKEN GENERATOR
