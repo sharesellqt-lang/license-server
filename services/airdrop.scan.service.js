@@ -8,7 +8,7 @@ const scoreService =
     require("./airdrop.score.service");
 
 /* =========================================
-   MOCK PROJECTS
+   MOCK PROJECTS -update
 ========================================= */
 
 const fs = require("fs");
