@@ -13,7 +13,12 @@ const path = require("path");
 const fs = require("fs");
 const app = express();
 const projectService = require("./services/airdrop.project.service");
-await projectService.initTable();
+
+async function bootstrap() {
+    await projectService.initTable();
+}
+
+bootstrap();
 
 app.use((req,res,next)=>{
 
