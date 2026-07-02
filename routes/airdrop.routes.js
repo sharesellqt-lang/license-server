@@ -184,11 +184,9 @@ router.get("/projects", authMiddleware, async (req, res) => {
         const projects =
             await projectService.getProjectsByUser(req.user.id);
 
-        return res.json({
-            success: true,
-            data: Array.isArray(projects) ? projects : [],
-            count: projects.length
-        });
+        const result = await projectService.getProjectsByUser(req.user.id);
+
+        return res.json(result);
 
     } catch (err) {
 
