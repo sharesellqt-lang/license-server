@@ -3,7 +3,7 @@ console.log("SERVER VERSION 2026-06-13-A");
 require("dotenv").config();
 
 // =========================
-// IMPORT CORE
+// IMPORT CORE ok
 // =========================
 const express = require("express");
 const cors = require("cors");
