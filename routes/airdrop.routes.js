@@ -226,9 +226,9 @@ router.post(
                 );
 
             return res.json({
-            success: true,
-            updated: ok
-        });
+                success: true,
+                project
+            });
 
         } catch (err) {
 
@@ -295,7 +295,7 @@ router.delete(
 
             return res.json({
             success: true,
-            updated: ok
+            deleted: ok
         });
 
         } catch (err) {
