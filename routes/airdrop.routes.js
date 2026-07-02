@@ -178,34 +178,30 @@ router.post(
    Get
    /api/airdrop/projects
 ========================================= */
-router.get(
-    "/projects",
-    authMiddleware,
-    async (req, res) => {
+router.get("/projects", authMiddleware, async (req, res) => {
+    try {
 
-        try {
+        const projects =
+            await projectService.getProjectsByUser(req.user.id);
 
-            const projects =
-                await projectService.getProjectsByUser(
-                    req.user.id
-                );
-
-            return res.json({
+        return res.json({
             success: true,
-            data: projects
+            data: Array.isArray(projects) ? projects : [],
+            count: projects.length
         });
 
-        } catch (err) {
+    } catch (err) {
 
-            console.error("[Projects GET]", err);
+        console.error("[Projects GET]", err);
 
-            return res.status(500).json({
-                success: false,
-                message: "Failed to load projects"
-            });
-        }
+        return res.status(500).json({
+            success: false,
+            message: "Failed to load projects",
+            data: [],
+            count: 0
+        });
     }
-);
+});
 
 /* =========================================
    Post
