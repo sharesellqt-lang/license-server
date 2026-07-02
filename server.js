@@ -25,24 +25,14 @@ app.use("/api/airdrop", airdropRoutes);
 // =========================
 // BOOTSTRAP
 // =========================
-async function bootstrap() {
+(async () => {
     try {
         await projectService.initTable();
-        console.log("✅ DB ready");
-
-        const PORT = process.env.PORT || 3000;
-
-        app.listen(PORT, () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-        });
-
+        console.log("✅ Airdrop table ready");
     } catch (err) {
-        console.error("❌ Bootstrap failed:", err);
-        process.exit(1);
+        console.error("❌ Init table failed:", err);
     }
-}
-
-bootstrap();
+})();
 
 app.use((req,res,next)=>{
 
