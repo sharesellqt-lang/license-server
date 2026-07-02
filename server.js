@@ -13,9 +13,33 @@ const path = require("path");
 const fs = require("fs");
 const app = express();
 const projectService = require("./services/airdrop.project.service");
+const airdropRoutes = require("./routes/airdrop.routes");
 
+app.use(express.json());
+
+// =========================
+// ROUTES
+// =========================
+app.use("/api/airdrop", airdropRoutes);
+
+// =========================
+// BOOTSTRAP
+// =========================
 async function bootstrap() {
-    await projectService.initTable();
+    try {
+        await projectService.initTable();
+        console.log("✅ DB ready");
+
+        const PORT = process.env.PORT || 3000;
+
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on port ${PORT}`);
+        });
+
+    } catch (err) {
+        console.error("❌ Bootstrap failed:", err);
+        process.exit(1);
+    }
 }
 
 bootstrap();
@@ -71,7 +95,7 @@ app.use((req, res, next) => {
 // =========================
 // BODY PARSER
 // =========================
-app.use(express.json());
+
 app.use(express.urlencoded({ extended: true }));
 
 // =========================
@@ -89,7 +113,7 @@ app.use("/api/match", require("./routes/match.routes"));
 app.use("/api/message", require("./routes/message.routes"));
 app.use("/api/follow", require("./routes/follow.routes"));
 app.use("/api/comment", require("./routes/comment.routes"));
-app.use("/api/airdrop", require("./routes/airdrop.routes"));
+
 
 // =========================
 // PAYMENT / USER SYSTEM
