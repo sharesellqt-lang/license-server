@@ -137,6 +137,4 @@ module.exports = {
 
     sortProjects,
 
-    getMockProjects
-
 };
