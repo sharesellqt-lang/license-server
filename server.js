@@ -17,23 +17,6 @@ const airdropRoutes = require("./routes/airdrop.routes");
 
 app.use(express.json());
 
-// =========================
-// ROUTES
-// =========================
-app.use("/api/airdrop", airdropRoutes);
-
-// =========================
-// BOOTSTRAP
-// =========================
-(async () => {
-    try {
-        await projectService.initTable();
-        console.log("✅ Airdrop table ready");
-    } catch (err) {
-        console.error("❌ Init table failed:", err);
-    }
-})();
-
 app.use((req,res,next)=>{
 
   console.log(
@@ -70,6 +53,24 @@ app.use((req, res, next) => {
   console.log("REQ:", req.method, req.originalUrl);
   next();
 });
+
+// =========================
+// ROUTES
+// =========================
+app.use("/api/airdrop", airdropRoutes);
+
+// =========================
+// BOOTSTRAP
+// =========================
+(async () => {
+    try {
+        await projectService.initTable();
+        console.log("✅ Airdrop table ready");
+    } catch (err) {
+        console.error("❌ Init table failed:", err);
+    }
+})();
+
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "https://sharesell.net");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
