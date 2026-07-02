@@ -20,7 +20,7 @@ async function initTable() {
 
             name VARCHAR(255) NOT NULL,
             url TEXT,
-
+            wallet VARCHAR(255) DEFAULT NULL,
             start_date DATE NULL,
             end_date DATE NULL,
 
@@ -78,6 +78,7 @@ function normalizeProjectInput(data = {}) {
     return {
         name: String(data.name || "").trim(),
         url: String(data.url || "").trim(),
+        wallet: String(data.wallet || "").trim(),
         start_date: data.startDate || null,
         end_date: data.endDate || null,
         tasks: String(data.tasks || "").trim(),
@@ -104,6 +105,7 @@ async function createProject(userId, data) {
             user_id,
             name,
             url,
+            wallet,
             start_date,
             end_date,
             tasks,
@@ -124,6 +126,7 @@ async function createProject(userId, data) {
         userId,
         p.name,
         p.url,
+        p.wallet,
         p.start_date,
         p.end_date,
         p.tasks,
@@ -172,6 +175,7 @@ async function updateProject(userId, id, data) {
         SET
             name=?,
             url=?,
+            wallet=?,
             start_date=?,
             end_date=?,
             tasks=?,
@@ -189,6 +193,7 @@ async function updateProject(userId, id, data) {
     const values = [
         p.name,
         p.url,
+        p.wallet,
         p.start_date,
         p.end_date,
         p.tasks,
