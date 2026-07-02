@@ -58,6 +58,12 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
+app.use("/api", (req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "API route not found"
+    });
+});
 
 // =========================
 // BOOTSTRAP
