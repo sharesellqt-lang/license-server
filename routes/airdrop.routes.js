@@ -30,18 +30,9 @@ const scanService =
 const walletService =
     require("../services/airdrop.wallet.service");
 
-/*
-|--------------------------------------------------------------------------
-| NOTE
-|--------------------------------------------------------------------------
-|
-| CRUD Project sẽ được bổ sung ở
-| airdrop.project.service.js
-|
-| router này đã chuẩn bị sẵn vị trí.
-|
-|--------------------------------------------------------------------------
-*/
+const projectService =
+    require("../services/airdrop.project.service");
+
 
 /* =========================================
    GET
@@ -93,6 +84,22 @@ router.get(
 
     }
 );
+
+router.get("/export/json", authMiddleware, async (req, res) => {
+    const data =
+        await projectService.exportJson(req.user.id);
+
+    res.setHeader("Content-Type", "application/json");
+    res.send(data);
+});
+
+router.get("/export/csv", authMiddleware, async (req, res) => {
+    const data =
+        await projectService.exportCsv(req.user.id);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.send(data);
+});
 
 /* =========================================
    POST
@@ -168,60 +175,140 @@ router.post(
 );
 
 /* =========================================
-   RESERVED
-   CRUD PROJECT
+   Get
+   /api/airdrop/projects
 ========================================= */
+router.get(
+    "/projects",
+    authMiddleware,
+    async (req, res) => {
 
-/*
+        try {
 
-GET
-/api/airdrop/projects
+            const projects =
+                await projectService.getProjectsByUser(
+                    req.user.id
+                );
 
-↓
+            return res.json({
+            success: true,
+            data: projects
+        });
 
-airdrop.project.service.js
+        } catch (err) {
 
-*/
+            console.error("[Projects GET]", err);
 
-/*
-
-POST
-/api/airdrop/projects
-
-*/
-
-/*
-
-PUT
-/api/airdrop/projects/:id
-
-*/
-
-/*
-
-DELETE
-/api/airdrop/projects/:id
-
-*/
+            return res.status(500).json({
+                success: false,
+                message: "Failed to load projects"
+            });
+        }
+    }
+);
 
 /* =========================================
-   RESERVED
-   EXPORT
+   Post
+   /api/airdrop/projects
 ========================================= */
 
-/*
+router.post(
+    "/projects",
+    authMiddleware,
+    async (req, res) => {
 
-GET
-/api/airdrop/export/json
+        try {
 
-*/
+            const project =
+                await projectService.createProject(
+                    req.user.id,
+                    req.body
+                );
 
-/*
+            return res.json({
+            success: true,
+            updated: ok
+        });
 
-GET
-/api/airdrop/export/csv
+        } catch (err) {
 
-*/
+            console.error("[Projects CREATE]", err);
+
+            return res.status(500).json({
+                success: false,
+                message: err.message || "Create failed"
+            });
+        }
+    }
+);
+
+/* =========================================
+   Put
+   /api/airdrop/projects
+========================================= */
+router.put(
+    "/projects/:id",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const ok =
+                await projectService.updateProject(
+                    req.user.id,
+                    req.params.id,
+                    req.body
+                );
+
+            return res.json({
+            success: true,
+            updated: ok
+        });
+
+        } catch (err) {
+
+            console.error("[Projects UPDATE]", err);
+
+            return res.status(500).json({
+                success: false,
+                message: "Update failed"
+            });
+        }
+    }
+);
+
+/* =========================================
+   DElete
+========================================= */
+router.delete(
+    "/projects/:id",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const ok =
+                await projectService.deleteProject(
+                    req.user.id,
+                    req.params.id
+                );
+
+            return res.json({
+            success: true,
+            updated: ok
+        });
+
+        } catch (err) {
+
+            console.error("[Projects DELETE]", err);
+
+            return res.status(500).json({
+                success: false,
+                message: "Delete failed"
+            });
+        }
+    }
+);
 
 /* =========================================
    HEALTH

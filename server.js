@@ -11,8 +11,9 @@ const db = require("./db"); // 👈 PHẢI Ở ĐÂY
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
-
 const app = express();
+const projectService = require("./services/airdrop.project.service");
+await projectService.initTable();
 
 app.use((req,res,next)=>{
 

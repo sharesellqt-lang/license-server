@@ -1,5 +1,5 @@
 // =========================================
-// services/airdrop.project.service.js
+// services/airdrop.project.service.js (FIXED)
 // =========================================
 
 "use strict";
@@ -49,7 +49,7 @@ async function initTable() {
         );
     `;
 
-    await db.execute(sql);
+    await db.query(sql);
 }
 
 /* =========================================
@@ -76,27 +76,16 @@ function validateProject(data) {
 function normalizeProjectInput(data = {}) {
 
     return {
-
         name: String(data.name || "").trim(),
-
         url: String(data.url || "").trim(),
-
         start_date: data.startDate || null,
-
         end_date: data.endDate || null,
-
         tasks: String(data.tasks || "").trim(),
-
         interactions: Number(data.interactions || 0),
-
         status: data.status || "on",
-
         result: data.result || "pending",
-
         fees: data.fees || null,
-
         source: data.source || "manual"
-
     };
 }
 
@@ -147,14 +136,24 @@ async function createProject(userId, data) {
         now
     ];
 
-    const [result] = await db.execute(sql, values);
+    const [result] = await db.query(sql, values);
+
+    if (!result.insertId) {
+        return {
+            success: false,
+            message: "Insert failed"
+        };
+    }
 
     return {
-        id: result.insertId,
-        user_id: userId,
-        ...p,
-        created_at: now,
-        updated_at: now
+        success: true,
+        data: {
+            id: result.insertId,
+            user_id: userId,
+            ...p,
+            created_at: now,
+            updated_at: now
+        }
     };
 }
 
@@ -203,9 +202,46 @@ async function updateProject(userId, id, data) {
         userId
     ];
 
-    const [result] = await db.execute(sql, values);
+    const [result] = await db.query(sql, values);
 
-    return result.affectedRows > 0;
+    if (!result.affectedRows) {
+        return {
+            success: false,
+            updated: false,
+            message: "No rows updated"
+        };
+    }
+
+    return {
+        success: true,
+        updated: true
+    };
+}
+
+/* =========================================
+   DELETE PROJECT
+========================================= */
+
+async function deleteProject(userId, id) {
+
+    const sql = `
+        DELETE FROM airdrop_projects
+        WHERE id=? AND user_id=?
+    `;
+
+    const [result] = await db.query(sql, [id, userId]);
+
+    if (!result.affectedRows) {
+        return {
+            success: false,
+            deleted: false
+        };
+    }
+
+    return {
+        success: true,
+        deleted: true
+    };
 }
 
 /* =========================================
@@ -221,31 +257,14 @@ async function getProjectById(userId, id) {
         LIMIT 1
     `;
 
-    const [rows] = await db.execute(sql, [id, userId]);
+    const [rows] = await db.query(sql, [id, userId]);
 
     return rows[0] || null;
 }
 
 /* =========================================
-   DELETE PROJECT
+   GET PROJECTS BY USER (LIST)
 ========================================= */
-
-async function deleteProject(userId, id) {
-
-    const sql = `
-        DELETE FROM airdrop_projects
-        WHERE id=? AND user_id=?
-    `;
-
-    const [result] = await db.execute(sql, [id, userId]);
-
-    return result.affectedRows > 0;
-}
-
-
-// =========================================
-// GET PROJECTS BY USER (LIST)
-// =========================================
 
 async function getProjectsByUser(userId) {
 
@@ -256,14 +275,18 @@ async function getProjectsByUser(userId) {
         ORDER BY created_at DESC
     `;
 
-    const [rows] = await db.execute(sql, [userId]);
+    const [rows] = await db.query(sql, [userId]);
 
-    return rows || [];
+    return {
+        success: true,
+        data: rows || [],
+        count: rows?.length || 0
+    };
 }
 
-// =========================================
-// SEARCH PROJECTS
-// =========================================
+/* =========================================
+   SEARCH PROJECTS
+========================================= */
 
 async function searchProjects(userId, keyword = "") {
 
@@ -281,52 +304,52 @@ async function searchProjects(userId, keyword = "") {
         ORDER BY created_at DESC
     `;
 
-    const [rows] = await db.execute(sql, [
+    const [rows] = await db.query(sql, [
         userId,
         keyword,
         keyword,
         keyword
     ]);
 
-    return rows || [];
+    return {
+        success: true,
+        data: rows || []
+    };
 }
 
-// =========================================
-// UPSERT PROJECT
-// (create if not exists, update if exists)
-// =========================================
+/* =========================================
+   UPSERT PROJECT
+========================================= */
 
 async function upsertProject(userId, id, data) {
 
     if (!id) {
-        return await createProject(userId, data);
+        return createProject(userId, data);
     }
 
     const existing = await getProjectById(userId, id);
 
     if (!existing) {
-        return await createProject(userId, data);
+        return createProject(userId, data);
     }
 
-    await updateProject(userId, id, data);
-
-    return await getProjectById(userId, id);
+    return updateProject(userId, id, data);
 }
 
-// =========================================
-// EXPORT JSON
-// =========================================
+/* =========================================
+   EXPORT JSON
+========================================= */
 
 async function exportJson(userId) {
 
     const projects = await getProjectsByUser(userId);
 
-    return JSON.stringify(projects, null, 2);
+    return JSON.stringify(projects.data || [], null, 2);
 }
 
-// =========================================
-// EXPORT CSV
-// =========================================
+/* =========================================
+   EXPORT CSV
+========================================= */
 
 async function exportCsv(userId) {
 
@@ -350,7 +373,7 @@ async function exportCsv(userId) {
 
     const rows = [headers];
 
-    for (const p of projects) {
+    for (const p of projects.data || []) {
 
         rows.push([
             p.id,
@@ -380,9 +403,9 @@ async function exportCsv(userId) {
         .join("\n");
 }
 
-// =========================================
-// STATISTICS
-// =========================================
+/* =========================================
+   STATISTICS
+========================================= */
 
 async function getStatistics(userId) {
 
@@ -397,7 +420,7 @@ async function getStatistics(userId) {
         WHERE user_id=?
     `;
 
-    const [rows] = await db.execute(sql, [userId]);
+    const [rows] = await db.query(sql, [userId]);
 
     return rows[0] || {
         total: 0,
@@ -408,33 +431,27 @@ async function getStatistics(userId) {
     };
 }
 
-// =========================================
-// MODULE EXPORTS
-// =========================================
+/* =========================================
+   EXPORTS
+========================================= */
 
 module.exports = {
 
-    // core
     initTable,
     validateProject,
     normalizeProjectInput,
 
-    // CRUD
     createProject,
     updateProject,
     deleteProject,
     getProjectById,
     getProjectsByUser,
 
-    // advanced
     searchProjects,
     upsertProject,
 
-    // export
     exportJson,
     exportCsv,
 
-    // analytics
     getStatistics
-
 };

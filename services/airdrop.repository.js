@@ -12,7 +12,7 @@ const db = require("../db");
 
 async function query(sql, params = []) {
 
-    const [rows] = await db.execute(sql, params);
+    const [rows] = await db.query(sql, params);
 
     return rows;
 }
@@ -69,7 +69,7 @@ async function insertProject(values) {
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
-    const [result] = await db.execute(sql, values);
+    const [result] = await db.query(sql, values);
 
     return result.insertId;
 }
@@ -93,7 +93,7 @@ async function updateProject(id, userId, values) {
         WHERE id=? AND user_id=?
     `;
 
-    const [result] = await db.execute(sql, [
+    const [result] = await db.query(sql, [
         ...values,
         id,
         userId
@@ -104,7 +104,7 @@ async function updateProject(id, userId, values) {
 
 async function deleteProject(userId, id) {
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
         `
         DELETE FROM airdrop_projects
         WHERE id=? AND user_id=?
