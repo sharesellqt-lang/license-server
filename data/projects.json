@@ -1,0 +1,24 @@
+[
+  {
+    "id": 1,
+    "title": "Monad",
+    "source": "CryptoRank",
+    "url": "https://cryptorank.io/drophunting/monad-activity750",
+    "funding": 95,
+    "community": 92,
+    "investors": ["Paradigm", "DragonFly"],
+    "token": false,
+    "deadline": "2026-12-31"
+  },
+  {
+    "id": 2,
+    "title": "MegaETH",
+    "source": "CryptoRank",
+    "url": "https://cryptorank.io",
+    "funding": 90,
+    "community": 88,
+    "investors": ["DragonFly"],
+    "token": false,
+    "deadline": "2026-10-15"
+  }
+]
