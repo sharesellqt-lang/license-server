@@ -204,18 +204,8 @@ async function updateProject(userId, id, data) {
 
     const [result] = await db.query(sql, values);
 
-    if (!result.affectedRows) {
-        return {
-            success: false,
-            updated: false,
-            message: "No rows updated"
-        };
-    }
-
-    return {
-        success: true,
-        updated: true
-    };
+    // ✅ FIX QUAN TRỌNG
+    return result.affectedRows > 0;
 }
 
 /* =========================================
