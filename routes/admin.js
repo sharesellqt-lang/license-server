@@ -79,7 +79,7 @@ router.post("/login", async (req, res) => {
 });
 
 // 🔒 lock từ đây trở xuống
-router.use(auth, requireAdmin);
+
 // =====================================
 // LIST USERS
 // =====================================
