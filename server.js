@@ -15,6 +15,17 @@ const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
+const http = require("http");
+const app = require("./app");
+
+const server = http.createServer(app);
+
+const socketService =
+    require("./services/socket.service");
+
+socketService.init(server);
+
+server.listen(3000);
 
 app.use(express.json());
 
