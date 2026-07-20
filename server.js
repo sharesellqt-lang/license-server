@@ -12,8 +12,7 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const app = express();
-const projectService = require("./services/airdrop.project.service");
-const airdropRoutes = require("./routes/airdrop.routes");
+
 
 const http = require("http");
 const server = http.createServer(app);
