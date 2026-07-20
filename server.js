@@ -16,7 +16,6 @@ const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
 const http = require("http");
-const app = require("./app");
 
 const server = http.createServer(app);
 
