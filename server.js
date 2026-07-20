@@ -15,9 +15,6 @@ const app = express();
 
 
 
-
-server.listen(3000);
-
 app.use(express.json());
 
 app.use((req,res,next)=>{
