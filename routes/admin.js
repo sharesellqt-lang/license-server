@@ -58,12 +58,16 @@ router.post("/login", async (req, res) => {
     );
 console.log("ROWS:", rows);
 
-    if (!rows.length)
-          console.log("HASH:", rows[0].password_hash);
+   if (!rows.length) {
+    return res.status(401).json({
+        success: false,
+        message: "Invalid credentials"
+    });
+}
 
-      return res.status(401).json({ success: false, message: "Invalid credentials" });
+const admin = rows[0];
 
-    const admin = rows[0];
+console.log("HASH:", admin.password_hash);
 
     // So sánh password hash
     const match = await bcrypt.compare(password, admin.password_hash);
