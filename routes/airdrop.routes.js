@@ -465,13 +465,6 @@ router.get(
 
     );
 
-            const metrics =
-                await metricsService.getMetrics(
-
-                    req.params.id
-
-                );
-
             return res.json({
 
                 success: true,
@@ -529,14 +522,6 @@ router.put(
     req.body
 
 );
-
-            await metricsService.saveMetrics(
-
-                req.params.id,
-
-                req.body
-
-            );
 
             const metrics =
                 await metricsService.getMetrics(
