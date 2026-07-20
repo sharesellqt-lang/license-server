@@ -2268,9 +2268,6 @@ router.get(
         const projectService =
             require("../services/airdrop.project.service");
 
-        const metricsService =
-            require("../services/airdrop.metrics.service");
-
         const walletService =
             require("../services/airdrop.wallet.intelligence.service");
 
