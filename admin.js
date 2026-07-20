@@ -8,6 +8,8 @@ const jwt = require("jsonwebtoken");
 // =========================
 const ADMIN_USER = process.env.ADMIN_USER;
 const ADMIN_PASS = process.env.ADMIN_PASS;
+console.log("ADMIN_USER =", ADMIN_USER);
+console.log("ADMIN_PASS =", ADMIN_PASS);
 const JWT_SECRET = process.env.JWT_SECRET || "secret_key";
 
 // =========================
