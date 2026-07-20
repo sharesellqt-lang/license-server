@@ -57,7 +57,7 @@ app.use((req, res, next) => {
 // =========================
 // ROUTES
 // =========================
-app.use("/api/airdrop", airdropRoutes);
+
 
 // =========================
 // BOOTSTRAP
