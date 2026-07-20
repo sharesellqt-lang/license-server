@@ -15,7 +15,17 @@ const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
+const http = require("http");
+const app = require("./app");
 
+const server = http.createServer(app);
+
+const socketService =
+    require("./services/socket.service");
+
+socketService.init(server);
+
+server.listen(3000);
 
 app.use(express.json());
 
@@ -160,6 +170,7 @@ if (!GOOGLE_CLIENT_ID) {
 if (!JWT_SECRET) {
   throw new Error("❌ JWT_SECRET missing");
 }
+
 
 // ✅ INIT
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
