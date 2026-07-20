@@ -50,18 +50,25 @@ router.post("/login", async (req, res) => {
     const { username, password } = req.body;
 
     // Lấy admin từ database
+    console.log("BODY:", req.body);
+
     const [rows] = await db.query(
       "SELECT * FROM admin WHERE username = ?", 
       [username]
     );
+console.log("ROWS:", rows);
 
     if (!rows.length)
+          console.log("HASH:", rows[0].password_hash);
+
       return res.status(401).json({ success: false, message: "Invalid credentials" });
 
     const admin = rows[0];
 
     // So sánh password hash
     const match = await bcrypt.compare(password, admin.password_hash);
+        console.log("MATCH:", match);
+
     if (!match){
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
