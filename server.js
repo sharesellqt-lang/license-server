@@ -14,13 +14,7 @@ const fs = require("fs");
 const app = express();
 
 
-const http = require("http");
-const server = http.createServer(app);
 
-const socketService =
-    require("./services/socket.service");
-
-socketService.init(server);
 
 server.listen(3000);
 
