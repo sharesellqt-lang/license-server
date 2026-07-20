@@ -41,12 +41,15 @@ function adminAuth(req, res, next) {
 // LOGIN
 // =========================
 router.post("/login", async (req, res) => {
-      console.log(req.body);
+       console.log("BODY:", req.body);
+  console.log("ADMIN_USER:", ADMIN_USER);
+  console.log("ADMIN_PASS:", ADMIN_PASS);
 
   try {
     const { user, pass } = req.body;
-     console.log(user);
-    console.log(pass);
+    
+  console.log("user =", user);
+  console.log("pass =", pass);
 
     if (user !== ADMIN_USER || pass !== ADMIN_PASS) {
       return res.status(401).json({ error: "Invalid credentials" });
