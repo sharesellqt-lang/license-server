@@ -253,9 +253,6 @@ router.get(
 router.get("/projects", authMiddleware, async (req, res) => {
     try {
 
-        const projects =
-            await projectService.getProjectsByUser(req.user.id);
-
         const result = await projectService.getProjectsByUser(req.user.id);
 
         return res.json(result);
@@ -579,12 +576,6 @@ router.delete(
     async (req, res) => {
 
         try {
-
-            await metricsService.deleteMetrics(
-
-    req.project.id
-
-);
 
             const deleted =
                 await metricsService.deleteMetrics(
@@ -2050,6 +2041,73 @@ router.get(
 
 );
 
+/* =========================================
+   POST
+   /api/airdrop/projects/:id/sync
+========================================= */
+
+router.post(
+
+    "/projects/:id/sync",
+
+    authMiddleware,
+
+    loadAirdropProject,
+
+    async (req, res) => {
+
+        try {
+
+            const collectorService =
+                require("../services/airdrop.data.collector.service");
+
+
+            const result =
+                await collectorService.collectProjectData(
+                    req.project.id
+                );
+
+
+            return res.json({
+
+                success: true,
+
+                message:
+                    "Project synced successfully.",
+
+                data:
+                    result
+
+            });
+
+
+        }
+
+        catch (err) {
+
+
+            console.error(
+                "[PROJECT SYNC]",
+                err
+            );
+
+
+            return res.status(500).json({
+
+                success:false,
+
+                message:
+                    err.message ||
+                    "Sync failed."
+
+            });
+
+
+        }
+
+    }
+
+);
 /* =========================================
    GET
    /api/airdrop/dashboard

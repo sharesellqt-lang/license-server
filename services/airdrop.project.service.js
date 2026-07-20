@@ -427,6 +427,38 @@ async function getStatistics(userId) {
 }
 
 /* =========================================
+   GET PROJECT BY ID
+========================================= */
+
+async function getProjectById(
+    userId,
+    projectId
+) {
+
+    const sql = `
+        SELECT *
+        FROM airdrop_projects
+        WHERE
+            id = ?
+        AND
+            user_id = ?
+        LIMIT 1
+    `;
+
+    const [rows] =
+        await db.query(sql, [
+
+            Number(projectId),
+
+            Number(userId)
+
+        ]);
+
+    return rows[0] || null;
+
+}
+
+/* =========================================
    EXPORTS
 ========================================= */
 
