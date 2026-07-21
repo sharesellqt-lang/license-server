@@ -25,11 +25,8 @@ const server = http.createServer(app);
 //    require("./services/socket.service");
 
 //socketService.init(server);
-
-server.listen(3000);
-
 app.use(express.json());
-
+server.listen(3000);
 app.use((req,res,next)=>{
 
   console.log(
