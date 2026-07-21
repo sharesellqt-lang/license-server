@@ -373,6 +373,140 @@ router.delete(
     }
 );
 
+router.get(
+    "/projects/statistics",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const projects =
+                await projectService.getProjects(
+                    req.user.id
+                );
+
+            const total =
+                projects.length;
+
+            const eligible =
+                projects.filter(
+                    p => p.result === "eligible"
+                ).length;
+
+            const pending =
+                projects.filter(
+                    p => p.status === "pending"
+                ).length;
+
+            const rejected =
+                projects.filter(
+                    p => p.result === "rejected"
+                ).length;
+
+            const avgScore =
+                total
+                    ? projects.reduce(
+                        (s, p) => s + Number(p.score || 0),
+                        0
+                    ) / total
+                    : 0;
+
+            res.json({
+
+                success: true,
+
+                totalProjects: total,
+
+                eligibleProjects: eligible,
+
+                pendingProjects: pending,
+
+                rejectedProjects: rejected,
+
+                averageScore:
+                    Number(avgScore.toFixed(2))
+
+            });
+
+        }
+
+        catch (err) {
+
+            console.error(err);
+
+            res.status(500).json({
+                success: false,
+                error: err.message
+            });
+
+        }
+
+    }
+);
+
+router.get(
+    "/projects/search",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const keyword =
+                String(
+                    req.query.q || ""
+                );
+
+            const projects =
+                await projectService.getProjects(
+                    req.user.id
+                );
+
+            const result =
+                projects.filter(project => {
+
+                    return (
+
+                        (project.project_name || "")
+                            .toLowerCase()
+                            .includes(keyword.toLowerCase())
+
+                        ||
+
+                        (project.website || "")
+                            .toLowerCase()
+                            .includes(keyword.toLowerCase())
+
+                    );
+
+                });
+
+            res.json({
+
+                success: true,
+
+                projects: result
+
+            });
+
+        }
+
+        catch (err) {
+
+            console.error(err);
+
+            res.status(500).json({
+
+                success: false,
+
+                error: err.message
+
+            });
+
+        }
+
+    }
+);
+
 /* =========================================
    GET
    /api/airdrop/projects/:id/analysis
