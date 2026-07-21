@@ -5,9 +5,6 @@
 "use strict";
 
 const db = require("../db");
-const metric =
-    normalizeMetrics(data);
-
 function normalizeMetrics(data = {}) {
 
     return {
@@ -167,7 +164,7 @@ async function getMetrics(projectId) {
 
 async function createMetrics(projectId, data = {}) {
 
-    const now = Date.now();
+const now = Date.now();
 
   const metric = {
 
