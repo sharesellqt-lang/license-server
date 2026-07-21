@@ -1,8 +1,8 @@
 "use strict";
 
 const db = require("../db");
-const alertQueue =
-    require("./queue/alert.queue");
+//const alertQueue =
+   // require("./queue/alert.queue");
 
 /* =========================================
    LOAD PROJECT DATA
