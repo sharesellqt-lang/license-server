@@ -1,3 +1,9 @@
+// =========================================
+// services/ai/airdrop.decision.engine.js
+// =========================================
+
+"use strict";
+
 const strategyEngine =
     require("./airdrop.strategy.engine");
 
@@ -7,164 +13,518 @@ const learning =
 const adaptive =
     require("./airdrop.adaptive.engine");
 
-const performance =
-    await learning.analyzePerformance(input.userId);
+/* =========================================
+   DEFAULT WEIGHTS
+========================================= */
 
-const weights =
-    adaptive.adjustWeights(DEFAULT_WEIGHTS, performance);
+const DEFAULT_WEIGHTS = {
 
+    fundamental_weight: 40,
 
-function buildFeatures({ wallet, project, metrics }) {
+    upside_weight: 25,
+
+    wallet_weight: 15,
+
+    unlock_weight: 10,
+
+    risk_weight: 10
+
+};
+
+/* =========================================
+   BUILD FEATURES
+========================================= */
+
+function buildFeatures({
+
+    wallet = {},
+
+    project = {},
+
+    metrics = {}
+
+} = {}) {
 
     return {
 
-        // Wallet exposure
-        wallet_roi: wallet.roi || 0,
-        wallet_risk: wallet.risk_score || 0,
+        project_id:
+            project.id || null,
 
-        // Project fundamentals
-        score: metrics.total_score || 0,
-        risk: metrics.risk_level || "medium",
+        project_name:
+            project.name || "",
 
-        fdv: metrics.fdv || 0,
-        mc: metrics.market_cap || 0,
+        wallet_roi:
+            Number(wallet.roi || 0),
 
-        upside:
-            metrics.fair_buy_price && metrics.current_price
-                ? metrics.fair_buy_price / metrics.current_price
-                : 1,
+        wallet_risk:
+            Number(wallet.risk_score || 0),
 
-        unlock_risk:
-            metrics.circulating_supply && metrics.max_supply
-                ? 1 - (metrics.circulating_supply / metrics.max_supply)
-                : 0,
+        score:
+            Number(metrics.total_score || 0),
 
-        near_ath:
-            metrics.ath_price && metrics.current_price
-                ? metrics.current_price / metrics.ath_price
-                : 0
+        risk:
+            metrics.risk_level || "medium",
+
+        fdv:
+            Number(metrics.fdv || 0),
+
+        market_cap:
+            Number(metrics.market_cap || 0),
+
+        current_price:
+            Number(metrics.current_price || 0),
+
+        fair_buy_price:
+            Number(metrics.fair_buy_price || 0),
+
+        circulating_supply:
+            Number(metrics.circulating_supply || 0),
+
+        max_supply:
+            Number(metrics.max_supply || 0),
+
+        ath_price:
+            Number(metrics.ath_price || 0)
+
     };
+
 }
 
-function score(features) {
+/* =========================================
+   CALCULATE UPSIDE
+========================================= */
 
-    let score = 50; // base neutral
+function calculateUpside(features) {
 
-    // Project quality
-    score += (features.score / 100) * 40;
+    if (
+        !features.current_price ||
+        !features.fair_buy_price
+    ) {
 
-    score += (features.score / 100) * weights.fundamental_weight;
+        return 1;
 
-    // Risk penalty
-    if (features.risk === "high") score -= 25;
-    if (features.risk === "very-high") score -= 40;
+    }
 
-    // Upside potential
-    if (features.upside > 1.5) score += 20;
-    if (features.upside > 2) score += 30;
+    return (
+        features.fair_buy_price /
+        features.current_price
+    );
 
-    // Unlock risk penalty
-    if (features.unlock_risk > 0.7) score -= 20;
-
-    // Near ATH penalty (buying top)
-    if (features.near_ath > 0.9) score -= 15;
-
-    // Wallet alignment bonus
-    if (features.wallet_roi > 1) score += 10;
-
-    return Math.max(0, Math.min(100, score));
 }
 
-function decide(score, features) {
+/* =========================================
+   UNLOCK RISK
+========================================= */
+
+function calculateUnlockRisk(features) {
+
+    if (
+        !features.max_supply ||
+        !features.circulating_supply
+    ) {
+
+        return 0;
+
+    }
+
+    return 1 -
+
+    (
+        features.circulating_supply /
+        features.max_supply
+    );
+
+}
+
+/* =========================================
+   ATH RATIO
+========================================= */
+
+function calculateNearATH(features) {
+
+    if (
+        !features.ath_price ||
+        !features.current_price
+    ) {
+
+        return 0;
+
+    }
+
+    return (
+
+        features.current_price /
+
+        features.ath_price
+
+    );
+
+}
+
+/* =========================================
+   SCORE
+========================================= */
+
+function score(
+
+    features,
+
+    weights = DEFAULT_WEIGHTS
+
+) {
+
+    let total = 50;
+
+    total +=
+
+        (features.score / 100) *
+
+        weights.fundamental_weight;
+
+    const upside =
+        calculateUpside(features);
+
+    if (upside > 1.5) {
+
+        total +=
+            weights.upside_weight;
+
+    }
+
+    if (upside > 2) {
+
+        total += 10;
+
+    }
+
+    const unlock =
+        calculateUnlockRisk(features);
+
+    if (unlock > 0.7) {
+
+        total -=
+            weights.unlock_weight;
+
+    }
+
+    const ath =
+        calculateNearATH(features);
+
+    if (ath > 0.9) {
+
+        total -= 15;
+
+    }
+
+    if (
+
+        features.wallet_roi >
+
+        100
+
+    ) {
+
+        total +=
+            weights.wallet_weight;
+
+    }
+
+    switch (features.risk) {
+
+        case "very-high":
+
+            total -= 40;
+
+            break;
+
+        case "high":
+
+            total -= 25;
+
+            break;
+
+        case "medium":
+
+            total -= 10;
+
+            break;
+
+    }
+
+    return Math.max(
+
+        0,
+
+        Math.min(100, Math.round(total))
+
+    );
+
+}
+
+/* =========================================
+   DECISION
+========================================= */
+
+function decide(score) {
 
     if (score >= 80) {
 
         return {
+
             action: "ACCUMULATE",
-            confidence: "high"
+
+            confidence: "HIGH"
+
         };
+
     }
 
     if (score >= 65) {
 
         return {
+
             action: "BUY",
-            confidence: "medium"
+
+            confidence: "MEDIUM"
+
         };
+
     }
 
     if (score >= 50) {
 
         return {
+
             action: "HOLD",
-            confidence: "low"
+
+            confidence: "LOW"
+
         };
+
     }
 
     if (score >= 30) {
 
         return {
+
             action: "WATCH",
-            confidence: "low"
+
+            confidence: "LOW"
+
         };
+
     }
 
     return {
+
         action: "AVOID",
-        confidence: "high"
+
+        confidence: "HIGH"
+
     };
+
 }
 
-function analyzeDecision(input) {
+/* =========================================
+   REASONS
+========================================= */
+
+function generateReason(
+
+    features,
+
+    scoreValue
+
+) {
+
+    const reasons = [];
+
+    if (
+
+        features.score >= 80
+
+    ) {
+
+        reasons.push(
+
+            "Strong fundamentals"
+
+        );
+
+    }
+
+    if (
+
+        calculateUpside(features) > 2
+
+    ) {
+
+        reasons.push(
+
+            "High upside potential"
+
+        );
+
+    }
+
+    if (
+
+        calculateUnlockRisk(features) >
+
+        0.7
+
+    ) {
+
+        reasons.push(
+
+            "Large future unlock"
+
+        );
+
+    }
+
+    if (
+
+        features.risk === "high" ||
+
+        features.risk === "very-high"
+
+    ) {
+
+        reasons.push(
+
+            "High project risk"
+
+        );
+
+    }
+
+    if (
+
+        scoreValue >= 80
+
+    ) {
+
+        reasons.push(
+
+            "Excellent AI score"
+
+        );
+
+    }
+
+    return reasons;
+
+}
+
+/* =========================================
+   ANALYZE DECISION
+========================================= */
+
+async function analyzeDecision(input = {}) {
+
+    const performance =
+
+        await learning.analyzePerformance(
+
+            input.userId
+
+        );
+
+    const weights =
+
+        adaptive.adjustWeights(
+
+            DEFAULT_WEIGHTS,
+
+            performance
+
+        );
 
     const features =
+
         buildFeatures(input);
 
     const scoreValue =
-        score(features);
+
+        score(
+
+            features,
+
+            weights
+
+        );
 
     const decision =
-        decide(scoreValue, features);
+
+        decide(scoreValue);
 
     const strategy =
-    strategyEngine.generateStrategy({
-        decision,
-        features,
-        wallet: input.wallet
-    });
+
+        strategyEngine.generateStrategy({
+
+            decision,
+
+            features,
+
+            wallet:
+
+                input.wallet || {}
+
+        });
 
     return {
 
         features,
 
-        score: scoreValue,
+        weights,
 
-        action: decision.action,
+        performance,
 
-        confidence: decision.confidence,
+        score:
 
-        reasoning: generateReason(features, scoreValue),
+            scoreValue,
 
-        strategy   // 👈 NEW
+        action:
+
+            decision.action,
+
+        confidence:
+
+            decision.confidence,
+
+        reasoning:
+
+            generateReason(
+
+                features,
+
+                scoreValue
+
+            ),
+
+        strategy
+
     };
+
 }
 
-function generateReason(f, score) {
+/* =========================================
+   EXPORTS
+========================================= */
 
-    const reasons = [];
+module.exports = {
 
-    if (f.upside > 2)
-        reasons.push("High upside potential");
+    DEFAULT_WEIGHTS,
 
-    if (f.risk === "high")
-        reasons.push("High risk profile");
+    buildFeatures,
 
-    if (f.unlock_risk > 0.7)
-        reasons.push("Heavy unlock pressure");
+    score,
 
-    if (f.score > 80)
-        reasons.push("Strong fundamentals");
+    decide,
 
-    return reasons;
-}
+    generateReason,
 
+    analyzeDecision
+
+};

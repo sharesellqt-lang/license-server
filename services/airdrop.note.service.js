@@ -7,7 +7,7 @@
 const db = require("../db");
 
 /* =========================================
-   GET ALL
+   GET NOTES OF PROJECT
 ========================================= */
 
 async function getNotes(projectId) {
@@ -15,11 +15,38 @@ async function getNotes(projectId) {
     const sql = `
         SELECT *
         FROM airdrop_project_notes
-        WHERE project_id=?
+        WHERE project_id = ?
         ORDER BY created_at DESC
     `;
 
-    const [rows] = await db.query(sql, [projectId]);
+    const [rows] =
+        await db.query(sql, [projectId]);
+
+    return rows || [];
+
+}
+
+/* =========================================
+   GET ALL NOTES OF USER (Dashboard Batch)
+========================================= */
+
+async function getAllNotes(userId) {
+
+    const sql = `
+        SELECT
+            n.*,
+            p.user_id,
+            p.name AS project_name
+        FROM airdrop_project_notes n
+        INNER JOIN airdrop_projects p
+            ON p.id = n.project_id
+        WHERE p.user_id = ?
+        ORDER BY n.project_id ASC,
+                 n.created_at DESC
+    `;
+
+    const [rows] =
+        await db.query(sql, [userId]);
 
     return rows || [];
 
@@ -34,11 +61,12 @@ async function getNote(id) {
     const sql = `
         SELECT *
         FROM airdrop_project_notes
-        WHERE id=?
+        WHERE id = ?
         LIMIT 1
     `;
 
-    const [rows] = await db.query(sql, [id]);
+    const [rows] =
+        await db.query(sql, [id]);
 
     return rows[0] || null;
 
@@ -48,10 +76,14 @@ async function getNote(id) {
    CREATE
 ========================================= */
 
-async function createNote(projectId, userId, note) {
+async function createNote(
+    projectId,
+    userId,
+    note
+) {
 
     const sql = `
-        INSERT INTO airdrop_project_notes(
+        INSERT INTO airdrop_project_notes (
 
             project_id,
             created_by,
@@ -60,7 +92,7 @@ async function createNote(projectId, userId, note) {
 
         )
 
-        VALUES(?,?,?,?)
+        VALUES (?,?,?,?)
     `;
 
     const now = Date.now();
@@ -68,11 +100,11 @@ async function createNote(projectId, userId, note) {
     const [result] =
         await db.query(sql, [
 
-            projectId,
+            Number(projectId),
 
-            userId,
+            Number(userId),
 
-            note || "",
+            String(note || "").trim(),
 
             now
 
@@ -86,21 +118,26 @@ async function createNote(projectId, userId, note) {
    UPDATE
 ========================================= */
 
-async function updateNote(id, note) {
+async function updateNote(
+    id,
+    note
+) {
 
     const sql = `
         UPDATE airdrop_project_notes
         SET
-            note=?
-        WHERE id=?
+
+            note = ?
+
+        WHERE id = ?
     `;
 
     const [result] =
         await db.query(sql, [
 
-            note || "",
+            String(note || "").trim(),
 
-            id
+            Number(id)
 
         ]);
 
@@ -117,7 +154,7 @@ async function deleteNote(id) {
     const sql = `
         DELETE
         FROM airdrop_project_notes
-        WHERE id=?
+        WHERE id = ?
     `;
 
     const [result] =
@@ -128,7 +165,7 @@ async function deleteNote(id) {
 }
 
 /* =========================================
-   DELETE ALL
+   DELETE ALL OF PROJECT
 ========================================= */
 
 async function deleteAll(projectId) {
@@ -136,7 +173,7 @@ async function deleteAll(projectId) {
     const sql = `
         DELETE
         FROM airdrop_project_notes
-        WHERE project_id=?
+        WHERE project_id = ?
     `;
 
     const [result] =
@@ -153,6 +190,8 @@ async function deleteAll(projectId) {
 module.exports = {
 
     getNotes,
+
+    getAllNotes,
 
     getNote,
 

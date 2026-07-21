@@ -178,12 +178,39 @@ async function deleteAll(projectId) {
 }
 
 /* =========================================
+   GET ALL MEMBERS OF USER
+========================================= */
+
+async function getAllMembers(userId) {
+
+    const sql = `
+        SELECT
+            t.*,
+            p.user_id
+        FROM airdrop_project_team t
+        INNER JOIN airdrop_projects p
+            ON p.id = t.project_id
+        WHERE p.user_id = ?
+        ORDER BY t.project_id, t.id
+    `;
+
+    const [rows] =
+        await db.query(sql, [userId]);
+
+    return rows || [];
+
+}
+
+
+/* =========================================
    EXPORTS
 ========================================= */
 
 module.exports = {
 
     getMembers,
+
+    getAllMembers,
 
     getMember,
 

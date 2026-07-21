@@ -159,6 +159,28 @@ async function getMetrics(projectId) {
 }
 
 /* =========================================
+   GET ALL METRICS
+========================================= */
+
+async function getAllMetrics(userId) {
+
+    const sql = `
+        SELECT
+            m.*
+        FROM airdrop_project_metrics m
+        INNER JOIN airdrop_projects p
+            ON p.id = m.project_id
+        WHERE p.user_id = ?
+    `;
+
+    const [rows] =
+        await db.query(sql, [userId]);
+
+    return rows || [];
+
+}
+
+/* =========================================
    CREATE
 ========================================= */
 
@@ -457,6 +479,8 @@ module.exports = {
     normalizeMetrics,
 
     getMetrics,
+
+    getAllMetrics,
 
     createMetrics,
 

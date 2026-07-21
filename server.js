@@ -14,6 +14,8 @@ const fs = require("fs");
 const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
+const dashboardRoutes =
+    require("./routes/dashboard.routes");
 
 const http = require("http");
 
@@ -69,6 +71,7 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
+app.use("/api/airdrop",dashboardRoutes);
 
 // =========================
 // BOOTSTRAP

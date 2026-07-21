@@ -240,24 +240,6 @@ async function deleteProject(userId, id) {
 }
 
 /* =========================================
-   GET BY ID
-========================================= */
-
-async function getProjectById(userId, id) {
-
-    const sql = `
-        SELECT *
-        FROM airdrop_projects
-        WHERE id=? AND user_id=?
-        LIMIT 1
-    `;
-
-    const [rows] = await db.query(sql, [id, userId]);
-
-    return rows[0] || null;
-}
-
-/* =========================================
    GET PROJECTS BY USER (LIST)
 ========================================= */
 

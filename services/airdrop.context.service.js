@@ -59,12 +59,8 @@ async function getProjectContext(userId, projectId) {
 
     ]);
 
-    const analysis =
-        analysisService.analyze({
-            ...metrics
-        });
-
-    return {
+ const analysis =
+    analysisService.analyze({
 
         project,
 
@@ -76,11 +72,9 @@ async function getProjectContext(userId, projectId) {
 
         team,
 
-        notes,
+        notes
 
-        analysis
-
-    };
+    });
 
 }
 

@@ -7,7 +7,7 @@
 const db = require("../db");
 
 /* =========================================
-   GET ALL
+   GET ALL OF PROJECT
 ========================================= */
 
 async function getInvestors(projectId) {
@@ -15,11 +15,37 @@ async function getInvestors(projectId) {
     const sql = `
         SELECT *
         FROM airdrop_project_investors
-        WHERE project_id=?
+        WHERE project_id = ?
         ORDER BY id ASC
     `;
 
-    const [rows] = await db.query(sql, [projectId]);
+    const [rows] =
+        await db.query(sql, [projectId]);
+
+    return rows || [];
+
+}
+
+/* =========================================
+   GET ALL OF USER (Dashboard Batch)
+========================================= */
+
+async function getAllInvestors(userId) {
+
+    const sql = `
+        SELECT
+            i.*,
+            p.user_id,
+            p.name AS project_name
+        FROM airdrop_project_investors i
+        INNER JOIN airdrop_projects p
+            ON p.id = i.project_id
+        WHERE p.user_id = ?
+        ORDER BY i.project_id ASC, i.id ASC
+    `;
+
+    const [rows] =
+        await db.query(sql, [userId]);
 
     return rows || [];
 
@@ -34,11 +60,12 @@ async function getInvestor(id) {
     const sql = `
         SELECT *
         FROM airdrop_project_investors
-        WHERE id=?
+        WHERE id = ?
         LIMIT 1
     `;
 
-    const [rows] = await db.query(sql, [id]);
+    const [rows] =
+        await db.query(sql, [id]);
 
     return rows[0] || null;
 
@@ -53,52 +80,52 @@ async function createInvestor(projectId, data = {}) {
     const now = Date.now();
 
     const sql = `
-        INSERT INTO airdrop_project_investors(
+        INSERT INTO airdrop_project_investors (
 
-    project_id,
+            project_id,
 
-    investor_name,
+            investor_name,
 
-    investment_round,
+            investment_round,
 
-    investment_amount,
+            investment_amount,
 
-    investor_tier,
+            investor_tier,
 
-    website,
+            website,
 
-    logo,
+            logo,
 
-    note,
+            note,
 
-    created_at
+            created_at
 
-)
+        )
 
-        VALUES(?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?)
     `;
 
-   const values = [
+    const values = [
 
-    projectId,
+        Number(projectId),
 
-    data.investor_name || "",
+        String(data.investor_name || "").trim(),
 
-    data.investment_round || "",
+        String(data.investment_round || "").trim(),
 
-    Number(data.investment_amount || 0),
+        Number(data.investment_amount || 0),
 
-    data.investor_tier || "normal",
+        String(data.investor_tier || "normal").trim(),
 
-    data.website || "",
+        String(data.website || "").trim(),
 
-    data.logo || "",
+        String(data.logo || "").trim(),
 
-    data.note || "",
+        String(data.note || "").trim(),
 
-    now
+        now
 
-];
+    ];
 
     const [result] =
         await db.query(sql, values);
@@ -117,28 +144,40 @@ async function updateInvestor(id, data = {}) {
         UPDATE airdrop_project_investors
         SET
 
-            investor_name=?,
+            investor_name = ?,
 
-            investment_round=?,
+            investment_round = ?,
 
-            investment_amount=?,
+            investment_amount = ?,
 
-            note=?
+            investor_tier = ?,
 
-        WHERE id=?
+            website = ?,
+
+            logo = ?,
+
+            note = ?
+
+        WHERE id = ?
     `;
 
     const values = [
 
-        data.investor_name || "",
+        String(data.investor_name || "").trim(),
 
-        data.investment_round || "",
+        String(data.investment_round || "").trim(),
 
         Number(data.investment_amount || 0),
 
-        data.note || "",
+        String(data.investor_tier || "normal").trim(),
 
-        id
+        String(data.website || "").trim(),
+
+        String(data.logo || "").trim(),
+
+        String(data.note || "").trim(),
+
+        Number(id)
 
     ];
 
@@ -158,7 +197,7 @@ async function deleteInvestor(id) {
     const sql = `
         DELETE
         FROM airdrop_project_investors
-        WHERE id=?
+        WHERE id = ?
     `;
 
     const [result] =
@@ -169,7 +208,7 @@ async function deleteInvestor(id) {
 }
 
 /* =========================================
-   DELETE ALL
+   DELETE ALL OF PROJECT
 ========================================= */
 
 async function deleteAll(projectId) {
@@ -177,7 +216,7 @@ async function deleteAll(projectId) {
     const sql = `
         DELETE
         FROM airdrop_project_investors
-        WHERE project_id=?
+        WHERE project_id = ?
     `;
 
     const [result] =
@@ -187,6 +226,8 @@ async function deleteAll(projectId) {
 
 }
 
+
+
 /* =========================================
    EXPORTS
 ========================================= */
@@ -194,6 +235,8 @@ async function deleteAll(projectId) {
 module.exports = {
 
     getInvestors,
+
+    getAllInvestors,
 
     getInvestor,
 
