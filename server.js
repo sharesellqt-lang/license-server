@@ -22,7 +22,7 @@ const server = http.createServer(app);
 //const socketService =
 //    require("./services/socket.service");
 
-socketService.init(server);
+//socketService.init(server);
 
 server.listen(3000);
 
