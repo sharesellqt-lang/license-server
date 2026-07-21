@@ -19,8 +19,8 @@ const http = require("http");
 
 const server = http.createServer(app);
 
-const socketService =
-    require("./services/socket.service");
+//const socketService =
+//    require("./services/socket.service");
 
 socketService.init(server);
 
