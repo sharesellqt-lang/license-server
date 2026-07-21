@@ -440,6 +440,24 @@ async function getProjectById(
 
 }
 
+async function getProjects(userId){
+
+    const [rows] =
+        await db.query(
+            `
+            SELECT *
+            FROM airdrop_projects
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            `,
+            [
+                userId
+            ]
+        );
+
+    return rows;
+
+}
 /* =========================================
    EXPORTS
 ========================================= */
@@ -449,18 +467,15 @@ module.exports = {
     initTable,
     validateProject,
     normalizeProjectInput,
-
     createProject,
     updateProject,
     deleteProject,
     getProjectById,
     getProjectsByUser,
-
+    getProjects,
     searchProjects,
     upsertProject,
-
     exportJson,
     exportCsv,
-
     getStatistics
 };
