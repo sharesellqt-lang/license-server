@@ -140,24 +140,104 @@ router.post(
 );
 
 router.get("/me", authMiddleware, async (req, res) => {
-  console.log(">>> /api/me reached");
 
-  try {
+    try {
 
-    res.json({
-      success: true,
-      user: req.user
-    });
+        const [rows] = await db.execute(
+            `
+            SELECT
+                id,
+                plan,
+                cycle,
+                created_at,
+                expire_at
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+            `,
+            [req.user.id]
+        );
 
-  } catch (err) {
+        if (!rows.length) {
 
-    console.error(err);
+            return res.status(404).json({
+                error: "USER_NOT_FOUND"
+            });
 
-    res.status(500).json({
-      success: false
-    });
+        }
 
-  }
+        const user = rows[0];
+
+        let plan =
+            String(user.plan || "free")
+                .trim()
+                .toLowerCase();
+
+        if (
+            user.expire_at &&
+            new Date() > new Date(user.expire_at)
+        ) {
+
+            plan = "free";
+
+        }
+
+        const now =
+            new Date();
+
+        const expireAt =
+            user.expire_at
+                ? new Date(user.expire_at)
+                : null;
+
+        const isActive =
+            expireAt &&
+            expireAt > now;
+
+        const daysLeft =
+            expireAt
+                ? Math.max(
+                    0,
+                    Math.ceil(
+                        (expireAt - now) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                )
+                : 0;
+
+        return res.json({
+
+            id: user.id,
+
+            licensed:
+                plan !== "free",
+
+            isActive,
+
+            daysLeft,
+
+            plan,
+
+            cycle:
+                user.cycle || "month",
+
+            expireAt:
+                user.expire_at || null
+
+        });
+
+    }
+    catch (err) {
+
+        console.error("ME ERROR:", err);
+
+        return res.status(500).json({
+
+            error: "SERVER_ERROR"
+
+        });
+
+    }
 
 });
 

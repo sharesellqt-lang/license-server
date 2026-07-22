@@ -16,17 +16,10 @@ const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 const dashboardRoutes =
     require("./routes/dashboard.routes");
-
-const http = require("http");
-
-const server = http.createServer(app);
-
 //const socketService =
 //    require("./services/socket.service");
-
 //socketService.init(server);
 app.use(express.json());
-server.listen(3000);
 app.use((req,res,next)=>{
 
   console.log(
@@ -687,98 +680,7 @@ console.error("🔥 RAW ERROR:", JSON.stringify(err, Object.getOwnPropertyNames(
 }
 });
 
-// =========================
-// ME (USER INFO)
-// =========================
-app.get("/me", authMiddleware, async (req, res) => {
 
-  try {
-
-    const [rows] = await db.execute(
-      `
-      SELECT 
-        id,
-        plan,
-	cycle,
-        created_at,
-        expire_at
-      FROM users
-      WHERE id=?
-      LIMIT 1
-      `,
-      [req.user.id]
-    );
-
-    if (!rows.length) {
-
-      return res.status(404).json({
-        error: "USER_NOT_FOUND"
-      });
-    }
-
-    const user = rows[0];
-
-    // 🔥 FREE nếu hết hạn
-    let plan = String(user.plan || "free").trim().toLowerCase();
-
-    if (
-      user.expire_at &&
-      new Date() > new Date(user.expire_at)
-    ) {
-      plan = "free";
-    }
-
-const now = new Date();
-
-const expireAt =
-  user.expire_at
-    ? new Date(user.expire_at)
-    : null;
-
-const isActive =
-  expireAt && expireAt > now;
-
-const daysLeft =
-  expireAt
-    ? Math.max(
-        0,
-        Math.ceil(
-          (expireAt - now)
-          / (1000 * 60 * 60 * 24)
-        )
-      )
-    : 0;
-
-    return res.json({
-
-  id: user.id,
-
-  licensed:
-    plan !== "free",
-
-  isActive,
-
-  daysLeft,
-
-  plan,
-
-  cycle:
-    user.cycle || "month",
-
-  expireAt:
-    user.expire_at || null
-
-});
-
-  } catch (err) {
-
-    console.log("ME ERROR:", err);
-
-    res.status(500).json({
-      error: "SERVER_ERROR"
-    });
-  }
-});
 // =========================
 // CHECK (LIMIT)
 // =========================
@@ -973,8 +875,16 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
 // =========================
 // START SERVER
 // =========================
+const http = require("http");
+
+const server = http.createServer(app);
+
 initDB().then(() => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log("🚀 Server chạy port", PORT);
-  });
+
+    server.listen(PORT, "0.0.0.0", () => {
+
+        console.log("🚀 Server chạy port", PORT);
+
+    });
+
 });
