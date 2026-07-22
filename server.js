@@ -127,7 +127,11 @@ app.use("/api", require("./routes/uploadBill"));
 app.use("/api", require("./routes/user"));
 app.use("/api", require("./routes/upgrade"));
 app.use("/api", require("./routes/webhook"));
-app.use("/api", require("./routes/auth"));
+const authRoutes = require("./routes/auth");
+
+console.log("AUTH ROUTES =", authRoutes);
+
+app.use("/api", authRoutes);
 app.use("/api", require("./routes/plans"));
 app.use("/api", require("./routes/feature.routes"));
 app.use("/api", require("./routes/usage"));

@@ -1,3 +1,6 @@
+console.log("################################");
+console.log("AUTH ROUTE LOADED");
+console.log("################################");
 const authMiddleware = require("../middleware/auth");
 const express = require("express");
 const jwt = require("jsonwebtoken");
