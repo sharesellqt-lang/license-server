@@ -132,6 +132,13 @@ const authRoutes = require("./routes/auth");
 console.log("AUTH ROUTES =", authRoutes);
 
 app.use("/api", authRoutes);
+app._router.stack.forEach((layer) => {
+    if (layer.route) {
+        console.log(layer.route.path);
+    } else if (layer.name === "router") {
+        console.log("ROUTER:", layer.regexp);
+    }
+});
 app.use("/api", require("./routes/plans"));
 app.use("/api", require("./routes/feature.routes"));
 app.use("/api", require("./routes/usage"));
