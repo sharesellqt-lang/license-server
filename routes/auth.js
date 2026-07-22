@@ -137,6 +137,7 @@ router.post(
 );
 
 router.get("/me", authMiddleware, async (req, res) => {
+  console.log(">>> /api/me reached");
 
   try {
 
