@@ -546,6 +546,8 @@ module.exports = {
 
     deleteMetrics,
 
-    syncCoinGecko
+    syncCoinGecko,
+
+    syncMarketData
 
 };
