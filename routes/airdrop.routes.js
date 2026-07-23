@@ -2506,39 +2506,24 @@ router.get(
 router.patch(
     "/projects/:id/watchlist",
     authMiddleware,
-    async(req,res)=>{
+    async (req,res)=>{
 
         try {
 
-            const {
-                watchlist
-            } = req.body;
+            const result =
+                await projectService.updateWatchlist(
+                    req.params.id,
+                    req.body.watchlist
+                );
 
 
-            await db.query(
-                `
-                UPDATE airdrop_projects
-                SET watchlist=?
-                WHERE id=?
-                `,
-                [
-                    watchlist,
-                    req.params.id
-                ]
-            );
-
-
-            res.json({
-                success:true,
-                watchlist
-            });
-
+            res.json(result);
 
         }
         catch(err){
 
             console.error(
-                "WATCHLIST UPDATE ERROR:",
+                "[WATCHLIST UPDATE]",
                 err
             );
 

@@ -239,6 +239,39 @@ async function deleteProject(userId, id) {
     };
 }
 
+async function updateWatchlist(
+    projectId,
+    watchlist
+){
+
+    const value =
+        Number(watchlist) === 1
+            ? 1
+            : 0;
+
+
+    const [result] =
+        await db.query(
+            `
+            UPDATE airdrop_projects
+            SET watchlist=?
+            WHERE id=?
+            `,
+            [
+                value,
+                projectId
+            ]
+        );
+
+
+    return {
+        success:true,
+        watchlist:value,
+        affectedRows:
+            result.affectedRows
+    };
+
+}
 /* =========================================
    GET PROJECTS BY USER (LIST)
 ========================================= */
@@ -470,6 +503,7 @@ module.exports = {
     createProject,
     updateProject,
     deleteProject,
+    updateWatchlist,
     getProjectById,
     getProjectsByUser,
     getProjects,
