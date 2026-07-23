@@ -88,7 +88,11 @@ function normalizeProjectInput(data = {}) {
         status: data.status || "on",
         result: data.result || "pending",
         fees: data.fees || null,
-        source: data.source || "manual"
+        source: data.source || "manual",
+        coingecko_id:
+    String(
+        data.coingecko_id || ""
+    ).trim(),
     };
 }
 
@@ -116,10 +120,11 @@ async function createProject(userId, data) {
             result,
             fees,
             source,
+            coingecko_id,
             created_at,
             updated_at
         )
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const now = Date.now();
@@ -137,6 +142,7 @@ async function createProject(userId, data) {
         p.result,
         p.fees,
         p.source,
+        p.coingecko_id,
         now,
         now
     ];
@@ -169,13 +175,32 @@ SYNC MARKET
 
 try{
 
-    await metricsService.syncMarketData({
+  if (p.coingecko_id) {
 
-        id: projectId,
+    try {
 
-        name: p.name
+        await metricsService.syncCoinGecko(
 
-    });
+            projectId,
+
+            p.coingecko_id
+
+        );
+
+    }
+    catch (err) {
+
+        console.log(
+
+            "CoinGecko:",
+
+            err.message
+
+        );
+
+    }
+
+}
 
 }
 catch(err){
