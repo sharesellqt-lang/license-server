@@ -141,60 +141,66 @@ async function createProject(userId, data) {
         now
     ];
 
-    const [result] = await db.query(sql, values);
-
-    if (!result.insertId) {
-        return {
-            success: false,
-            message: "Insert failed"
-        };
-    }
-
     const projectId = result.insertId;
+
+/*
+-------------------------------------
+SYNC MARKET
+-------------------------------------
+*/
+
+try{
 
     await metricsService.syncMarketData({
 
-        id:projectId,
+        id: projectId,
 
-        name:p.name
+        name: p.name
 
     });
 
+}
+catch(err){
+
+    console.log(
+
+        "Sync Market:",
+
+        err.message
+
+    );
+
+}
+
+/*
+-------------------------------------
+ANALYSIS
+-------------------------------------
+*/
+
+try{
+
     await analysisService.analyzeProject(
 
-    userId,
+        userId,
 
-    projectId
+        projectId
 
-);
-
-    /*
-    -------------------------------------
-    CREATE DEFAULT METRICS
-    -------------------------------------
-    */
-
-    await db.query(
-    `
-    INSERT INTO airdrop_project_metrics
-    (
-        project_id,
-        created_at,
-        updated_at
-    )
-    VALUES
-    (
-        ?,
-        ?,
-        ?
-    )
-    `,
-    [
-        projectId,
-        now,
-        now
-    ]
     );
+
+}
+catch(err){
+
+    console.log(
+
+        "Analysis:",
+
+        err.message
+
+    );
+
+}
+  
 
     return {
         success: true,
