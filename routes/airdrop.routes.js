@@ -2503,42 +2503,28 @@ router.get(
     }
 );
 
-router.put(
-    "/projects/:id",
+router.patch(
+    "/projects/:id/watchlist",
     authMiddleware,
-    async (req, res) => {
+    async(req,res)=>{
 
         try {
-
-            console.log(
-                "WATCHLIST REQUEST:",
-                req.params.id,
-                req.body
-            );
-
 
             const {
                 watchlist
             } = req.body;
 
 
-            const [result] =
-                await db.query(
-                    `
-                    UPDATE airdrop_projects
-                    SET watchlist=?
-                    WHERE id=?
-                    `,
-                    [
-                        watchlist,
-                        req.params.id
-                    ]
-                );
-
-
-            console.log(
-                "MYSQL UPDATE:",
-                result
+            await db.query(
+                `
+                UPDATE airdrop_projects
+                SET watchlist=?
+                WHERE id=?
+                `,
+                [
+                    watchlist,
+                    req.params.id
+                ]
             );
 
 
@@ -2558,8 +2544,7 @@ router.put(
 
 
             res.status(500).json({
-                error:
-                err.message
+                error:err.message
             });
 
         }
