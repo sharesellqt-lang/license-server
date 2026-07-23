@@ -37,13 +37,27 @@ app.use((req,res,next)=>{
 // CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
 // =========================
 const corsOptions = {
-  origin: "https://sharesell.net",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+    origin: "https://sharesell.net",
+
+    credentials: true,
+
+    methods: [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS"
+    ],
+
+    allowedHeaders: [
+        "Content-Type",
+        "Authorization"
+    ]
 };
 
-// 👉 MUST BE FIRST MIDDLEWARE
+
+// MUST BE FIRST
 app.use(cors(corsOptions));
 
 // 👉 handle preflight
