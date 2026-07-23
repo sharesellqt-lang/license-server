@@ -148,10 +148,41 @@ async function createProject(userId, data) {
         };
     }
 
+    const projectId = result.insertId;
+
+
+    /*
+    -------------------------------------
+    CREATE DEFAULT METRICS
+    -------------------------------------
+    */
+
+    await db.query(
+    `
+    INSERT INTO airdrop_project_metrics
+    (
+        project_id,
+        created_at,
+        updated_at
+    )
+    VALUES
+    (
+        ?,
+        ?,
+        ?
+    )
+    `,
+    [
+        projectId,
+        now,
+        now
+    ]
+    );
+
     return {
         success: true,
         data: {
-            id: result.insertId,
+            id: projectId,
             user_id: userId,
             ...p,
             created_at: now,
