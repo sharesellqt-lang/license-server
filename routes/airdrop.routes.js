@@ -2541,6 +2541,52 @@ router.patch(
     }
 );
 
+router.post(
+"/projects/:id/sync-market",
+authMiddleware,
+async(req,res)=>{
+
+try{
+
+
+const result =
+await metricsService.syncCoinGecko(
+    req.params.id,
+    req.body.coinId
+);
+
+
+res.json({
+
+success:true,
+
+data:result
+
+});
+
+
+}
+catch(err){
+
+console.error(
+"[SYNC MARKET]",
+err
+);
+
+
+res.status(500).json({
+
+success:false,
+
+message:err.message
+
+});
+
+}
+
+
+});
+
 /* =========================================
    EXPORT
 ========================================= */

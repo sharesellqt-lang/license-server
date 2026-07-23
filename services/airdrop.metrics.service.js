@@ -5,6 +5,8 @@
 "use strict";
 
 const db = require("../db");
+const coingecko =
+    require("./collectors/coingecko.collector");
 function normalizeMetrics(data = {}) {
 
     return {
@@ -468,6 +470,35 @@ async function deleteMetrics(projectId) {
 
 }
 
+async function syncCoinGecko(
+    projectId,
+    coinId
+){
+
+    if(!coinId){
+
+        throw new Error(
+            "Missing CoinGecko ID"
+        );
+
+    }
+
+
+    const data =
+        await coingecko.fetchById(
+            coinId
+        );
+
+
+    await saveMetrics(
+        projectId,
+        data
+    );
+
+
+    return data;
+
+}
 /* =========================================
    EXPORT
 ========================================= */
@@ -488,6 +519,8 @@ module.exports = {
 
     saveMetrics,
 
-    deleteMetrics
+    deleteMetrics,
+    
+    syncCoinGecko
 
 };
