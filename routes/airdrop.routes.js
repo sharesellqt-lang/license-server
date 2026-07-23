@@ -2503,36 +2503,69 @@ router.get(
     }
 );
 
-
 router.put(
     "/projects/:id",
     authMiddleware,
     async (req, res) => {
 
-    const {
-        watchlist
-    } = req.body;
+        try {
+
+            console.log(
+                "WATCHLIST REQUEST:",
+                req.params.id,
+                req.body
+            );
 
 
-    await db.query(
-`
-UPDATE airdrop_projects
-SET watchlist=?
-WHERE id=?
-`,
-[
-watchlist,
-req.params.id
-]
+            const {
+                watchlist
+            } = req.body;
+
+
+            const [result] =
+                await db.query(
+                    `
+                    UPDATE airdrop_projects
+                    SET watchlist=?
+                    WHERE id=?
+                    `,
+                    [
+                        watchlist,
+                        req.params.id
+                    ]
+                );
+
+
+            console.log(
+                "MYSQL UPDATE:",
+                result
+            );
+
+
+            res.json({
+                success:true,
+                watchlist
+            });
+
+
+        }
+        catch(err){
+
+            console.error(
+                "WATCHLIST UPDATE ERROR:",
+                err
+            );
+
+
+            res.status(500).json({
+                error:
+                err.message
+            });
+
+        }
+
+    }
 );
-
-
-res.json({
- success:true
-});
-
-
-});
 
 /* =========================================
    EXPORT
