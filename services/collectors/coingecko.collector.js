@@ -55,7 +55,15 @@ async function fetchById(
                 timeout: 10000
             }
         );
+console.log(
+    "CoinGecko status:",
+    response.status
+);
 
+console.log(
+    "CoinGecko symbol:",
+    response.data.symbol
+);
 
     const data =
         response.data;
