@@ -10,6 +10,9 @@ const express =
 const router =
     express.Router();
 
+const db =
+    require("../config/db");
+
 /* =========================================
    MIDDLEWARE
 ========================================= */
@@ -68,6 +71,7 @@ const rankingService =
 
 const alertService =
     require("../services/airdrop.alert.service");
+
 /* =========================================
    GET
    /api/airdrop/scan
@@ -530,13 +534,27 @@ router.get(
 
     );
 
-            const analysis =
-
+        const analysis =
                 analysisService.analyze(
-
                     context
-
                 );
+
+            await db.query(
+            `
+            UPDATE airdrop_projects
+            SET
+                score=?,
+                risk=?,
+                updated_at=?
+            WHERE id=?
+            `,
+            [
+                analysis.score?.overall_score || 0,
+                analysis.risk?.risk_score || 0,
+                Date.now(),
+                req.project.id
+            ]
+            );
 
             return res.json({
 
