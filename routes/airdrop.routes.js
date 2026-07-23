@@ -539,21 +539,10 @@ router.get(
                     context
                 );
 
-            await db.query(
-            `
-            UPDATE airdrop_projects
-            SET
-                score=?,
-                risk=?,
-                updated_at=?
-            WHERE id=?
-            `,
-            [
+        await projectService.updateAnalysisScore(
+                req.project.id,
                 analysis.score?.overall_score || 0,
-                analysis.risk?.risk_score || 0,
-                Date.now(),
-                req.project.id
-            ]
+                analysis.risk?.risk_score || 0
             );
 
             return res.json({

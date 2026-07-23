@@ -491,6 +491,31 @@ async function getProjects(userId){
     return rows;
 
 }
+
+async function updateAnalysisScore(
+    id,
+    score,
+    risk
+){
+
+    await db.query(
+        `
+        UPDATE airdrop_projects
+        SET
+            score=?,
+            risk=?,
+            updated_at=?
+        WHERE id=?
+        `,
+        [
+            score,
+            risk,
+            Date.now(),
+            id
+        ]
+    );
+
+}
 /* =========================================
    EXPORTS
 ========================================= */
@@ -511,5 +536,6 @@ module.exports = {
     upsertProject,
     exportJson,
     exportCsv,
-    getStatistics
+    getStatistics,
+    updateAnalysisScore
 };

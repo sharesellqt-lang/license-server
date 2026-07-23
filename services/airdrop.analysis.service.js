@@ -26,7 +26,7 @@ const recommendation =
    ANALYZE
 ========================================= */
 
-function analyze(context = {}) {
+async function analyze(context = {}) {
 
     const project =
 
