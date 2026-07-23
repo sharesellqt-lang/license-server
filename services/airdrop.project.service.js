@@ -7,6 +7,8 @@
 const db = require("../db");
 const metricsService =
 require("./airdrop.metrics.service");
+const analysisService =
+    require("./airdrop.analysis.service");
 
 /* =========================================
    INIT TABLE (SAFE AUTO MIGRATION)

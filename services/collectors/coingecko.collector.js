@@ -27,174 +27,165 @@ async function fetchById(
 
     }
 
-
     const url =
         `${BASE_URL}/coins/${coinId}`;
 
+    console.log(
+        "CoinGecko URL:",
+        url
+    );
 
-    const response =
-        await axios.get(
-            url,
-            {
-                params: {
+    try {
 
-                    localization: false,
+        const response =
+            await axios.get(
+                url,
+                {
+                    params: {
 
-                    tickers: false,
+                        localization: false,
 
-                    market_data: true,
+                        tickers: false,
 
-                    community_data: false,
+                        market_data: true,
 
-                    developer_data: false,
+                        community_data: false,
 
-                    sparkline: false
+                        developer_data: false,
 
-                },
+                        sparkline: false
 
-                timeout: 10000
-            }
+                    },
+
+                    timeout: 10000
+                }
+            );
+
+        console.log(
+            "CoinGecko status:",
+            response.status
         );
-console.log(
-    "CoinGecko status:",
-    response.status
-);
 
-console.log(
-    "CoinGecko symbol:",
-    response.data.symbol
-);
+        console.log(
+            "CoinGecko symbol:",
+            response.data.symbol
+        );
 
-    const data =
-        response.data;
+        const data =
+            response.data;
 
+        const market =
+            data.market_data || {};
 
-    const market =
-        data.market_data || {};
+        return {
 
+            // =========================
+            // BASIC
+            // =========================
 
-    return {
+            token_symbol:
+                data.symbol
+                    ? data.symbol.toUpperCase()
+                    : "",
 
-        // =========================
-        // BASIC
-        // =========================
+            name:
+                data.name || "",
 
-        token_symbol:
-            data.symbol
-                ? data.symbol.toUpperCase()
-                : "",
+            // =========================
+            // PRICE
+            // =========================
 
+            current_price:
+                market.current_price?.usd || 0,
 
-        name:
-            data.name || "",
+            // =========================
+            // MARKET CAP
+            // =========================
 
+            market_cap:
+                market.market_cap?.usd || 0,
 
-        // =========================
-        // PRICE
-        // =========================
+            // =========================
+            // FDV
+            // =========================
 
-        current_price:
+            fdv:
+                market.fully_diluted_valuation?.usd || 0,
 
-            market.current_price?.usd || 0,
+            // =========================
+            // SUPPLY
+            // =========================
 
+            total_supply:
+                market.total_supply || 0,
 
-        // =========================
-        // MARKET CAP
-        // =========================
+            circulating_supply:
+                market.circulating_supply || 0,
 
-        market_cap:
+            max_supply:
+                market.max_supply || 0,
 
-            market.market_cap?.usd || 0,
+            // =========================
+            // ATH / ATL
+            // =========================
 
+            ath_price:
+                market.ath?.usd || 0,
 
-        // =========================
-        // FDV
-        // =========================
+            atl_price:
+                market.atl?.usd || 0,
 
-        fdv:
+            // =========================
+            // VOLUME
+            // =========================
 
-            market.fully_diluted_valuation?.usd
-            ||
-            0,
+            volume_24h:
+                market.total_volume?.usd || 0,
 
+            price_change_24h:
+                market.price_change_percentage_24h || 0,
 
-        // =========================
-        // SUPPLY
-        // =========================
+            price_change_7d:
+                market.price_change_percentage_7d || 0,
 
-        total_supply:
+            price_change_30d:
+                market.price_change_percentage_30d || 0
 
-            market.total_supply
-            ||
-            0,
+        };
 
+    }
+    catch (err) {
 
-        circulating_supply:
+        console.log(
+            "=============================="
+        );
 
-            market.circulating_supply
-            ||
-            0,
+        console.log(
+            "CoinGecko ERROR"
+        );
 
+        console.log(
+            "Status:",
+            err.response?.status
+        );
 
-        max_supply:
+        console.log(
+            "Body:",
+            err.response?.data
+        );
 
-            market.max_supply
-            ||
-            0,
+        console.log(
+            "Message:",
+            err.message
+        );
 
+        console.log(
+            "=============================="
+        );
 
-        // =========================
-        // ATH / ATL
-        // =========================
+        throw err;
 
-        ath_price:
-
-            market.ath?.usd
-            ||
-            0,
-
-
-        atl_price:
-
-            market.atl?.usd
-            ||
-            0,
-
-
-        // =========================
-        // VOLUME
-        // =========================
-
-        volume_24h:
-
-            market.total_volume?.usd
-            ||
-            0,
-
-
-        price_change_24h:
-
-            market.price_change_percentage_24h
-            ||
-            0,
-
-
-        price_change_7d:
-
-            market.price_change_percentage_7d
-            ||
-            0,
-
-
-        price_change_30d:
-
-            market.price_change_percentage_30d
-            ||
-            0
-
-
-    };
-
+    }
 
 }
 
