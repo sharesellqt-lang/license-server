@@ -5,6 +5,8 @@
 "use strict";
 
 const db = require("../db");
+const metricsService =
+require("./airdrop.metrics.service");
 
 /* =========================================
    INIT TABLE (SAFE AUTO MIGRATION)
