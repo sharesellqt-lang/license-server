@@ -473,6 +473,9 @@ async function syncCoinGecko(
     projectId,
     coinId
 ){
+    console.log("========== SYNC COINGECKO ==========");
+console.log("projectId =", projectId);
+console.log("coinId =", coinId);
 
     if(!coinId){
 
@@ -487,13 +490,13 @@ async function syncCoinGecko(
         await coingecko.fetchById(
             coinId
         );
-
+console.log("CoinGecko DATA:", data);
 
     await saveMetrics(
         projectId,
         data
     );
-
+console.log("Metrics saved.");
 
     return data;
 
