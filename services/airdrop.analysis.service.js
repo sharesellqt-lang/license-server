@@ -22,6 +22,12 @@ const score =
 const recommendation =
     require("./analysis/recommendation");
 
+const db =
+require("../db");
+
+const contextService =
+require("./airdrop.context.service");
+
 /* =========================================
    ANALYZE
 ========================================= */
@@ -218,12 +224,66 @@ return {
 
 }
 
+async function analyzeProject(
+    userId,
+    projectId
+){
+
+    const context =
+        await contextService.getProjectContext(
+
+            userId,
+
+            projectId
+
+        );
+
+
+    const analysis =
+        analyze(
+            context
+        );
+
+
+    await db.query(
+`
+UPDATE airdrop_projects
+SET
+
+score=?,
+
+risk=? ,
+
+updated_at=?
+
+WHERE id=?
+
+`,
+[
+
+analysis.score?.overall_score || 0,
+
+analysis.risk?.risk_score || 0,
+
+Date.now(),
+
+projectId
+
+]);
+
+
+    return analysis;
+
+}
+
 /* =========================================
    EXPORTS
 ========================================= */
 
 module.exports = {
 
-    analyze
+    analyze,
+
+    analyzeProject
 
 };

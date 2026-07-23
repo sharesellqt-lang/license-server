@@ -150,6 +150,21 @@ async function createProject(userId, data) {
 
     const projectId = result.insertId;
 
+    await metricsService.syncMarketData({
+
+        id:projectId,
+
+        name:p.name
+
+    });
+
+    await analysisService.analyzeProject(
+
+    userId,
+
+    projectId
+
+);
 
     /*
     -------------------------------------

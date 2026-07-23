@@ -499,6 +499,31 @@ async function syncCoinGecko(
     return data;
 
 }
+
+async function syncMarketData(project){
+
+    const coins =
+        await coingecko.searchCoin(
+            project.name
+        );
+
+    if(!coins.length){
+
+        throw new Error(
+            "Coin not found"
+        );
+
+    }
+
+    return syncCoinGecko(
+
+        project.id,
+
+        coins[0].id
+
+    );
+
+}
 /* =========================================
    EXPORT
 ========================================= */
@@ -520,7 +545,7 @@ module.exports = {
     saveMetrics,
 
     deleteMetrics,
-    
+
     syncCoinGecko
 
 };
