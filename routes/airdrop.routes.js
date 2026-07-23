@@ -2503,6 +2503,37 @@ router.get(
     }
 );
 
+
+router.put(
+"/projects/:id",
+auth,
+async(req,res)=>{
+
+    const {
+        watchlist
+    } = req.body;
+
+
+    await db.query(
+`
+UPDATE airdrop_projects
+SET watchlist=?
+WHERE id=?
+`,
+[
+watchlist,
+req.params.id
+]
+);
+
+
+res.json({
+ success:true
+});
+
+
+});
+
 /* =========================================
    EXPORT
 ========================================= */
