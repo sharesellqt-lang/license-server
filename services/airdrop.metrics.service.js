@@ -318,14 +318,13 @@ const now = Date.now();
 
 async function updateMetrics(projectId, data = {}) {
 
-    const metric =
-     data = {
+   const metric = {
 
-        ...defaultMetrics(),
+    ...defaultMetrics(),
 
-        ...normalizeMetrics(data)
+    ...normalizeMetrics(data)
 
-    };
+};
 
     const now = Date.now();
 

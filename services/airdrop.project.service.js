@@ -141,6 +141,24 @@ async function createProject(userId, data) {
         now
     ];
 
+    const [result] =
+    await db.query(
+        sql,
+        values
+    );
+
+if (!result.insertId) {
+
+    return {
+
+        success: false,
+
+        message: "Insert failed"
+
+    };
+
+}
+
     const projectId = result.insertId;
 
 /*
