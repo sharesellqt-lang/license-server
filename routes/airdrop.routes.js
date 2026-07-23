@@ -2505,9 +2505,9 @@ router.get(
 
 
 router.put(
-"/projects/:id",
-auth,
-async(req,res)=>{
+    "/projects/:id",
+    authMiddleware,
+    async (req, res) => {
 
     const {
         watchlist
