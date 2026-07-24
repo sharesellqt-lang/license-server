@@ -128,9 +128,30 @@ const source = {
     /* -------------------------------------
        SCORE
     ------------------------------------- */
+    console.log("===== SCORE INPUT =====");
+
+    console.log({
+
+        network: project.network,
+
+        contract: project.contract_address,
+
+        url: project.url,
+
+        coingecko: project.coingecko_id,
+
+        liquidity: source.liquidity,
+
+        volume: source.volume_24h,
+
+        marketCap: source.market_cap
+
+    });
 
     const scoreData =
         score.calculate({
+
+            ...project,
 
             ...source,
 
