@@ -604,22 +604,65 @@ async function syncMarketData(project) {
 
     ) {
 
-        console.log("Using GeckoTerminal");
+        try {
 
-        data =
-            await gecko.fetchToken(
+            console.log("Using GeckoTerminal");
 
-                project.network,
+            data =
+                await gecko.fetchToken(
 
-                project.contract_address
+                    project.network,
 
-            );
+                    project.contract_address
+
+                );
+
+        }
+        catch (err) {
+
+            console.log("========== GECKOTERMINAL ERROR ==========");
+            console.log(err.message);
+
+            /*
+            -------------------------------------
+            FALLBACK COINGECKO
+            -------------------------------------
+            */
+
+            if (
+
+                project.coingecko_id
+
+            ) {
+
+                try {
+
+                    console.log("Fallback -> CoinGecko");
+
+                    data =
+                        await coingecko.fetchById(
+
+                            project.coingecko_id
+
+                        );
+
+                }
+                catch (cgErr) {
+
+                    console.log("========== COINGECKO ERROR ==========");
+                    console.log(cgErr.message);
+
+                }
+
+            }
+
+        }
 
     }
 
     /*
     =====================================
-    COINGECKO
+    COINGECKO ONLY
     =====================================
     */
 
@@ -629,14 +672,24 @@ async function syncMarketData(project) {
 
     ) {
 
-        console.log("Using CoinGecko");
+        try {
 
-        data =
-            await coingecko.fetchById(
+            console.log("Using CoinGecko");
 
-                project.coingecko_id
+            data =
+                await coingecko.fetchById(
 
-            );
+                    project.coingecko_id
+
+                );
+
+        }
+        catch (err) {
+
+            console.log("========== COINGECKO ERROR ==========");
+            console.log(err.message);
+
+        }
 
     }
 
@@ -648,11 +701,23 @@ async function syncMarketData(project) {
 
     else {
 
-        throw new Error(
+        console.log("Missing market source");
 
-            "Missing market source"
+        return null;
 
-        );
+    }
+
+    /*
+    =====================================
+    NO DATA
+    =====================================
+    */
+
+    if (!data) {
+
+        console.log("No market data");
+
+        return null;
 
     }
 
@@ -662,17 +727,17 @@ async function syncMarketData(project) {
     =====================================
     */
 
-   await saveMetrics(
+    await saveMetrics(
 
-    project.id,
+        project.id,
 
-    data
+        data
 
-);
+    );
 
-console.log("Metrics saved");
+    console.log("Metrics saved");
 
-return data;
+    return data;
 
 }
 /* =========================================
