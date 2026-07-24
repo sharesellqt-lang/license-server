@@ -247,6 +247,73 @@ async function analyzeProject(
     );
 
 console.log("analysis =", analysis);
+
+await db.query(
+`
+UPDATE airdrop_project_metrics
+SET
+
+circulating_percent=?,
+locked_percent=?,
+inflation=?,
+
+risk_score=?,
+risk_level=?,
+
+seed_roi=?,
+private_roi=?,
+public_roi=?,
+
+team_score=?,
+investor_score=?,
+partner_score=?,
+tokenomics_score=?,
+financial_score=?,
+community_score=?,
+development_score=?,
+onchain_score=?,
+
+total_score=?,
+
+recommendation=?,
+
+updated_at=?
+
+WHERE project_id=?
+`,
+[
+
+analysis.tokenomics?.circulating_percent || 0,
+analysis.tokenomics?.locked_percent || 0,
+analysis.tokenomics?.inflation || 0,
+
+analysis.risk?.risk_score || 0,
+analysis.risk?.risk_level || "medium",
+
+analysis.roi?.seed_roi || 0,
+analysis.roi?.private_roi || 0,
+analysis.roi?.public_roi || 0,
+
+analysis.score?.team_score || 0,
+analysis.score?.investor_score || 0,
+analysis.score?.partner_score || 0,
+analysis.score?.tokenomics_score || 0,
+analysis.score?.financial_score || 0,
+analysis.score?.community_score || 0,
+analysis.score?.development_score || 0,
+analysis.score?.onchain_score || 0,
+
+analysis.score?.overall_score || 0,
+
+analysis.recommendation?.recommendation || null,
+
+Date.now(),
+
+projectId
+
+]
+);
+
 const [result] =
     await db.query(
         `
