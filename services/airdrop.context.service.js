@@ -69,9 +69,7 @@ return {
 
     team,
 
-    notes,
-
-    analysis
+    notes
 
 };
 
