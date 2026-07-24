@@ -247,31 +247,23 @@ async function analyzeProject(
     );
 
 console.log("analysis =", analysis);
+const [result] =
     await db.query(
-`
-UPDATE airdrop_projects
-SET
-
-score=?,
-
-risk=? ,
-
-updated_at=?
-
-WHERE id=?
-
-`,
-[
-
-analysis.score?.overall_score || 0,
-
-analysis.risk?.risk_score || 0,
-
-Date.now(),
-
-projectId
-
-]);
+        `
+        UPDATE airdrop_projects
+        SET
+            score=?,
+            risk=?,
+            updated_at=?
+        WHERE id=?
+        `,
+        [
+            analysis.score?.overall_score || 0,
+            analysis.risk?.risk_score || 0,
+            Date.now(),
+            projectId
+        ]
+    );
 
 console.log(result);
     return analysis;

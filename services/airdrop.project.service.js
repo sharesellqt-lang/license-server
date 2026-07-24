@@ -240,7 +240,7 @@ ANALYSIS
 */
 
 try{
-console.log("Before analyze");
+console.log("CALL analyzeProject");
     await analysisService.analyzeProject(
 
         userId,
@@ -248,17 +248,12 @@ console.log("Before analyze");
         projectId
 
     );
-console.log("After analyze");
+console.log("AFTER analyzeProject");
 }
 catch(err){
 
-    console.log(
-
-        "Analysis:",
-
-        err.message
-
-    );
+    console.error("Analysis ERROR:");
+    console.error(err);
 
 }
   
