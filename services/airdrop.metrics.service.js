@@ -591,110 +591,150 @@ console.log("Metrics saved.");
 
 }
 
-async function syncMarketData(project) {
+async function syncMarketData(project){
 
-    console.log("========== syncMarketData ==========");
-    console.log(project);
+console.log(
+"========== syncMarketData =========="
+);
 
-    let data = null;
+console.log(project);
 
-    /*
-    =====================================
-    GECKOTERMINAL
-    =====================================
-    */
 
-    if (
+let data=null;
 
-        project.network &&
-        project.contract_address
 
-    ) {
+/*
+==============================
+GECKOTERMINAL
+==============================
+*/
 
-        try {
 
-            console.log("Using GeckoTerminal");
+if(
+project.network &&
+project.contract_address
+){
 
-            data = await gecko.fetchToken(
+console.log(
+"TRY GeckoTerminal"
+);
 
-                project.network,
-                project.contract_address
 
-            );
+try{
 
-        }
-        catch (err) {
+data =
+await gecko.fetchToken(
 
-            console.log(err.message);
+project.network,
 
-            /*
-            =====================================
-            FALLBACK COINGECKO
-            =====================================
-            */
+project.contract_address
 
-            if (project.coingecko_id) {
+);
 
-                console.log("Fallback CoinGecko");
 
-                data = await coingecko.fetchById(
+}
 
-                    project.coingecko_id
+catch(err){
 
-                );
+console.log(
+"Gecko failed:",
+err.message
+);
 
-            }
 
-        }
+}
 
-    }
+}
 
-    /*
-    =====================================
-    COINGECKO
-    =====================================
-    */
 
-    else if (
 
-        project.coingecko_id
+/*
+==============================
+COINGECKO FALLBACK
+==============================
+*/
 
-    ) {
 
-        console.log("Using CoinGecko");
+if(
+!data &&
+project.coingecko_id
+){
 
-        data = await coingecko.fetchById(
+console.log(
+"TRY CoinGecko"
+);
 
-            project.coingecko_id
 
-        );
+try{
 
-    }
 
-    /*
-    =====================================
-    SAVE
-    =====================================
-    */
+data =
+await coingecko.fetchById(
 
-    if (!data) {
+project.coingecko_id
 
-        console.log("No market data");
+);
 
-        return null;
 
-    }
+}
 
-    await saveMetrics(
+catch(err){
 
-        project.id,
-        data
+console.log(
+"CoinGecko failed:",
+err.message
 
-    );
+);
 
-    console.log("Metrics saved");
+}
 
-    return data;
+
+}
+
+
+
+/*
+==============================
+NO DATA
+==============================
+*/
+
+
+if(!data){
+
+console.log(
+"No market data"
+);
+
+return null;
+
+}
+
+
+
+/*
+==============================
+SAVE
+==============================
+*/
+
+
+await saveMetrics(
+
+project.id,
+
+data
+
+);
+
+
+console.log(
+"Metrics saved"
+);
+
+
+return data;
+
 
 }
 /* =========================================

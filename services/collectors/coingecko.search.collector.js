@@ -1,242 +1,100 @@
 "use strict";
 
+
 const axios = require("axios");
 
 
 const BASE =
-    "https://api.coingecko.com/api/v3";
+"https://api.coingecko.com/api/v3";
 
 
-/*
-=========================================
-SEARCH COIN
-=========================================
-*/
 
 async function searchCoin(query){
 
-    if(!query){
 
-        throw new Error(
-            "Missing search query"
-        );
+if(!query){
 
-    }
+throw new Error(
+"Missing search query"
+);
 
-
-    const url =
-        `${BASE}/search`;
+}
 
 
-    try{
+try{
 
 
-        const response =
-            await axios.get(
+const res =
+await axios.get(
 
-                url,
+`${BASE}/search`,
 
-                {
-                    params:{
-                        query
-                    },
+{
 
-                    timeout:10000
-                }
+params:{
+query
+},
 
-            );
+timeout:10000
 
+}
 
-        const coins =
-            response.data?.coins || [];
-
-
-        if(
-            !coins.length
-        ){
-
-            return null;
-
-        }
+);
 
 
 
-        /*
-        =====================================
-        ƯU TIÊN MATCH EXACT
-        =====================================
-        */
+return (
+
+res.data.coins || []
+
+).map(c=>({
+
+id:c.id,
+
+name:c.name,
+
+symbol:c.symbol,
+
+market_cap_rank:
+c.market_cap_rank,
+
+thumb:c.thumb
+
+}));
 
 
-        const lower =
-            query.toLowerCase();
+}
+
+catch(err){
 
 
-
-        let coin =
-            coins.find(
-                c =>
-                c.symbol?.toLowerCase()
-                ===
-                lower
-            );
+console.log(
+"========== COINGECKO SEARCH ERROR =========="
+);
 
 
-
-        if(!coin){
-
-            coin =
-            coins[0];
-
-        }
+console.log(
+err.response?.status
+);
 
 
-
-        return {
-
-            id:
-                coin.id,
+console.log(
+err.response?.data
+);
 
 
-            symbol:
-                coin.symbol,
+throw err;
 
 
-            name:
-                coin.name,
-
-
-            thumb:
-                coin.thumb
-
-        };
-
-
-    }
-    catch(err){
-
-
-        console.log(
-            "========== COINGECKO SEARCH ERROR =========="
-        );
-
-
-        if(err.response){
-
-            console.log(
-                "STATUS:",
-                err.response.status
-            );
-
-            console.log(
-                err.response.data
-            );
-
-        }
-
-
-        throw err;
-
-    }
+}
 
 
 }
 
 
 
-/*
-=========================================
-SEARCH BY CONTRACT
-=========================================
-*/
+module.exports={
 
-
-async function searchByContract(
-    platform,
-    address
-){
-
-    const url =
-        `${BASE}/coins/${platform}/contract/${address}`;
-
-
-    try{
-
-
-        const response =
-            await axios.get(
-
-                url,
-
-                {
-                    timeout:10000
-                }
-
-            );
-
-
-        const data =
-            response.data;
-
-
-        if(!data){
-
-            return null;
-
-        }
-
-
-
-        return {
-
-            id:
-                data.id,
-
-
-            symbol:
-                data.symbol,
-
-
-            name:
-                data.name,
-
-
-            market_data:
-                data.market_data || {}
-
-        };
-
-
-    }
-    catch(err){
-
-
-        if(err.response){
-
-            console.log(
-                "CoinGecko Contract:",
-                err.response.status
-            );
-
-        }
-
-
-        return null;
-
-    }
-
-
-}
-
-
-
-module.exports = {
-
-
-    searchCoin,
-
-
-    searchByContract
-
+searchCoin
 
 };

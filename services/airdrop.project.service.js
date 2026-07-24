@@ -112,11 +112,18 @@ function normalizeProjectInput(data = {}) {
 
 async function createProject(userId, data) {
 
-    validateProject(data);
+validateProject(data);
 
-    const p = normalizeProjectInput(data);
+const p = normalizeProjectInput(data);
 
-    if (
+
+/*
+=====================================
+AUTO FIND COINGECKO ID
+=====================================
+*/
+
+if (
 
     !p.coingecko_id &&
 
@@ -126,16 +133,44 @@ async function createProject(userId, data) {
 
     try{
 
-        p.coingecko_id =
+
+        const coins =
             await coinSearch.searchCoin(
 
                 p.name
 
             );
 
+
+        if (
+
+            coins &&
+
+            coins.length
+
+        ){
+
+            /*
+            ưu tiên coin đầu tiên
+            */
+
+            p.coingecko_id =
+                coins[0].id;
+
+
+            console.log(
+                "AUTO COINGECKO ID:",
+                p.coingecko_id
+            );
+
+
+        }
+
+
     }
 
     catch(err){
+
 
         console.log(
 
@@ -144,6 +179,7 @@ async function createProject(userId, data) {
             err.message
 
         );
+
 
     }
 
@@ -246,21 +282,40 @@ try {
 
         console.log("CALL syncMarketData");
 
-        const market =
-
+       const marketData =
             await metricsService.syncMarketData({
 
-                id: projectId,
+            id:projectId,
 
-                name: p.name,
+            name:p.name,
 
-                network: p.network,
+            network:p.network,
 
-                contract_address: p.contract_address,
+            contract_address:p.contract_address,
 
-                coingecko_id: p.coingecko_id
+            coingecko_id:p.coingecko_id
 
             });
+
+
+            if(!marketData){
+
+            console.log(
+            "Skip analysis because no market data"
+            );
+
+            return {
+
+            success:true,
+
+            data:{
+            id:projectId,
+            ...p
+            }
+
+            };
+
+            }
 
         console.log("RETURN syncMarketData");
 
