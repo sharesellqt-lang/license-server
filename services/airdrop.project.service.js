@@ -192,42 +192,75 @@ console.log("coingecko =", p.coingecko_id);
 
 try {
 
+    const hasGeckoTerminal =
+
+        p.network &&
+        p.contract_address;
+
+    const hasCoinGecko =
+
+        p.coingecko_id;
+
     if (
 
-        p.network ||
+        hasGeckoTerminal ||
 
-        p.contract_address ||
-
-        p.coingecko_id
+        hasCoinGecko
 
     ) {
 
         console.log("CALL syncMarketData");
 
-        await metricsService.syncMarketData({
+        const market =
 
-            id: projectId,
+            await metricsService.syncMarketData({
 
-            name: p.name,
+                id: projectId,
 
-            network: p.network,
+                name: p.name,
 
-            contract_address: p.contract_address,
+                network: p.network,
 
-            coingecko_id: p.coingecko_id
+                contract_address: p.contract_address,
 
-        });
+                coingecko_id: p.coingecko_id
+
+            });
 
         console.log("RETURN syncMarketData");
+
+        console.log(market);
+
+    }
+    else {
+
+        console.log(
+            "Skip market sync (missing source)"
+        );
 
     }
 
 }
 catch(err){
 
-    console.error("SYNC MARKET ERROR");
+    console.log("========== SYNC MARKET ERROR ==========");
 
-    console.error(err);
+    console.log(err.message);
+
+    if (err.response?.status) {
+
+        console.log(
+            "HTTP:",
+            err.response.status
+        );
+
+    }
+
+    if (err.response?.data) {
+
+        console.log(err.response.data);
+
+    }
 
 }
 

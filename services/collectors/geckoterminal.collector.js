@@ -17,98 +17,191 @@ async function fetchToken(
     const url =
 `${BASE}/networks/${network}/tokens/${tokenAddress}`;
 
-    const response =
-        await axios.get(
-            url,
-            {
-                timeout:10000
-            }
-        );
+    try{
+
+        const response =
+            await axios.get(
+                url,
+                {
+                    timeout:10000
+                }
+            );
 
         console.log(
-    JSON.stringify(response.data, null, 2)
-);
+            JSON.stringify(
+                response.data,
+                null,
+                2
+            )
+        );
 
-    if (
-        !response.data ||
-        !response.data.data
-    ){
-        throw new Error("Token not found");
+        if(
+
+            !response.data ||
+
+            !response.data.data
+
+        ){
+
+            throw new Error(
+                "Token not found"
+            );
+
+        }
+
+        const token =
+            response.data.data;
+
+        const attr =
+            token.attributes || {};
+
+        console.log({
+
+            total_supply:
+                attr.total_supply,
+
+            normalized_total_supply:
+                attr.normalized_total_supply,
+
+            circulating_supply:
+                attr.circulating_supply,
+
+            max_supply:
+                attr.max_supply
+
+        });
+
+        return {
+
+            token_symbol:
+                attr.symbol || "",
+
+            current_price:
+                Number(
+                    attr.price_usd ||
+
+                    attr.base_token_price_usd ||
+
+                    0
+                ),
+
+            total_supply:
+                Number(
+
+                    attr.normalized_total_supply ||
+
+                    attr.total_supply ||
+
+                    0
+
+                ),
+
+            circulating_supply:
+                Number(
+
+                    attr.circulating_supply ||
+
+                    attr.normalized_total_supply ||
+
+                    attr.total_supply ||
+
+                    0
+
+                ),
+
+            max_supply:
+                Number(
+
+                    attr.max_supply ||
+
+                    attr.normalized_total_supply ||
+
+                    attr.total_supply ||
+
+                    0
+
+                ),
+
+            market_cap:
+                Number(
+                    attr.market_cap_usd || 0
+                ),
+
+            fdv:
+                Number(
+                    attr.fdv_usd || 0
+                ),
+
+            volume_24h:
+                Number(
+                    attr.volume_usd?.h24 || 0
+                ),
+
+            liquidity:
+                Number(
+
+                    attr.total_reserve_in_usd ||
+
+                    attr.reserve_in_usd ||
+
+                    0
+
+                ),
+
+            price_change_24h:
+                Number(
+                    attr.price_change_percentage?.h24 || 0
+                )
+
+        };
+
     }
+    catch(err){
 
-    const token =
-    response.data.data;
+        if(
 
-    const attr =
-    token.attributes;
+            err.response
 
-    console.log({
+        ){
 
-    total_supply:
-        token?.attributes?.total_supply,
+            console.log(
+                "========== GECKOTERMINAL ERROR =========="
+            );
 
-    normalized_total_supply:
-        token?.attributes?.normalized_total_supply,
+            console.log(
+                "Status:",
+                err.response.status
+            );
 
-    circulating_supply:
-        token?.attributes?.circulating_supply,
+            console.log(
+                JSON.stringify(
+                    err.response.data,
+                    null,
+                    2
+                )
+            );
 
-    max_supply:
-        token?.attributes?.max_supply
+            if(
 
-});
+                err.response.status === 429
 
-return {
+            ){
 
-    token_symbol:
-        token?.attributes?.symbol || "",
+                throw new Error(
+                    "GeckoTerminal rate limit"
+                );
 
-    current_price:
-        Number(attr.base_token_price_usd || 0),
+            }
 
-    total_supply:
-        Number(
-            token?.attributes?.normalized_total_supply ||
-            token?.attributes?.total_supply ||
-            0
-        ),
+        }
 
-    circulating_supply:
-        Number(
-            token?.attributes?.circulating_supply ||
-            token?.attributes?.normalized_total_supply ||
-            token?.attributes?.total_supply ||
-            0
-        ),
+        throw err;
 
-    max_supply:
-        Number(
-            token?.attributes?.max_supply ||
-            token?.attributes?.normalized_total_supply ||
-            token?.attributes?.total_supply ||
-            0
-        ),
-
-    market_cap:
-        Number(attr.market_cap_usd || 0),
-
-    fdv:
-        Number(attr.fdv_usd || 0),
-
-    volume_24h:
-        Number(attr.volume_usd?.h24 || 0),
-
-    liquidity:
-        Number(attr.total_reserve_in_usd || 0),
-
-    price_change_24h:
-        Number(attr.price_change_percentage?.h24 || 0)
-
-};
+    }
 
 }
 
-module.exports={
+module.exports = {
 
     fetchToken
 
