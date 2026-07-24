@@ -141,24 +141,26 @@ function defaultMetrics() {
    GET
 ========================================= */
 
-async function getMetrics(projectId) {
+async function getMetrics(projectId){
 
-    const sql = `
-        SELECT *
-        FROM airdrop_project_metrics
-        WHERE project_id=?
-        LIMIT 1
-    `;
+const sql=`
 
-    const [rows] = await db.query(sql, [projectId]);
+SELECT *
+FROM airdrop_project_metrics
+WHERE project_id=?
+LIMIT 1
 
-    if (!rows.length) {
+`;
 
-        return defaultMetrics();
+const [rows]=
+await db.query(
+sql,
+[projectId]
+);
 
-    }
 
-    return rows[0];
+return rows[0] || null;
+
 
 }
 
@@ -179,6 +181,11 @@ async function getAllMetrics(userId) {
 
     const [rows] =
         await db.query(sql, [userId]);
+
+        console.log(
+"METRICS UPDATED",
+projectId
+);
 
     return rows || [];
 

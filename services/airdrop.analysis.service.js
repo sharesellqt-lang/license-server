@@ -31,6 +31,19 @@ require("./airdrop.context.service");
 /* =========================================
    ANALYZE
 ========================================= */
+function safeNumber(value, fallback = 0){
+
+    value = Number(value);
+
+    if(
+        !Number.isFinite(value)
+    ){
+        return fallback;
+    }
+
+    return value;
+
+}
 
 async function analyze(context = {}) {
 
@@ -283,29 +296,77 @@ WHERE project_id=?
 `,
 [
 
-analysis.tokenomics?.circulating_percent || 0,
-analysis.tokenomics?.locked_percent || 0,
-analysis.tokenomics?.inflation || 0,
+safeNumber(
+    analysis.tokenomics?.circulating_percent
+),
 
-analysis.risk?.risk_score || 0,
+safeNumber(
+    analysis.tokenomics?.locked_percent
+),
+
+safeNumber(
+    analysis.tokenomics?.inflation
+),
+
+
+safeNumber(
+    analysis.risk?.risk_score
+),
+
 analysis.risk?.risk_level || "medium",
 
-analysis.roi?.seed_roi || 0,
-analysis.roi?.private_roi || 0,
-analysis.roi?.public_roi || 0,
 
-analysis.score?.team_score || 0,
-analysis.score?.investor_score || 0,
-analysis.score?.partner_score || 0,
-analysis.score?.tokenomics_score || 0,
-analysis.score?.financial_score || 0,
-analysis.score?.community_score || 0,
-analysis.score?.development_score || 0,
-analysis.score?.onchain_score || 0,
+safeNumber(
+    analysis.roi?.seed_roi
+),
 
-analysis.score?.overall_score || 0,
+safeNumber(
+    analysis.roi?.private_roi
+),
 
-analysis.recommendation?.recommendation || null,
+safeNumber(
+    analysis.roi?.public_roi
+),
+
+
+safeNumber(
+    analysis.score?.team_score
+),
+
+safeNumber(
+    analysis.score?.investor_score
+),
+
+safeNumber(
+    analysis.score?.partner_score
+),
+
+safeNumber(
+    analysis.score?.tokenomics_score
+),
+
+safeNumber(
+    analysis.score?.financial_score
+),
+
+safeNumber(
+    analysis.score?.community_score
+),
+
+safeNumber(
+    analysis.score?.development_score
+),
+
+safeNumber(
+    analysis.score?.onchain_score
+),
+
+
+safeNumber(
+    analysis.score?.overall_score
+),
+
+analysis.recommendation?.recommendation ?? null,
 
 Date.now(),
 
