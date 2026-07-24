@@ -185,51 +185,49 @@ SYNC MARKET
 -------------------------------------
 */
 
-try{
+console.log("========== BEFORE SYNC ==========");
+console.log("network =", p.network);
+console.log("contract =", p.contract_address);
+console.log("coingecko =", p.coingecko_id);
 
-  if (p.coingecko_id) {
+try {
 
-    try {
+    if (
 
-    await metricsService.syncMarketData({
+        p.network ||
 
-    id: projectId,
+        p.contract_address ||
 
-    name: p.name,
+        p.coingecko_id
 
-    coingecko_id: p.coingecko_id,
+    ) {
 
-    network: p.network,
+        console.log("CALL syncMarketData");
 
-    contract_address: p.contract_address
+        await metricsService.syncMarketData({
 
-});
+            id: projectId,
+
+            name: p.name,
+
+            network: p.network,
+
+            contract_address: p.contract_address,
+
+            coingecko_id: p.coingecko_id
+
+        });
+
+        console.log("RETURN syncMarketData");
 
     }
-    catch (err) {
-
-        console.log(
-
-            "CoinGecko:",
-
-            err.message
-
-        );
-
-    }
-
-}
 
 }
 catch(err){
 
-    console.log(
+    console.error("SYNC MARKET ERROR");
 
-        "Sync Market:",
-
-        err.message
-
-    );
+    console.error(err);
 
 }
 

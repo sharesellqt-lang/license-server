@@ -586,6 +586,9 @@ console.log("Metrics saved.");
 
 async function syncMarketData(project) {
 
+    console.log("========== syncMarketData ==========");
+    console.log(project);
+
     let data = null;
 
     /*
@@ -659,17 +662,17 @@ async function syncMarketData(project) {
     =====================================
     */
 
-    await saveMetrics(
+   await saveMetrics(
 
-        project.id,
+    project.id,
 
-        data
+    data
 
-    );
+);
 
-    console.log("Metrics saved");
+console.log("Metrics saved");
 
-    return data;
+return data;
 
 }
 /* =========================================
