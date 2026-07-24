@@ -7,6 +7,8 @@
 const db = require("../db");
 const metricsService =
 require("./airdrop.metrics.service");
+const coinSearch =
+require("./collectors/coingecko.search.collector");
 const analysisService =
     require("./airdrop.analysis.service");
 
@@ -113,6 +115,39 @@ async function createProject(userId, data) {
     validateProject(data);
 
     const p = normalizeProjectInput(data);
+
+    if (
+
+    !p.coingecko_id &&
+
+    p.name
+
+){
+
+    try{
+
+        p.coingecko_id =
+            await coinSearch.searchCoin(
+
+                p.name
+
+            );
+
+    }
+
+    catch(err){
+
+        console.log(
+
+            "Search CoinGecko:",
+
+            err.message
+
+        );
+
+    }
+
+}
 
     const sql = `
         INSERT INTO airdrop_projects (
