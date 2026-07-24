@@ -59,8 +59,8 @@ async function getProjectContext(userId, projectId) {
 
     ]);
 
- const analysis =
-    analysisService.analyze({
+const analysis =
+    await analysisService.analyze({
 
         project,
 
@@ -75,6 +75,24 @@ async function getProjectContext(userId, projectId) {
         notes
 
     });
+
+return {
+
+    project,
+
+    metrics,
+
+    investors,
+
+    partners,
+
+    team,
+
+    notes,
+
+    analysis
+
+};
 
 }
 
