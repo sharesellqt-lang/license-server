@@ -25,6 +25,10 @@ async function fetchToken(
             }
         );
 
+        console.log(
+    JSON.stringify(response.data, null, 2)
+);
+
     if(
         !response.data ||
         !response.data.data ||

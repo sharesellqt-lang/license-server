@@ -18,8 +18,6 @@ const teamService =
 const noteService =
     require("./airdrop.note.service");
 
-const analysisService =
-    require("./airdrop.analysis.service");
 
 /* =========================================
    GET PROJECT CONTEXT
@@ -58,23 +56,6 @@ async function getProjectContext(userId, projectId) {
         noteService.getNotes(projectId)
 
     ]);
-
-const analysis =
-    await analysisService.analyze({
-
-        project,
-
-        metrics,
-
-        investors,
-
-        partners,
-
-        team,
-
-        notes
-
-    });
 
 return {
 
