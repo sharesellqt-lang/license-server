@@ -228,6 +228,8 @@ async function analyzeProject(
     userId,
     projectId
 ){
+    console.log("========== ANALYZE ==========");
+    console.log("projectId =", projectId);
 
     const context =
         await contextService.getProjectContext(
@@ -244,7 +246,7 @@ async function analyzeProject(
         context
     );
 
-
+console.log("analysis =", analysis);
     await db.query(
 `
 UPDATE airdrop_projects
@@ -271,7 +273,7 @@ projectId
 
 ]);
 
-
+console.log(result);
     return analysis;
 
 }
