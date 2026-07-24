@@ -25,6 +25,13 @@ async function initTable() {
             name VARCHAR(255) NOT NULL,
             url TEXT,
             wallet VARCHAR(255) DEFAULT NULL,
+
+            network VARCHAR(50) DEFAULT NULL,
+
+            contract_address VARCHAR(255) DEFAULT NULL,
+
+            coingecko_id VARCHAR(100) DEFAULT NULL,
+
             start_date DATE NULL,
             end_date DATE NULL,
 
@@ -127,7 +134,7 @@ async function createProject(userId, data) {
             created_at,
             updated_at
         )
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const now = Date.now();
@@ -151,7 +158,7 @@ async function createProject(userId, data) {
         now,
         now
     ];
-
+console.log(values.length);
     const [result] =
     await db.query(
         sql,
@@ -184,13 +191,17 @@ try{
 
     try {
 
-      await metricsService.syncMarketData({
+    await metricsService.syncMarketData({
 
-    id:projectId,
+    id: projectId,
 
-    network:p.network,
+    name: p.name,
 
-    contract_address:p.contract_address
+    coingecko_id: p.coingecko_id,
+
+    network: p.network,
+
+    contract_address: p.contract_address
 
 });
 
