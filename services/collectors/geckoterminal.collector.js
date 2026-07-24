@@ -29,63 +29,43 @@ async function fetchToken(
     JSON.stringify(response.data, null, 2)
 );
 
-    if(
+    if (
         !response.data ||
-        !response.data.data ||
-        !response.data.data.length
+        !response.data.data
     ){
-        throw new Error(
-            "Token not found"
-        );
+        throw new Error("Token not found");
     }
 
-    const pool =
-        response.data.data[0];
+    const token =
+    response.data.data;
 
     const attr =
-        pool.attributes;
+    token.attributes;
 
-    const token =
-        response.data.included?.find(
-            x=>x.type==="token"
-        );
+return {
 
-    return{
+    token_symbol:
+        attr.symbol,
 
-        token_symbol:
-            token?.attributes?.symbol || "",
+    current_price:
+        Number(attr.price_usd || 0),
 
-        current_price:
-            Number(
-                attr.base_token_price_usd || 0
-            ),
+    market_cap:
+        Number(attr.market_cap_usd || 0),
 
-        market_cap:
-            Number(
-                attr.market_cap_usd || 0
-            ),
+    fdv:
+        Number(attr.fdv_usd || 0),
 
-        fdv:
-            Number(
-                attr.fdv_usd || 0
-            ),
+    total_supply:
+        Number(attr.normalized_total_supply || 0),
 
-        volume_24h:
-            Number(
-                attr.volume_usd?.h24 || 0
-            ),
+    volume_24h:
+        Number(attr.volume_usd?.h24 || 0),
 
-        liquidity:
-            Number(
-                attr.reserve_in_usd || 0
-            ),
+    liquidity:
+        Number(attr.total_reserve_in_usd || 0)
 
-        price_change_24h:
-            Number(
-                attr.price_change_percentage?.h24 || 0
-            )
-
-    };
+};
 
 }
 
