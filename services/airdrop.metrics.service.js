@@ -449,10 +449,18 @@ const values = [
 
 async function saveMetrics(projectId, data = {}) {
 
+    console.log("========== SAVE METRICS ==========");
+    console.log("projectId =", projectId);
+    console.log(data);
+
     const current =
         await getMetrics(projectId);
 
-    if (!current.id) {
+    console.log("current =", current);
+
+    if (!current || !current.id) {
+
+        console.log("Create metrics");
 
         await createMetrics(
             projectId,
@@ -463,7 +471,9 @@ async function saveMetrics(projectId, data = {}) {
 
     }
 
-    return updateMetrics(
+    console.log("Update metrics");
+
+    return await updateMetrics(
         projectId,
         data
     );
@@ -555,25 +565,80 @@ console.log("Metrics saved.");
 
 }
 
-async function syncMarketData(project){
+async function syncMarketData(project) {
 
-    if(
-        !project.network ||
-        !project.contract_address
-    ){
-        throw new Error(
-            "Missing network or contract"
-        );
+    let data = null;
+
+    /*
+    =====================================
+    GECKOTERMINAL
+    =====================================
+    */
+
+    if (
+
+        project.network &&
+        project.contract_address
+
+    ) {
+
+        console.log("Using GeckoTerminal");
+
+        data =
+            await gecko.fetchToken(
+
+                project.network,
+
+                project.contract_address
+
+            );
+
     }
 
-    const data =
-        await gecko.fetchToken(
+    /*
+    =====================================
+    COINGECKO
+    =====================================
+    */
 
-            project.network,
+    else if (
 
-            project.contract_address
+        project.coingecko_id
+
+    ) {
+
+        console.log("Using CoinGecko");
+
+        data =
+            await coingecko.fetchById(
+
+                project.coingecko_id
+
+            );
+
+    }
+
+    /*
+    =====================================
+    NO SOURCE
+    =====================================
+    */
+
+    else {
+
+        throw new Error(
+
+            "Missing market source"
 
         );
+
+    }
+
+    /*
+    =====================================
+    SAVE
+    =====================================
+    */
 
     await saveMetrics(
 
@@ -582,6 +647,8 @@ async function syncMarketData(project){
         data
 
     );
+
+    console.log("Metrics saved");
 
     return data;
 
