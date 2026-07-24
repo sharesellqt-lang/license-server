@@ -315,8 +315,27 @@ const now = Date.now();
 
     ];
 
+    console.log("VALUES LENGTH =", values.length);
+
+console.log("SQL =");
+console.log(sql);
+
+try {
+
     const [result] =
         await db.query(sql, values);
+
+    return result.insertId;
+
+}
+catch(err){
+
+    console.log("========== INSERT METRICS ERROR ==========");
+    console.log(err.message);
+
+    throw err;
+
+}
 
     return result.insertId;
 
