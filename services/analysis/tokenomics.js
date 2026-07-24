@@ -1,14 +1,18 @@
 "use strict";
 
+/* =========================================
+   TOKENOMICS CALCULATOR
+========================================= */
+
 function calculate(m = {}) {
 
-    const total =
+    let total =
         Number(m.total_supply || 0);
 
-    const circulating =
+    let circulating =
         Number(m.circulating_supply || 0);
 
-    const max =
+    let max =
         Number(m.max_supply || 0);
 
     const marketCap =
@@ -25,28 +29,101 @@ function calculate(m = {}) {
 
     /*
     =====================================
-    CASE 1
-    Có supply
+    FALLBACK
+    only total supply exists
     =====================================
     */
 
     if (
+
+        total > 0 &&
+        circulating <= 0
+
+    ) {
+
+        circulating = total;
+
+    }
+
+    if (
+
+        total > 0 &&
+        max <= 0
+
+    ) {
+
+        max = total;
+
+    }
+
+    /*
+    =====================================
+    CASE 1
+    Supply available
+    =====================================
+    */
+
+    if (
+
         total > 0 &&
         circulating > 0
+
     ) {
 
         circulatingPercent =
-            circulating / total * 100;
+            circulating /
+            total *
+            100;
+
+        if (
+
+            circulatingPercent > 100
+
+        ) {
+
+            circulatingPercent = 100;
+
+        }
 
         lockedPercent =
-            100 - circulatingPercent;
+            100 -
+            circulatingPercent;
 
-        if (max > 0) {
+        if (
+
+            lockedPercent < 0
+
+        ) {
+
+            lockedPercent = 0;
+
+        }
+
+        if (
+
+            max > 0
+
+        ) {
 
             inflation =
-                (max - circulating)
-                / max
-                * 100;
+                (
+                    max -
+                    circulating
+                )
+                /
+                max
+                *
+                100;
+
+            if (
+
+                inflation < 0
+
+            ) {
+
+                inflation = 0;
+
+            }
 
         }
 
@@ -55,8 +132,8 @@ function calculate(m = {}) {
     /*
     =====================================
     CASE 2
-    Không có supply
-    nhưng có MarketCap + FDV
+    No supply
+    Use MarketCap / FDV
     =====================================
     */
 
@@ -68,16 +145,43 @@ function calculate(m = {}) {
     ) {
 
         circulatingPercent =
-            marketCap / fdv * 100;
+            marketCap /
+            fdv *
+            100;
 
         if (
+
             circulatingPercent > 100
+
         ) {
+
             circulatingPercent = 100;
+
+        }
+
+        if (
+
+            circulatingPercent < 0
+
+        ) {
+
+            circulatingPercent = 0;
+
         }
 
         lockedPercent =
-            100 - circulatingPercent;
+            100 -
+            circulatingPercent;
+
+        if (
+
+            lockedPercent < 0
+
+        ) {
+
+            lockedPercent = 0;
+
+        }
 
         inflation =
             lockedPercent;
@@ -87,17 +191,27 @@ function calculate(m = {}) {
     return {
 
         circulating_percent:
-            circulatingPercent,
+            Number(
+                circulatingPercent.toFixed(2)
+            ),
 
         locked_percent:
-            lockedPercent,
+            Number(
+                lockedPercent.toFixed(2)
+            ),
 
         inflation:
-            inflation
+            Number(
+                inflation.toFixed(2)
+            )
 
     };
 
 }
+
+/* =========================================
+   EXPORT
+========================================= */
 
 module.exports = {
 

@@ -45,25 +45,40 @@ async function fetchToken(
 return {
 
     token_symbol:
-        attr.symbol,
+        token?.attributes?.symbol || "",
 
     current_price:
         Number(attr.price_usd || 0),
 
+    total_supply:
+        Number(
+            attr.normalized_total_supply || 0
+        ),
+
     market_cap:
-        Number(attr.market_cap_usd || 0),
+        Number(
+            attr.market_cap_usd || 0
+        ),
 
     fdv:
-        Number(attr.fdv_usd || 0),
-
-    total_supply:
-        Number(attr.normalized_total_supply || 0),
+        Number(
+            attr.fdv_usd || 0
+        ),
 
     volume_24h:
-        Number(attr.volume_usd?.h24 || 0),
+        Number(
+            attr.volume_usd?.h24 || 0
+        ),
 
     liquidity:
-        Number(attr.total_reserve_in_usd || 0)
+        Number(
+            attr.total_reserve_in_usd || 0
+        ),
+
+    price_change_24h:
+        Number(
+            attr.price_change_percentage?.h24 || 0
+        )
 
 };
 
