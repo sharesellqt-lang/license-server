@@ -55,18 +55,68 @@ function normalize(value, max) {
 
 }
 
+
 /* =========================================
    TEAM
 ========================================= */
 
-function calculateTeam(data) {
+function calculateTeam(data = {}) {
+
+    let score = 0;
+
+    const funding =
+        Number(data.funding_amount || 0);
+
+    const marketCap =
+        Number(data.market_cap || 0);
+
+    const liquidity =
+        Number(data.liquidity || 0);
+
+    // Có gọi vốn
+    if (funding >= 100000000) {
+
+        score += 6;
+
+    } else if (funding >= 20000000) {
+
+        score += 4;
+
+    } else if (funding > 0) {
+
+        score += 2;
+
+    }
+
+    // Market Cap lớn → thường team mạnh hơn
+    if (marketCap >= 1000000000) {
+
+        score += 5;
+
+    } else if (marketCap >= 100000000) {
+
+        score += 3;
+
+    } else if (marketCap >= 10000000) {
+
+        score += 1;
+
+    }
+
+    // Thanh khoản tốt
+    if (liquidity >= 1000000) {
+
+        score += 4;
+
+    } else if (liquidity >= 250000) {
+
+        score += 2;
+
+    }
 
     return normalize(
-
-        data.team_score,
-
+        score,
         SCORE.TEAM
-
     );
 
 }

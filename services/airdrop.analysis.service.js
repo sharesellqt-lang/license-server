@@ -239,10 +239,10 @@ async function analyzeProject(
         );
 
 
-    const analysis =
-        analyze(
-            context
-        );
+   const analysis =
+    await analyze(
+        context
+    );
 
 
     await db.query(
