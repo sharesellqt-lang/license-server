@@ -615,51 +615,33 @@ async function syncMarketData(project) {
 
             console.log("Using GeckoTerminal");
 
-            data =
-                await gecko.fetchToken(
+            data = await gecko.fetchToken(
 
-                    project.network,
+                project.network,
+                project.contract_address
 
-                    project.contract_address
-
-                );
+            );
 
         }
         catch (err) {
 
-            console.log("========== GECKOTERMINAL ERROR ==========");
             console.log(err.message);
 
             /*
-            -------------------------------------
+            =====================================
             FALLBACK COINGECKO
-            -------------------------------------
+            =====================================
             */
 
-            if (
+            if (project.coingecko_id) {
 
-                project.coingecko_id
+                console.log("Fallback CoinGecko");
 
-            ) {
+                data = await coingecko.fetchById(
 
-                try {
+                    project.coingecko_id
 
-                    console.log("Fallback -> CoinGecko");
-
-                    data =
-                        await coingecko.fetchById(
-
-                            project.coingecko_id
-
-                        );
-
-                }
-                catch (cgErr) {
-
-                    console.log("========== COINGECKO ERROR ==========");
-                    console.log(cgErr.message);
-
-                }
+                );
 
             }
 
@@ -669,7 +651,7 @@ async function syncMarketData(project) {
 
     /*
     =====================================
-    COINGECKO ONLY
+    COINGECKO
     =====================================
     */
 
@@ -679,44 +661,19 @@ async function syncMarketData(project) {
 
     ) {
 
-        try {
+        console.log("Using CoinGecko");
 
-            console.log("Using CoinGecko");
+        data = await coingecko.fetchById(
 
-            data =
-                await coingecko.fetchById(
+            project.coingecko_id
 
-                    project.coingecko_id
-
-                );
-
-        }
-        catch (err) {
-
-            console.log("========== COINGECKO ERROR ==========");
-            console.log(err.message);
-
-        }
+        );
 
     }
 
     /*
     =====================================
-    NO SOURCE
-    =====================================
-    */
-
-    else {
-
-        console.log("Missing market source");
-
-        return null;
-
-    }
-
-    /*
-    =====================================
-    NO DATA
+    SAVE
     =====================================
     */
 
@@ -728,16 +685,9 @@ async function syncMarketData(project) {
 
     }
 
-    /*
-    =====================================
-    SAVE
-    =====================================
-    */
-
     await saveMetrics(
 
         project.id,
-
         data
 
     );
