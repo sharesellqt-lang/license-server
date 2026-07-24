@@ -264,93 +264,70 @@ console.log("coingecko =", p.coingecko_id);
 try {
 
     const hasGeckoTerminal =
+        Boolean(
+            p.network &&
+            p.contract_address
+        );
 
-        p.network &&
-        p.contract_address;
 
     const hasCoinGecko =
+        typeof p.coingecko_id === "string" &&
+        p.coingecko_id.trim().length > 0;
 
-        p.coingecko_id;
 
-    if (
 
+    if(
         hasGeckoTerminal ||
-
         hasCoinGecko
+    ){
 
-    ) {
+        console.log(
+            "CALL syncMarketData"
+        );
 
-        console.log("CALL syncMarketData");
 
-       const marketData =
+        const marketData =
             await metricsService.syncMarketData({
 
-            id:projectId,
+                id: projectId,
 
-            name:p.name,
+                name:p.name,
 
-            network:p.network,
+                network:p.network,
 
-            contract_address:p.contract_address,
+                contract_address:p.contract_address,
 
-            coingecko_id:p.coingecko_id
+                coingecko_id:p.coingecko_id
 
             });
 
 
-            if(!marketData){
+        console.log(
+            "MARKET DATA:",
+            marketData
+        );
 
-            console.log(
-            "Skip analysis because no market data"
-            );
-
-            return {
-
-            success:true,
-
-            data:{
-            id:projectId,
-            ...p
-            }
-
-            };
-
-            }
-
-        console.log("RETURN syncMarketData");
-
-        console.log(market);
 
     }
     else {
 
         console.log(
-            "Skip market sync (missing source)"
+            "Skip market sync"
         );
 
     }
+
 
 }
 catch(err){
 
-    console.log("========== SYNC MARKET ERROR ==========");
+    console.log(
+        "========== SYNC MARKET ERROR =========="
+    );
 
-    console.log(err.message);
-
-    if (err.response?.status) {
-
-        console.log(
-            "HTTP:",
-            err.response.status
-        );
-
-    }
-
-    if (err.response?.data) {
-
-        console.log(err.response.data);
-
-    }
+    console.log(
+        err.message
+    );
 
 }
 
