@@ -4,33 +4,51 @@
 
 "use strict";
 
+
 /* =========================================
    GENERATE
 ========================================= */
 
 function generate(data = {}) {
 
+
     const reasons = [];
 
     const warnings = [];
 
+
     const score =
         Number(data.overall_score || 0);
+
 
     const risk =
         data.risk_level || "medium";
 
+
+    const riskScore =
+        Number(data.risk_score || 50);
+
+
     const current =
         Number(data.current_price || 0);
 
+
     const fairBuy =
         Number(data.fair_buy_price || 0);
+
+
 
     /* =====================================
        REASONS
     ===================================== */
 
-    if (risk === "low") {
+
+    if (
+
+        risk === "very-low" ||
+        risk === "low"
+
+    ) {
 
         reasons.push(
             "Low investment risk"
@@ -38,9 +56,12 @@ function generate(data = {}) {
 
     }
 
+
     if (
+
         fairBuy > 0 &&
         current <= fairBuy
+
     ) {
 
         reasons.push(
@@ -49,10 +70,23 @@ function generate(data = {}) {
 
     }
 
+
+
+    const fdv =
+        Number(data.fdv || 0);
+
+
+    const marketCap =
+        Number(data.market_cap || 0);
+
+
+
     if (
-        Number(data.fdv || 0) > 0 &&
-        Number(data.market_cap || 0) > 0 &&
-        data.fdv / data.market_cap <= 2
+
+        fdv > 0 &&
+        marketCap > 0 &&
+        fdv / marketCap <= 2
+
     ) {
 
         reasons.push(
@@ -61,8 +95,18 @@ function generate(data = {}) {
 
     }
 
+
+
+    const circulating =
+        Number(
+            data.circulating_percent || 0
+        );
+
+
     if (
-        Number(data.circulating_percent || 0) >= 50
+
+        circulating >= 50
+
     ) {
 
         reasons.push(
@@ -71,12 +115,47 @@ function generate(data = {}) {
 
     }
 
+
+
+    if (
+
+        Number(data.volume_24h || 0) > 0
+
+    ) {
+
+        reasons.push(
+            "Active trading volume"
+        );
+
+    }
+
+
+
+    if (
+
+        Number(data.liquidity || 0)
+        >= 1000000
+
+    ) {
+
+        reasons.push(
+            "Strong liquidity"
+        );
+
+    }
+
+
+
     /* =====================================
        WARNINGS
     ===================================== */
 
+
     if (
-        Number(data.locked_percent || 0) >= 80
+
+        Number(data.locked_percent || 0)
+        >= 80
+
     ) {
 
         warnings.push(
@@ -85,9 +164,14 @@ function generate(data = {}) {
 
     }
 
+
+
     if (
-        Number(data.fdv || 0) >
-        Number(data.market_cap || 0) * 8
+
+        fdv > 0 &&
+        marketCap > 0 &&
+        fdv / marketCap > 8
+
     ) {
 
         warnings.push(
@@ -96,10 +180,13 @@ function generate(data = {}) {
 
     }
 
+
+
     if (
+
         Number(data.ath_price || 0) > 0 &&
-        current >=
-        Number(data.ath_price) * 0.8
+        current >= Number(data.ath_price) * 0.8
+
     ) {
 
         warnings.push(
@@ -108,94 +195,172 @@ function generate(data = {}) {
 
     }
 
+
+
     /* =====================================
        RECOMMENDATION
     ===================================== */
 
+
     let recommendation =
-        "Speculative";
+        "Watch";
+
 
     let action =
-        "Watch";
+        "Monitor";
+
 
     let badge =
         "yellow";
 
+
+
+    /*
+    =====================================
+    EXCELLENT
+    =====================================
+    */
+
+
     if (
-        score >= 90 &&
-        risk === "low"
+
+        score >= 80 &&
+        riskScore <= 30
+
     ) {
+
 
         recommendation =
             "Strong Candidate";
 
+
         action =
             "Strong Buy";
+
 
         badge =
             "green";
 
+
     }
 
+
+    /*
+    =====================================
+    GOOD
+    =====================================
+    */
+
+
     else if (
-        score >= 80
+
+        score >= 60 &&
+        riskScore <= 50
+
     ) {
+
 
         recommendation =
             "Worth Watching";
 
+
         action =
-            "Buy";
+            "Consider";
+
 
         badge =
             "green";
 
+
     }
 
+
+    /*
+    =====================================
+    SAFE BUT LOW SCORE
+    =====================================
+    */
+
+
     else if (
-        score >= 70
+
+        riskScore <= 30 &&
+        score < 60
+
     ) {
+
+
+        recommendation =
+            "Safe but Undervalued";
+
+
+        action =
+            "Research";
+
+
+        badge =
+            "blue";
+
+
+    }
+
+
+    /*
+    =====================================
+    MEDIUM RISK
+    =====================================
+    */
+
+
+    else if (
+
+        riskScore <= 70
+
+    ) {
+
 
         recommendation =
             "Speculative";
 
+
         action =
             "Watch";
 
-        badge =
-            "yellow";
-
-    }
-
-    else if (
-        score >= 60
-    ) {
-
-        recommendation =
-            "High Risk";
-
-        action =
-            "Wait";
 
         badge =
             "orange";
 
+
     }
 
+
+    /*
+    =====================================
+    HIGH RISK
+    =====================================
+    */
+
+
     else {
+
 
         recommendation =
             "Avoid";
 
+
         action =
             "Avoid";
+
 
         badge =
             "red";
 
     }
 
+
+
     return {
+
 
         recommendation,
 
@@ -207,9 +372,13 @@ function generate(data = {}) {
 
         warnings
 
+
     };
 
+
 }
+
+
 
 /* =========================================
    EXPORTS

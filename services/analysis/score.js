@@ -224,52 +224,65 @@ function calculateTokenomics(data) {
    FINANCIAL
 ========================================= */
 
-function calculateFinancial(data) {
+function calculateFinancial(data){
 
-    let score = Number(
+    let score = 0;
 
-        data.financial_score || 0
 
-    );
+    const marketCap =
+        Number(data.market_cap || 0);
 
-    if (
 
-        Number(data.funding_amount) >=
-        100000000
+    const volume =
+        Number(data.volume_24h || 0);
 
-    ) {
+
+    const fdv =
+        Number(data.fdv || 0);
+
+
+    if(marketCap >= 1000000000){
 
         score += 5;
 
     }
-
-    else if (
-
-        Number(data.funding_amount) >=
-        20000000
-
-    ) {
+    else if(marketCap >= 100000000){
 
         score += 3;
 
     }
 
-    else if (
 
-        Number(data.funding_amount) > 0
+    if(volume >= 10000000){
 
-    ) {
+        score += 3;
 
-        score += 1;
+    }
+    else if(volume >= 1000000){
+
+        score += 2;
 
     }
 
+
+    if(fdv > 0 && marketCap > 0){
+
+        const ratio =
+            fdv / marketCap;
+
+
+        if(ratio <= 2){
+
+            score += 2;
+
+        }
+
+    }
+
+
     return normalize(
-
         score,
-
         SCORE.FINANCIAL
-
     );
 
 }
@@ -294,14 +307,42 @@ function calculateCommunity(data) {
    DEVELOPMENT
 ========================================= */
 
-function calculateDevelopment(data) {
+function calculateDevelopment(data){
+
+    let score = 0;
+
+
+    if(data.network){
+
+        score += 3;
+
+    }
+
+
+    if(data.contract_address){
+
+        score += 3;
+
+    }
+
+
+    if(data.url){
+
+        score += 2;
+
+    }
+
+
+    if(data.coingecko_id){
+
+        score += 2;
+
+    }
+
 
     return normalize(
-
-        data.development_score,
-
+        score,
         SCORE.DEVELOPMENT
-
     );
 
 }
@@ -310,14 +351,51 @@ function calculateDevelopment(data) {
    ONCHAIN
 ========================================= */
 
-function calculateOnchain(data) {
+function calculateOnchain(data){
+
+    let score = 0;
+
+
+    const liquidity =
+        Number(data.liquidity || 0);
+
+
+    const volume =
+        Number(data.volume_24h || 0);
+
+
+    if(liquidity >= 10000000){
+
+        score += 5;
+
+    }
+    else if(liquidity >= 1000000){
+
+        score += 3;
+
+    }
+    else if(liquidity > 100000){
+
+        score += 1;
+
+    }
+
+
+    if(volume >= 10000000){
+
+        score += 5;
+
+    }
+    else if(volume >= 1000000){
+
+        score += 3;
+
+    }
+
 
     return normalize(
-
-        data.onchain_score,
-
+        score,
         SCORE.ONCHAIN
-
     );
 
 }
