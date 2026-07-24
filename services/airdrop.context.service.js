@@ -1,7 +1,7 @@
 "use strict";
 
-const projectService =
-    require("./airdrop.project.service");
+const projectRepository =
+    require("./repositories/project.repository");
 
 const metricsService =
     require("./airdrop.metrics.service");
@@ -25,11 +25,11 @@ const noteService =
 
 async function getProjectContext(userId, projectId) {
 
-    const project =
-        await projectService.getProjectById(
-            userId,
-            projectId
-        );
+   const project =
+    await projectRepository.getProjectById(
+        userId,
+        projectId
+    );
 
     if (!project) {
 
