@@ -91,10 +91,9 @@ function normalizeProjectInput(data = {}) {
         result: data.result || "pending",
         fees: data.fees || null,
         source: data.source || "manual",
-        coingecko_id:
-    String(
-        data.coingecko_id || ""
-    ).trim(),
+        network: String(data.network || "").trim(),
+        contract_address: String(data.contract_address || "").trim(),
+        coingecko_id: String(data.coingecko_id || "").trim(),
     };
 }
 
@@ -114,6 +113,8 @@ async function createProject(userId, data) {
             name,
             url,
             wallet,
+            network,
+            contract_address,
             start_date,
             end_date,
             tasks,
@@ -136,6 +137,8 @@ async function createProject(userId, data) {
         p.name,
         p.url,
         p.wallet,
+        p.network,
+        p.contract_address,
         p.start_date,
         p.end_date,
         p.tasks,
@@ -181,13 +184,15 @@ try{
 
     try {
 
-        await metricsService.syncCoinGecko(
+      await metricsService.syncMarketData({
 
-            projectId,
+    id:projectId,
 
-            p.coingecko_id
+    network:p.network,
 
-        );
+    contract_address:p.contract_address
+
+});
 
     }
     catch (err) {

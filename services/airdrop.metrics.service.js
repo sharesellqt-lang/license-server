@@ -5,8 +5,8 @@
 "use strict";
 
 const db = require("../db");
-const coingecko =
-    require("./collectors/coingecko.collector");
+const coingecko = require("./collectors/coingecko.collector");
+const gecko = require("./collectors/geckoterminal.collector");
 function normalizeMetrics(data = {}) {
 
     return {
@@ -31,6 +31,15 @@ function normalizeMetrics(data = {}) {
 
         fdv:
             Number(data.fdv || 0),
+
+        volume_24h:
+            Number(data.volume_24h || 0),
+
+        liquidity:
+            Number(data.liquidity || 0),
+
+        price_change_24h:
+            Number(data.price_change_24h || 0),
 
         seed_price:
             Number(data.seed_price || 0),
@@ -97,28 +106,23 @@ function normalizeMetrics(data = {}) {
 function defaultMetrics() {
     return {
         token_symbol: "",
-
         current_price: 0,
-
         total_supply: 0,
         circulating_supply: 0,
         max_supply: 0,
-
         market_cap: 0,
         fdv: 0,
-
+        volume_24h:0,
+        liquidity:0,
+        price_change_24h:0,
         seed_price: 0,
         private_price: 0,
         public_price: 0,
-
         fair_buy_price: 0,
         fair_sell_price: 0,
-
         ath_price: 0,
         atl_price: 0,
-
         funding_amount: 0,
-
         team_score: 0,
         investor_score: 0,
         partner_score: 0,
@@ -127,9 +131,7 @@ function defaultMetrics() {
         development_score: 0,
         financial_score: 0,
         onchain_score: 0,
-
         total_score: 0,
-
         risk_level: "medium"
     };
 }
@@ -213,7 +215,9 @@ const now = Date.now();
 
             market_cap,
             fdv,
-
+            volume_24h,
+            liquidity,
+            price_change_24h,
             seed_price,
             private_price,
             public_price,
@@ -247,7 +251,7 @@ const now = Date.now();
         VALUES(
 
             ?,?,?,?,?,?,
-            ?,?,
+            ?,?,?,?,?,
             ?,?,?,
             ?,?,
             ?,?,
@@ -274,6 +278,12 @@ const now = Date.now();
 
         metric.market_cap,
         metric.fdv,
+
+        metric.volume_24h,
+
+        metric.liquidity,
+
+        metric.price_change_24h,
 
         metric.seed_price,
         metric.private_price,
@@ -343,6 +353,11 @@ async function updateMetrics(projectId, data = {}) {
             market_cap=?,
             fdv=?,
 
+            volume_24h=?,
+
+            liquidity=?,
+            price_change_24h=?,
+
             seed_price=?,
             private_price=?,
             public_price=?,
@@ -384,6 +399,11 @@ const values = [
 
     metric.market_cap,
     metric.fdv,
+
+    metric.volume_24h,
+
+    metric.liquidity,
+    metric.price_change_24h,
 
     metric.seed_price,
     metric.private_price,
@@ -502,28 +522,68 @@ console.log("Metrics saved.");
 
 }
 
-async function syncMarketData(project){
+async function syncGeckoTerminal(
+    projectId,
+    coinId
+){
+    console.log("========== SYNC COINGECKO ==========");
+console.log("projectId =", projectId);
+console.log("coinId =", coinId);
 
-    const coins =
-        await coingecko.searchCoin(
-            project.name
-        );
-
-    if(!coins.length){
+    if(!coinId){
 
         throw new Error(
-            "Coin not found"
+            "Missing CoinGecko ID"
         );
 
     }
 
-    return syncCoinGecko(
+
+    const data =
+        await coingecko.fetchById(
+            coinId
+        );
+console.log("CoinGecko DATA:", data);
+
+    await saveMetrics(
+        projectId,
+        data
+    );
+console.log("Metrics saved.");
+
+    return data;
+
+}
+
+async function syncMarketData(project){
+
+    if(
+        !project.network ||
+        !project.contract_address
+    ){
+        throw new Error(
+            "Missing network or contract"
+        );
+    }
+
+    const data =
+        await gecko.fetchToken(
+
+            project.network,
+
+            project.contract_address
+
+        );
+
+    await saveMetrics(
 
         project.id,
 
-        coins[0].id
+        data
 
     );
+
+    return data;
 
 }
 /* =========================================
