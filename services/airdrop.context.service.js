@@ -18,6 +18,24 @@ const teamService =
 const noteService =
     require("./airdrop.note.service");
 
+const recommendation =
+    require("./analysis/recommendation");
+
+const risk =
+    require("./analysis/risk");
+
+const score =
+    require("./analysis/score");
+
+const roi =
+    require("./analysis/roi");
+
+const tokenomics =
+    require("./analysis/tokenomics");
+
+const valuation =
+    require("./analysis/valuation");
+
 
 /* =========================================
    GET PROJECT CONTEXT
@@ -57,14 +75,6 @@ async function getProjectContext(userId, projectId) {
 
     ]);
 
-const analysis = {
-    recommendation: recommendation.generate(metrics),
-    risk: risk.calculate(metrics),
-    score: score.calculate(metrics),
-    roi: roi.calculate(metrics),
-    tokenomics: tokenomics.calculate(metrics),
-    valuation: valuation.calculate(metrics)
-};
 
 return {
     project,
