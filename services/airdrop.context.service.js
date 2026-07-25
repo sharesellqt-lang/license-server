@@ -57,20 +57,23 @@ async function getProjectContext(userId, projectId) {
 
     ]);
 
+const analysis = {
+    recommendation: recommendation.generate(metrics),
+    risk: risk.calculate(metrics),
+    score: score.calculate(metrics),
+    roi: roi.calculate(metrics),
+    tokenomics: tokenomics.calculate(metrics),
+    valuation: valuation.calculate(metrics)
+};
+
 return {
-
     project,
-
     metrics,
-
     investors,
-
     partners,
-
     team,
-
-    notes
-
+    notes,
+    analysis
 };
 
 }
