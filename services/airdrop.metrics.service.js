@@ -892,6 +892,12 @@ async function syncCoinGecko(
 
     };
 
+    console.log(
+    "========== FINAL METRICS =========="
+);
+
+console.log(data);
+
     await saveMetrics(
 
         projectId,
@@ -950,6 +956,27 @@ async function syncMarketData(project){
     console.log(project);
 
     let marketData = {};
+
+    const safeCollector = async (fn)=>{
+
+    try{
+
+        return await fn() || {};
+
+    }
+
+    catch(err){
+
+        console.log(
+            "Collector error:",
+            err.message
+        );
+
+        return {};
+
+    }
+
+};
 
     /*
     ======================================
@@ -1031,37 +1058,84 @@ async function syncMarketData(project){
     */
 const [
 
-    githubResult,
+    githubData,
 
-    llamaResult,
+    llamaData,
 
-    terminalResult,
+    terminalData,
 
-    auditResult
+    auditData
 
-] = await Promise.allSettled([
+] = await Promise.all([
+
+
+    safeCollector(()=>
+
 
         project.github_repo
-            ? github.fetchRepository(
-                project.github_repo
-            )
-            : null,
+
+        ?
+
+        github.fetchRepository(
+            project.github_repo
+        )
+
+        :
+
+        {}
+
+
+    ),
+
+
+    safeCollector(()=>
+
 
         project.defillama_slug
-            ? defillama.fetchProtocol(
-                project.defillama_slug
-            )
-            : null,
+
+        ?
+
+        defillama.fetchProtocol(
+            project.defillama_slug
+        )
+
+        :
+
+        {}
+
+
+    ),
+
+
+    safeCollector(()=>
+
 
         project.token_terminal_id
-            ? tokenterminal.fetchProject(
-                project.token_terminal_id
-            )
-            : null,
+
+        ?
+
+        tokenterminal.fetchProject(
+            project.token_terminal_id
+        )
+
+        :
+
+        {}
+
+
+    ),
+
+
+    safeCollector(()=>
+
 
         audit.fetchAudit(project)
 
-    ]);
+
+    )
+
+
+]);
 
     const githubData =
 
@@ -1287,6 +1361,12 @@ const data = {
         teamScore
 
 };
+
+console.log(
+    "========== FINAL METRICS =========="
+);
+
+console.log(data);
 
     await saveMetrics(
 

@@ -79,79 +79,142 @@ async function fetchById(
 
         return {
 
-            // =========================
-            // BASIC
-            // =========================
 
-            token_symbol:
-                data.symbol
-                    ? data.symbol.toUpperCase()
-                    : "",
+    // =========================
+    // BASIC
+    // =========================
 
-            name:
-                data.name || "",
+    token_symbol:
+        data.symbol
+            ?
+            data.symbol.toUpperCase()
+            :
+            "",
 
-            // =========================
-            // PRICE
-            // =========================
 
-            current_price:
-                market.current_price?.usd || 0,
+    name:
+        data.name || "",
 
-            // =========================
-            // MARKET CAP
-            // =========================
 
-            market_cap:
-                market.market_cap?.usd || 0,
 
-            // =========================
-            // FDV
-            // =========================
+    // =========================
+    // PRICE
+    // =========================
 
-            fdv:
-                market.fully_diluted_valuation?.usd || 0,
+    current_price:
 
-            // =========================
-            // SUPPLY
-            // =========================
+        market.current_price?.usd
+        ||
+        0,
 
-            total_supply:
-                market.total_supply || 0,
 
-            circulating_supply:
-                market.circulating_supply || 0,
 
-            max_supply:
-                market.max_supply || 0,
+    // =========================
+    // MARKET CAP
+    // =========================
 
-            // =========================
-            // ATH / ATL
-            // =========================
+    market_cap:
 
-            ath_price:
-                market.ath?.usd || 0,
+        market.market_cap?.usd
+        ||
+        0,
 
-            atl_price:
-                market.atl?.usd || 0,
 
-            // =========================
-            // VOLUME
-            // =========================
 
-            volume_24h:
-                market.total_volume?.usd || 0,
+    // =========================
+    // FDV
+    // =========================
 
-            price_change_24h:
-                market.price_change_percentage_24h || 0,
+    fdv:
 
-            price_change_7d:
-                market.price_change_percentage_7d || 0,
+        market.fully_diluted_valuation?.usd
+        ||
+        0,
 
-            price_change_30d:
-                market.price_change_percentage_30d || 0
 
-        };
+
+    // =========================
+    // VOLUME
+    // =========================
+
+    volume_24h:
+
+        market.total_volume?.usd
+        ||
+        0,
+
+
+
+    // =========================
+    // SUPPLY
+    // =========================
+
+    total_supply:
+
+        market.total_supply
+        ||
+        0,
+
+
+    circulating_supply:
+
+        market.circulating_supply
+        ||
+        0,
+
+
+    max_supply:
+
+        market.max_supply
+        ||
+        0,
+
+
+
+    // =========================
+    // ATH / ATL
+    // =========================
+
+    ath_price:
+
+        market.ath?.usd
+        ||
+        0,
+
+
+    atl_price:
+
+        market.atl?.usd
+        ||
+        0,
+
+
+
+    // =========================
+    // PRICE CHANGE
+    // =========================
+
+    price_change_24h:
+
+        market.price_change_percentage_24h
+        ||
+        0,
+
+
+    price_change_7d:
+
+        market.price_change_percentage_7d
+        ||
+        0,
+
+
+    price_change_30d:
+
+        market.price_change_percentage_30d
+        ||
+        0
+
+};
 
     }
     catch (err) {

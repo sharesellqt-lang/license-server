@@ -1871,100 +1871,80 @@ function calculateDevelopment(data = {}) {
     let score = 0;
 
 
-    const githubStars =
-
-        Number(
-            data.github_stars || 0
-        );
-
-
-    const githubForks =
-
-        Number(
-            data.github_forks || 0
-        );
-
-
-    const commits =
-
-        Number(
-            data.github_recent_commits || 0
-        );
-
-
-    const contributors =
-
-        Number(
-            data.github_contributors || 0
-        );
-
-
     const githubScore =
-
         Number(
             data.github_score || 0
         );
 
 
-
-    /*
-    =====================================
-       GITHUB REPOSITORY QUALITY
-    =====================================
-    */
+    const stars =
+        Number(
+            data.github_stars || 0
+        );
 
 
-    if(githubStars >= 10000){
-
-        score += 3;
-
-    }
-    else if(githubStars >= 1000){
-
-        score += 2;
-
-    }
-    else if(githubStars >= 100){
-
-        score += 1;
-
-    }
+    const forks =
+        Number(
+            data.github_forks || 0
+        );
 
 
-
-    /*
-    =====================================
-       FORKS
-    =====================================
-    */
+    const contributors =
+        Number(
+            data.github_contributors || 0
+        );
 
 
-    if(githubForks >= 1000){
+    const commits =
+        Number(
+            data.github_recent_commits || 0
+        );
 
-        score += 2;
 
-    }
-    else if(githubForks >= 100){
-
-        score += 1;
-
-    }
-
+    const auditScore =
+        Number(
+            data.audit_score || 0
+        );
 
 
     /*
     =====================================
-       RECENT DEVELOPMENT
+       GITHUB QUALITY
     =====================================
     */
 
 
-    if(commits >= 100){
+    if(githubScore >= 80){
+
+        score += 5;
+
+    }
+    else if(githubScore >= 60){
+
+        score += 4;
+
+    }
+    else if(githubScore >= 40){
 
         score += 2;
 
     }
-    else if(commits >= 30){
+
+
+
+    /*
+    =====================================
+       STARS
+    =====================================
+    */
+
+
+    if(stars >= 10000){
+
+        score += 2;
+
+    }
+    else if(stars >= 1000){
 
         score += 1;
 
@@ -1981,10 +1961,20 @@ function calculateDevelopment(data = {}) {
 
     if(contributors >= 50){
 
-        score += 2;
+        score += 1;
 
     }
-    else if(contributors >= 10){
+
+
+
+    /*
+    =====================================
+       RECENT COMMITS
+    =====================================
+    */
+
+
+    if(commits >= 100){
 
         score += 1;
 
@@ -1994,12 +1984,12 @@ function calculateDevelopment(data = {}) {
 
     /*
     =====================================
-       EXTERNAL SCORE
+       AUDIT
     =====================================
     */
 
 
-    if(githubScore >= 8){
+    if(auditScore >= 8){
 
         score += 1;
 
@@ -2008,11 +1998,8 @@ function calculateDevelopment(data = {}) {
 
 
     return normalize(
-
         score,
-
         SCORE.DEVELOPMENT
-
     );
 
 }

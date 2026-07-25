@@ -414,26 +414,34 @@ async function fetchRepository(repoInput) {
 
             releases,
 
-        github_score:
+       github_score:
 
-            calculateGithubScore({
+        calculateGithubScore({
 
-                stars:
-                    repository.stargazers_count,
+            stars:
+                repository.stargazers_count,
 
-                forks:
-                    repository.forks_count,
 
-                contributors,
+            forks:
+                repository.forks_count,
 
-                commits,
 
-                releases,
+            contributors,
 
-                updated:
-                    repository.pushed_at
 
-            })
+            commits,
+
+
+            releases,
+
+
+            updated:
+
+                repository.pushed_at
+                ||
+                repository.updated_at
+
+        })
 
     };
 
@@ -443,177 +451,208 @@ async function fetchRepository(repoInput) {
    SCORE
 ========================================= */
 
-function calculateGithubScore(d) {
+function calculateGithubScore(d = {}) {
+
 
     let score = 0;
 
-    if (
 
-        number(d.stars) >= 1000
 
-    ) {
+    /*
+    ==============================
+    STARS
+    ==============================
+    */
+
+
+    const stars =
+        number(d.stars);
+
+
+    if(stars >= 1000){
 
         score += 25;
 
     }
-
-    else if (
-
-        number(d.stars) >= 300
-
-    ) {
+    else if(stars >= 300){
 
         score += 18;
 
     }
-
-    else if (
-
-        number(d.stars) >= 100
-
-    ) {
+    else if(stars >= 100){
 
         score += 12;
 
     }
 
-    if (
 
-        number(d.forks) >= 100
 
-    ) {
+    /*
+    ==============================
+    FORKS
+    ==============================
+    */
+
+
+    const forks =
+        number(d.forks);
+
+
+    if(forks >= 100){
 
         score += 10;
 
     }
-
-    else if (
-
-        number(d.forks) >= 20
-
-    ) {
+    else if(forks >= 20){
 
         score += 6;
 
     }
 
-    if (
 
-        number(d.contributors) >= 20
 
-    ) {
+    /*
+    ==============================
+    CONTRIBUTORS
+    ==============================
+    */
+
+
+    const contributors =
+        number(d.contributors);
+
+
+    if(contributors >= 20){
 
         score += 20;
 
     }
-
-    else if (
-
-        number(d.contributors) >= 10
-
-    ) {
+    else if(contributors >= 10){
 
         score += 15;
 
     }
-
-    else if (
-
-        number(d.contributors) >= 5
-
-    ) {
+    else if(contributors >= 5){
 
         score += 10;
 
     }
 
-    if (
 
-        number(d.commits) >= 50
 
-    ) {
+    /*
+    ==============================
+    DEVELOPMENT ACTIVITY
+    ==============================
+    */
+
+
+    const commits =
+        number(d.commits);
+
+
+    if(commits >= 50){
 
         score += 20;
 
     }
-
-    else if (
-
-        number(d.commits) >= 20
-
-    ) {
+    else if(commits >= 20){
 
         score += 15;
 
     }
-
-    else if (
-
-        number(d.commits) >= 5
-
-    ) {
+    else if(commits >= 5){
 
         score += 8;
 
     }
 
-    if (
 
-        number(d.releases) >= 5
 
-    ) {
+    /*
+    ==============================
+    RELEASES
+    ==============================
+    */
+
+
+    const releases =
+        number(d.releases);
+
+
+    if(releases >= 5){
 
         score += 10;
 
     }
 
-    const pushed =
-        new Date(
-            d.updated
-        );
 
-    const days =
-        (
 
-            Date.now() -
+    /*
+    ==============================
+    RECENT UPDATE
+    ==============================
+    */
 
+
+    if(d.updated){
+
+
+        const pushed =
+            new Date(
+                d.updated
+            );
+
+
+        if(!Number.isNaN(
             pushed.getTime()
+        )){
 
-        ) /
 
-        86400000;
+            const days =
 
-    if (
+                (
+                    Date.now()
+                    -
+                    pushed.getTime()
 
-        days <= 30
+                )
+                /
+                86400000;
 
-    ) {
 
-        score += 15;
 
-    }
+            if(days <=30){
 
-    else if (
+                score +=15;
 
-        days <= 90
+            }
 
-    ) {
+            else if(days <=90){
 
-        score += 8;
+                score +=8;
 
-    }
+            }
 
-    if (
 
-        score > 100
-
-    ) {
-
-        score = 100;
+        }
 
     }
 
-    return score;
+
+
+    /*
+    ==============================
+    LIMIT
+    ==============================
+    */
+
+
+    return Math.min(
+        score,
+        100
+    );
+
 
 }
 
