@@ -437,18 +437,23 @@ console.log(JSON.stringify(data, null, 2));
     const onchain =
         calculateOnchain(data);
 
-    
-console.log("===== SCORE RESULT =====");
-console.table({
-    team,
-    investor,
-    partner,
-    tokenomics,
-    financial,
-    community,
-    development,
-    onchain
-});
+    const overall =
+
+        team +
+
+        investor +
+
+        partner +
+
+        tokenomics +
+
+        financial +
+
+        community +
+
+        development +
+
+        onchain;
 
     return {
 
