@@ -1865,6 +1865,158 @@ else if (burnRatio >= 1) {
 
 }
 
+function calculateDevelopment(data = {}) {
+
+
+    let score = 0;
+
+
+    const githubStars =
+
+        Number(
+            data.github_stars || 0
+        );
+
+
+    const githubForks =
+
+        Number(
+            data.github_forks || 0
+        );
+
+
+    const commits =
+
+        Number(
+            data.github_recent_commits || 0
+        );
+
+
+    const contributors =
+
+        Number(
+            data.github_contributors || 0
+        );
+
+
+    const githubScore =
+
+        Number(
+            data.github_score || 0
+        );
+
+
+
+    /*
+    =====================================
+       GITHUB REPOSITORY QUALITY
+    =====================================
+    */
+
+
+    if(githubStars >= 10000){
+
+        score += 3;
+
+    }
+    else if(githubStars >= 1000){
+
+        score += 2;
+
+    }
+    else if(githubStars >= 100){
+
+        score += 1;
+
+    }
+
+
+
+    /*
+    =====================================
+       FORKS
+    =====================================
+    */
+
+
+    if(githubForks >= 1000){
+
+        score += 2;
+
+    }
+    else if(githubForks >= 100){
+
+        score += 1;
+
+    }
+
+
+
+    /*
+    =====================================
+       RECENT DEVELOPMENT
+    =====================================
+    */
+
+
+    if(commits >= 100){
+
+        score += 2;
+
+    }
+    else if(commits >= 30){
+
+        score += 1;
+
+    }
+
+
+
+    /*
+    =====================================
+       CONTRIBUTORS
+    =====================================
+    */
+
+
+    if(contributors >= 50){
+
+        score += 2;
+
+    }
+    else if(contributors >= 10){
+
+        score += 1;
+
+    }
+
+
+
+    /*
+    =====================================
+       EXTERNAL SCORE
+    =====================================
+    */
+
+
+    if(githubScore >= 8){
+
+        score += 1;
+
+    }
+
+
+
+    return normalize(
+
+        score,
+
+        SCORE.DEVELOPMENT
+
+    );
+
+}
+
 /* =========================================
    ONCHAIN
 ========================================= */
