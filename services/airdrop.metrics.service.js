@@ -1100,7 +1100,7 @@ const auditData =
     ======================================
     */
 
-    let linkedinScore = 0;
+   
 
   const team =
 
