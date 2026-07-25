@@ -282,6 +282,18 @@ async function analyzeProject(
 
 console.log("analysis =", analysis);
 
+console.log("===== SCORE RESULT =====");
+
+console.log(analysis.score);
+
+console.log("===== RISK RESULT =====");
+
+console.log(analysis.risk);
+
+console.log("===== TOKENOMICS =====");
+
+console.log(analysis.tokenomics);
+
 await db.query(
 `
 UPDATE airdrop_project_metrics
