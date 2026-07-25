@@ -406,6 +406,9 @@ function calculateOnchain(data){
 
 function calculate(data = {}) {
 
+    console.log("========== SCORE INPUT ==========");
+console.log(JSON.stringify(data, null, 2));
+
     const team =
         calculateTeam(data);
 
