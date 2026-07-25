@@ -1036,37 +1036,7 @@ const [
 
 ]);
 
-    const githubData =
-
-    githubResult.status === "fulfilled"
-
-        ? githubResult.value
-
-        : {};
-
-const llamaData =
-
-    llamaResult.status === "fulfilled"
-
-        ? llamaResult.value
-
-        : {};
-
-const terminalData =
-
-    terminalResult.status === "fulfilled"
-
-        ? terminalResult.value
-
-        : {};
-
-const auditData =
-
-    auditResult.status === "fulfilled"
-
-        ? auditResult.value
-
-        : {};
+   
     /*
     ======================================
     TEAM LINKEDIN
