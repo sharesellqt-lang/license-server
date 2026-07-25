@@ -82,8 +82,7 @@ return {
     investors,
     partners,
     team,
-    notes,
-    analysis
+    notes
 };
 
 }
