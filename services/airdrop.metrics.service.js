@@ -757,15 +757,18 @@ async function syncCoinGecko(
         "========== SYNC COINGECKO =========="
     );
 
+
     console.log(
         "projectId =",
         projectId
     );
 
+
     console.log(
         "coinId =",
         coinId
     );
+
 
     if(!coinId){
 
@@ -775,142 +778,38 @@ async function syncCoinGecko(
 
     }
 
+
+
     const data =
         await coingecko.fetchById(
             coinId
         );
+
+
 
     console.log(
         "CoinGecko DATA:",
         data
     );
 
-    /*
-    =====================================
-    MERGE EXTRA COLLECTORS
-    =====================================
-    */
 
-    let githubData = {};
-    let auditData = {};
-    let llamaData = {};
-    let terminalData = {};
-
-    if(data.github_repo){
-
-        try{
-
-            githubData =
-                await github.fetchRepository(
-                    data.github_repo
-                );
-
-        }
-
-        catch(err){
-
-            console.log(
-                "GitHub:",
-                err.message
-            );
-
-        }
-
-    }
-
-    if(data.defillama_slug){
-
-        try{
-
-            llamaData =
-                await defillama.fetchProtocol(
-                    data.defillama_slug
-                );
-
-        }
-
-        catch(err){
-
-            console.log(
-                "DeFiLlama:",
-                err.message
-            );
-
-        }
-
-    }
-
-    if(data.token_terminal_id){
-
-        try{
-
-            terminalData =
-                await tokenterminal.fetchProject(
-                    data.token_terminal_id
-                );
-
-        }
-
-        catch(err){
-
-            console.log(
-                "TokenTerminal:",
-                err.message
-            );
-
-        }
-
-    }
-
-    try{
-
-        auditData =
-            await audit.fetchAudit(data);
-
-    }
-
-    catch(err){
-
-        console.log(
-            "Audit:",
-            err.message
-        );
-
-    }
-
-    const metrics = {
-
-        ...data,
-
-        ...githubData,
-
-        ...llamaData,
-
-        ...terminalData,
-
-        ...auditData
-
-    };
-
-    console.log(
-    "========== FINAL METRICS =========="
-);
-
-console.log(data);
 
     await saveMetrics(
 
         projectId,
 
-        metrics
+        data
 
     );
+
+
 
     console.log(
-        "Metrics saved."
+        "CoinGecko metrics saved."
     );
 
-    return metrics;
+
+    return data;
 
 }
 
