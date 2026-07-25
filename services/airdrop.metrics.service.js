@@ -7,6 +7,23 @@
 const db = require("../db");
 const coingecko = require("./collectors/coingecko.collector");
 const gecko = require("./collectors/geckoterminal.collector");
+const github =
+    require("./collectors/github.collector");
+
+const defillama =
+    require("./collectors/defillama.collector");
+
+const tokenterminal =
+    require("./collectors/tokenterminal.collector");
+
+const audit =
+    require("./collectors/audit.collector");
+
+const linkedin =
+    require("./collectors/linkedin.collector");
+
+const teamService =
+    require("./airdrop.team.service");
 function normalizeMetrics(data = {}) {
 
     return {
@@ -34,6 +51,63 @@ function normalizeMetrics(data = {}) {
 
         volume_24h:
             Number(data.volume_24h || 0),
+
+            tvl:
+    Number(data.tvl || 0),
+
+tvl_growth_7d:
+    Number(data.tvl_growth_7d || 0),
+
+tvl_growth_30d:
+    Number(data.tvl_growth_30d || 0),
+
+protocol_fee:
+    Number(data.protocol_fee || 0),
+
+protocol_revenue:
+    Number(data.protocol_revenue || 0),
+
+revenue_growth_30d:
+    Number(data.revenue_growth_30d || 0),
+
+treasury:
+    Number(data.treasury || 0),
+
+cash_runway_months:
+    Number(data.cash_runway_months || 0),
+
+stablecoin_reserve:
+    Number(data.stablecoin_reserve || 0),
+
+token_buyback:
+    Number(data.token_buyback || 0),
+
+token_burn:
+    Number(data.token_burn || 0),
+
+holders:
+    Number(data.holders || 0),
+
+github_score:
+    Number(data.github_score || 0),
+
+github_stars:
+    Number(data.github_stars || 0),
+
+github_forks:
+    Number(data.github_forks || 0),
+
+github_recent_commits:
+    Number(data.github_recent_commits || 0),
+
+github_contributors:
+    Number(data.github_contributors || 0),
+
+audit_score:
+    Number(data.audit_score || 0),
+
+transactions_24h:
+    Number(data.transactions_24h || 0),
 
         liquidity:
             Number(data.liquidity || 0),
@@ -104,38 +178,85 @@ function normalizeMetrics(data = {}) {
 ========================================= */
 
 function defaultMetrics() {
+
     return {
+
         token_symbol: "",
+
         current_price: 0,
+
         total_supply: 0,
         circulating_supply: 0,
         max_supply: 0,
+
         market_cap: 0,
         fdv: 0,
-        volume_24h:0,
-        liquidity:0,
-        price_change_24h:0,
+
+        volume_24h: 0,
+        liquidity: 0,
+        price_change_24h: 0,
+
+        tvl: 0,
+        tvl_growth_7d: 0,
+        tvl_growth_30d: 0,
+
+        protocol_fee: 0,
+        protocol_revenue: 0,
+        revenue_growth_30d: 0,
+
+        treasury: 0,
+        cash_runway_months: 0,
+        stablecoin_reserve: 0,
+
+        token_buyback: 0,
+        token_burn: 0,
+
+        holders: 0,
+        transactions_24h: 0,
+
+        github_score: 0,
+        github_stars: 0,
+        github_forks: 0,
+        github_recent_commits: 0,
+        github_contributors: 0,
+
+        audit_score: 0,
+
+        linkedin_score: 0,
+        followers: 0,
+        total_experience: 0,
+        big_companies: 0,
+        education_count: 0,
+
         seed_price: 0,
         private_price: 0,
         public_price: 0,
+
         fair_buy_price: 0,
         fair_sell_price: 0,
+
         ath_price: 0,
         atl_price: 0,
+
         funding_amount: 0,
+
         team_score: 0,
         investor_score: 0,
         partner_score: 0,
+
         tokenomics_score: 0,
         community_score: 0,
         development_score: 0,
         financial_score: 0,
         onchain_score: 0,
-        total_score: 0,
-        risk_level: "medium"
-    };
-}
 
+        total_score: 0,
+
+        risk_level: "medium"
+
+    };
+
+}
 
 /* =========================================
    GET
@@ -168,7 +289,7 @@ return rows[0] || null;
    GET ALL METRICS
 ========================================= */
 
-async function getAllMetrics(userId) {
+async function getAllMetrics(userId){
 
     const sql = `
         SELECT
@@ -176,16 +297,19 @@ async function getAllMetrics(userId) {
         FROM airdrop_project_metrics m
         INNER JOIN airdrop_projects p
             ON p.id = m.project_id
-        WHERE p.user_id = ?
+        WHERE p.user_id=?
     `;
 
     const [rows] =
-        await db.query(sql, [userId]);
+        await db.query(
+            sql,
+            [userId]
+        );
 
-        console.log(
-"METRICS UPDATED",
-projectId
-);
+    console.log(
+        "METRICS LOADED:",
+        rows.length
+    );
 
     return rows || [];
 
@@ -225,6 +349,24 @@ const now = Date.now();
             volume_24h,
             liquidity,
             price_change_24h,
+            tvl,
+tvl_growth_7d,
+tvl_growth_30d,
+
+protocol_fee,
+protocol_revenue,
+revenue_growth_30d,
+
+treasury,
+cash_runway_months,
+
+stablecoin_reserve,
+
+token_buyback,
+token_burn,
+
+holders,
+transactions_24h,
             seed_price,
             private_price,
             public_price,
@@ -291,6 +433,39 @@ const now = Date.now();
         metric.liquidity,
 
         metric.price_change_24h,
+
+        metric.tvl,
+metric.tvl_growth_7d,
+metric.tvl_growth_30d,
+
+metric.protocol_fee,
+metric.protocol_revenue,
+metric.revenue_growth_30d,
+
+metric.treasury,
+metric.cash_runway_months,
+
+metric.stablecoin_reserve,
+
+metric.token_buyback,
+metric.token_burn,
+
+metric.holders,
+metric.transactions_24h,
+
+metric.github_score,
+metric.github_stars,
+metric.github_forks,
+metric.github_recent_commits,
+metric.github_contributors,
+
+metric.audit_score,
+
+metric.linkedin_score,
+metric.followers,
+metric.total_experience,
+metric.big_companies,
+metric.education_count,
 
         metric.seed_price,
         metric.private_price,
@@ -383,7 +558,37 @@ async function updateMetrics(projectId, data = {}) {
 
             liquidity=?,
             price_change_24h=?,
+            tvl=?,
+tvl_growth_7d=?,
+tvl_growth_30d=?,
 
+protocol_fee=?,
+protocol_revenue=?,
+revenue_growth_30d=?,
+
+treasury=?,
+cash_runway_months=?,
+
+stablecoin_reserve=?,
+
+token_buyback=?,
+token_burn=?,
+
+holders=?,
+transactions_24h=?,
+github_score=?,
+github_stars=?,
+github_forks=?,
+github_recent_commits=?,
+github_contributors=?,
+
+audit_score=?,
+
+linkedin_score=?,
+followers=?,
+total_experience=?,
+big_companies=?,
+education_count=?,
             seed_price=?,
             private_price=?,
             public_price=?,
@@ -430,6 +635,24 @@ const values = [
 
     metric.liquidity,
     metric.price_change_24h,
+    metric.tvl,
+metric.tvl_growth_7d,
+metric.tvl_growth_30d,
+
+metric.protocol_fee,
+metric.protocol_revenue,
+metric.revenue_growth_30d,
+
+metric.treasury,
+metric.cash_runway_months,
+
+metric.stablecoin_reserve,
+
+metric.token_buyback,
+metric.token_burn,
+
+metric.holders,
+metric.transactions_24h,
 
     metric.seed_price,
     metric.private_price,
@@ -529,9 +752,20 @@ async function syncCoinGecko(
     projectId,
     coinId
 ){
-    console.log("========== SYNC COINGECKO ==========");
-console.log("projectId =", projectId);
-console.log("coinId =", coinId);
+
+    console.log(
+        "========== SYNC COINGECKO =========="
+    );
+
+    console.log(
+        "projectId =",
+        projectId
+    );
+
+    console.log(
+        "coinId =",
+        coinId
+    );
 
     if(!coinId){
 
@@ -541,20 +775,136 @@ console.log("coinId =", coinId);
 
     }
 
-
     const data =
         await coingecko.fetchById(
             coinId
         );
-console.log("CoinGecko DATA:", data);
 
-    await saveMetrics(
-        projectId,
+    console.log(
+        "CoinGecko DATA:",
         data
     );
-console.log("Metrics saved.");
 
-    return data;
+    /*
+    =====================================
+    MERGE EXTRA COLLECTORS
+    =====================================
+    */
+
+    let githubData = {};
+    let auditData = {};
+    let llamaData = {};
+    let terminalData = {};
+
+    if(data.github_repo){
+
+        try{
+
+            githubData =
+                await github.fetchRepository(
+                    data.github_repo
+                );
+
+        }
+
+        catch(err){
+
+            console.log(
+                "GitHub:",
+                err.message
+            );
+
+        }
+
+    }
+
+    if(data.defillama_slug){
+
+        try{
+
+            llamaData =
+                await defillama.fetchProtocol(
+                    data.defillama_slug
+                );
+
+        }
+
+        catch(err){
+
+            console.log(
+                "DeFiLlama:",
+                err.message
+            );
+
+        }
+
+    }
+
+    if(data.token_terminal_id){
+
+        try{
+
+            terminalData =
+                await tokenterminal.fetchProject(
+                    data.token_terminal_id
+                );
+
+        }
+
+        catch(err){
+
+            console.log(
+                "TokenTerminal:",
+                err.message
+            );
+
+        }
+
+    }
+
+    try{
+
+        auditData =
+            await audit.fetchAudit(data);
+
+    }
+
+    catch(err){
+
+        console.log(
+            "Audit:",
+            err.message
+        );
+
+    }
+
+    const metrics = {
+
+        ...data,
+
+        ...githubData,
+
+        ...llamaData,
+
+        ...terminalData,
+
+        ...auditData
+
+    };
+
+    await saveMetrics(
+
+        projectId,
+
+        metrics
+
+    );
+
+    console.log(
+        "Metrics saved."
+    );
+
+    return metrics;
 
 }
 
@@ -593,148 +943,364 @@ console.log("Metrics saved.");
 
 async function syncMarketData(project){
 
-console.log(
-"========== syncMarketData =========="
-);
+    console.log(
+        "========== syncMarketData =========="
+    );
 
-console.log(project);
+    console.log(project);
 
+    let marketData = {};
 
-let data=null;
+    /*
+    ======================================
+    GECKOTERMINAL
+    ======================================
+    */
 
+    if(
+        project.network &&
+        project.contract_address
+    ){
 
-/*
-==============================
-GECKOTERMINAL
-==============================
-*/
+        try{
 
+            marketData =
+                await gecko.fetchToken(
 
-if(
-project.network &&
-project.contract_address
-){
+                    project.network,
 
-console.log(
-"TRY GeckoTerminal"
-);
+                    project.contract_address
 
+                ) || {};
 
-try{
+        }
 
-data =
-await gecko.fetchToken(
+        catch(err){
 
-project.network,
+            console.log(
+                "GeckoTerminal:",
+                err.message
+            );
 
-project.contract_address
+        }
 
-);
+    }
 
+    /*
+    ======================================
+    COINGECKO FALLBACK
+    ======================================
+    */
+
+    if(
+
+        Object.keys(
+            marketData
+        ).length === 0 &&
+
+        project.coingecko_id
+
+    ){
+
+        try{
+
+            marketData =
+                await coingecko.fetchById(
+
+                    project.coingecko_id
+
+                ) || {};
+
+        }
+
+        catch(err){
+
+            console.log(
+                "CoinGecko:",
+                err.message
+            );
+
+        }
+
+    }
+
+    /*
+    ======================================
+    OTHER COLLECTORS
+    ======================================
+    */
+const [
+
+    githubResult,
+
+    llamaResult,
+
+    terminalResult,
+
+    auditResult
+
+] = await Promise.allSettled([
+
+        project.github_repo
+            ? github.fetchRepository(
+                project.github_repo
+            )
+            : null,
+
+        project.defillama_slug
+            ? defillama.fetchProtocol(
+                project.defillama_slug
+            )
+            : null,
+
+        project.token_terminal_id
+            ? tokenterminal.fetchProject(
+                project.token_terminal_id
+            )
+            : null,
+
+        audit.fetchAudit(project)
+
+    ]);
+
+    const githubData =
+
+    githubResult.status === "fulfilled"
+
+        ? githubResult.value
+
+        : {};
+
+const llamaData =
+
+    llamaResult.status === "fulfilled"
+
+        ? llamaResult.value
+
+        : {};
+
+const terminalData =
+
+    terminalResult.status === "fulfilled"
+
+        ? terminalResult.value
+
+        : {};
+
+const auditData =
+
+    auditResult.status === "fulfilled"
+
+        ? auditResult.value
+
+        : {};
+    /*
+    ======================================
+    TEAM LINKEDIN
+    ======================================
+    */
+
+    let linkedinScore = 0;
+
+  const team =
+
+    await teamService.getMembers(
+
+        project.id
+
+    );
+
+let linkedinScore = 0;
+
+let githubScore = 0;
+
+for(const member of team){
+
+    /*
+    ===========================
+    LINKEDIN
+    ===========================
+    */
+
+    if(member.linkedin){
+
+        try{
+
+            const info =
+
+                await linkedin.fetchProfile(
+
+                    member.linkedin
+
+                );
+
+            linkedinScore +=
+
+                info.linkedin_score || 0;
+
+        }
+
+        catch(err){
+
+            console.log(
+
+                "LinkedIn:",
+
+                err.message
+
+            );
+
+        }
+
+    }
+
+    /*
+    ===========================
+    GITHUB
+    ===========================
+    */
+
+    if(member.github){
+
+        try{
+
+            const repo =
+
+                await github.fetchProfile(
+
+                    member.github
+
+                );
+
+            githubScore +=
+
+                repo.github_score || 0;
+
+        }
+
+        catch(err){
+
+            console.log(
+
+                "GitHub:",
+
+                err.message
+
+            );
+
+        }
+
+    }
 
 }
 
-catch(err){
+  const memberCount =
 
-console.log(
-"Gecko failed:",
-err.message
-);
+    team.length || 1;
 
+const teamScore =
 
-}
+    (
 
-}
+        linkedinScore +
 
+        githubScore
 
+    )
 
-/*
-==============================
-COINGECKO FALLBACK
-==============================
-*/
+    /
 
+    memberCount;
 
-if(
-!data &&
-project.coingecko_id
-){
+    /*
+    ======================================
+    MERGE
+    ======================================
+    */
 
-console.log(
-"TRY CoinGecko"
-);
+const data = {
 
+    ...marketData,
 
-try{
+    ...githubData,
 
+    ...llamaData,
 
-data =
-await coingecko.fetchById(
+    ...terminalData,
 
-project.coingecko_id
+    ...auditData,
 
-);
+    github_score:
 
+        githubData.github_score || 0,
 
-}
+    audit_score:
 
-catch(err){
+        auditData.audit_score || 0,
 
-console.log(
-"CoinGecko failed:",
-err.message
+    tvl:
 
-);
+        llamaData.tvl || 0,
 
-}
+    tvl_growth_7d:
 
+        llamaData.tvl_growth_7d || 0,
 
-}
+    tvl_growth_30d:
 
+        llamaData.tvl_growth_30d || 0,
 
+    treasury:
 
-/*
-==============================
-NO DATA
-==============================
-*/
+        terminalData.treasury || 0,
 
+    protocol_fee:
 
-if(!data){
+        terminalData.protocol_fee || 0,
 
-console.log(
-"No market data"
-);
+    protocol_revenue:
 
-return null;
+        terminalData.protocol_revenue || 0,
 
-}
+    revenue_growth_30d:
 
+        terminalData.revenue_growth_30d || 0,
 
+    cash_runway_months:
 
-/*
-==============================
-SAVE
-==============================
-*/
+        terminalData.cash_runway_months || 0,
 
+    stablecoin_reserve:
 
-await saveMetrics(
+        terminalData.stablecoin_reserve || 0,
 
-project.id,
+    token_buyback:
 
-data
+        terminalData.token_buyback || 0,
 
-);
+    token_burn:
 
+        terminalData.token_burn || 0,
 
-console.log(
-"Metrics saved"
-);
+    team_score:
 
+        teamScore
 
-return data;
+};
 
+    await saveMetrics(
+
+        project.id,
+
+        data
+
+    );
+
+    console.log(
+        "Metrics saved."
+    );
+
+    return data;
 
 }
 /* =========================================
