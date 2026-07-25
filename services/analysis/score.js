@@ -62,9 +62,6 @@ function normalize(value, max) {
 
 function calculateTeam(data = {}) {
 
-    console.log("TEAM marketCap =", marketCap);
-console.log("TEAM liquidity =", liquidity);
-
     let score = 0;
 
     const funding =
@@ -226,16 +223,18 @@ function calculateTokenomics(data) {
 /* =========================================
    FINANCIAL
 ========================================= */
+
 function calculateFinancial(data){
 
-    console.log("===== calculateFinancial =====");
-    console.log({
-        market_cap: data.market_cap,
-        volume_24h: data.volume_24h,
-        fdv: data.fdv
-    });
-
     let score = 0;
+
+
+    const marketCap =
+        Number(data.market_cap || 0);
+
+
+    const volume =
+        Number(data.volume_24h || 0);
 
 
     const fdv =
@@ -354,9 +353,6 @@ function calculateDevelopment(data){
 
 function calculateOnchain(data){
 
-    console.log("ONCHAIN liquidity =", liquidity);
-console.log("ONCHAIN volume =", volume);
-
     let score = 0;
 
 
@@ -410,9 +406,6 @@ console.log("ONCHAIN volume =", volume);
 
 function calculate(data = {}) {
 
-    console.log("========== SCORE INPUT ==========");
-console.log(JSON.stringify(data, null, 2));
-
     const team =
         calculateTeam(data);
 
@@ -437,6 +430,18 @@ console.log(JSON.stringify(data, null, 2));
     const onchain =
         calculateOnchain(data);
 
+    console.log("===== SCORE RESULT =====");
+    console.table({
+        team,
+        investor,
+        partner,
+        tokenomics,
+        financial,
+        community,
+        development,
+        onchain
+    });
+
     const overall =
 
         team +
@@ -454,6 +459,8 @@ console.log(JSON.stringify(data, null, 2));
         development +
 
         onchain;
+
+    console.log("OVERALL =", overall);
 
     return {
 
