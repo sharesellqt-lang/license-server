@@ -214,11 +214,17 @@ function defaultMetrics() {
         holders: 0,
         transactions_24h: 0,
 
+        circulating_percent: 0,
+        locked_percent: 0,
+        inflation: 0,
+
         github_score: 0,
         github_stars: 0,
         github_forks: 0,
-        github_recent_commits: 0,
+        github_watchers: 0,
         github_contributors: 0,
+        github_recent_commits: 0,
+        github_releases: 0,
 
         audit_score: 0,
 
@@ -252,12 +258,115 @@ function defaultMetrics() {
 
         total_score: 0,
 
-        risk_level: "medium"
+        risk_level: "medium",
+
+        risk_score: 0,
+
+        seed_roi: 0,
+        private_roi: 0,
+        public_roi: 0,
+
+        recommendation: "",
+
+        created_at: 0,
+        updated_at: 0
 
     };
 
 }
+const METRIC_COLUMNS = [
 
+    "project_id",
+
+    "token_symbol",
+
+    "current_price",
+
+    "total_supply",
+    "circulating_supply",
+    "max_supply",
+
+    "market_cap",
+    "fdv",
+
+    "volume_24h",
+    "liquidity",
+    "price_change_24h",
+
+    "tvl",
+    "tvl_growth_7d",
+    "tvl_growth_30d",
+
+    "protocol_fee",
+    "protocol_revenue",
+    "revenue_growth_30d",
+
+    "treasury",
+    "cash_runway_months",
+    "stablecoin_reserve",
+
+    "token_buyback",
+    "token_burn",
+
+    "holders",
+    "transactions_24h",
+
+    "seed_price",
+    "private_price",
+    "public_price",
+
+    "fair_buy_price",
+    "fair_sell_price",
+
+    "ath_price",
+    "atl_price",
+
+    "funding_amount",
+
+    "team_score",
+    "investor_score",
+    "partner_score",
+
+    "tokenomics_score",
+    "community_score",
+    "development_score",
+    "financial_score",
+    "onchain_score",
+
+    "total_score",
+
+    "risk_level",
+
+    "created_at",
+    "updated_at",
+
+    "circulating_percent",
+    "locked_percent",
+    "inflation",
+
+    "risk_score",
+
+    "seed_roi",
+    "private_roi",
+    "public_roi",
+
+    "recommendation",
+
+    "github_score",
+    "github_stars",
+    "github_forks",
+    "github_watchers",
+    "github_contributors",
+    "github_recent_commits",
+    "github_releases",
+
+    "linkedin_score",
+    "followers",
+    "total_experience",
+    "big_companies",
+    "education_count"
+
+];
 /* =========================================
    GET
 ========================================= */
@@ -321,219 +430,77 @@ async function getAllMetrics(userId){
 
 async function createMetrics(projectId, data = {}) {
 
-const now = Date.now();
+    const now = Date.now();
 
-  const metric = {
+    const metric = {
 
-    ...defaultMetrics(),
+        ...defaultMetrics(),
 
-    ...normalizeMetrics(data)
+        ...normalizeMetrics(data),
 
-};
-    
+        project_id: projectId,
+
+        created_at: now,
+
+        updated_at: now
+
+    };
+
+    const columns =
+        METRIC_COLUMNS;
+
+    const placeholders =
+        columns
+            .map(() => "?")
+            .join(",");
+
     const sql = `
-        INSERT INTO airdrop_project_metrics(
 
-            project_id,
+INSERT INTO airdrop_project_metrics(
 
-            token_symbol,
+${columns.join(",")}
 
-            current_price,
+)
 
-            total_supply,
-            circulating_supply,
-            max_supply,
+VALUES(
 
-            market_cap,
-            fdv,
-            volume_24h,
-            liquidity,
-            price_change_24h,
-            tvl,
-tvl_growth_7d,
-tvl_growth_30d,
+${placeholders}
 
-protocol_fee,
-protocol_revenue,
-revenue_growth_30d,
+)
 
-treasury,
-cash_runway_months,
+`;
 
-stablecoin_reserve,
+    const values =
+        columns.map(
 
-token_buyback,
-token_burn,
+            c => metric[c] ?? null
 
-holders,
-transactions_24h,
-            seed_price,
-            private_price,
-            public_price,
+        );
 
-            fair_buy_price,
-            fair_sell_price,
+    console.log("COLUMN COUNT =", columns.length);
+    console.log("PLACEHOLDER COUNT =", placeholders.split(",").length);
+    console.log("VALUES COUNT =", values.length);
 
-            ath_price,
-            atl_price,
+    try {
 
-            funding_amount,
+        const [result] =
+            await db.query(
+                sql,
+                values
+            );
 
-            team_score,
-            investor_score,
-            partner_score,
-            tokenomics_score,
-            community_score,
-            development_score,
-            financial_score,
-            onchain_score,
+        return result.insertId;
 
-            total_score,
+    }
 
-            risk_level,
+    catch (err) {
 
-            created_at,
-            updated_at
+        console.log("========== INSERT METRICS ERROR ==========");
+        console.log(err.message);
 
-        )
+        throw err;
 
-        VALUES(
-
-            ?,?,?,?,?,?,
-            ?,?,?,?,?,
-            ?,?,?,
-            ?,?,
-            ?,?,
-            ?,
-            ?,?,?,?,?,?,?,?,
-            ?,
-            ?,
-            ?,?
-
-        )
-    `;
-
-    const values = [
-
-        projectId,
-
-        metric.token_symbol,
-
-        metric.current_price,
-
-        metric.total_supply,
-        metric.circulating_supply,
-        metric.max_supply,
-
-        metric.market_cap,
-        metric.fdv,
-
-        metric.volume_24h,
-
-        metric.liquidity,
-
-        metric.price_change_24h,
-
-        metric.tvl,
-metric.tvl_growth_7d,
-metric.tvl_growth_30d,
-
-metric.protocol_fee,
-metric.protocol_revenue,
-metric.revenue_growth_30d,
-
-metric.treasury,
-metric.cash_runway_months,
-
-metric.stablecoin_reserve,
-
-metric.token_buyback,
-metric.token_burn,
-
-metric.holders,
-metric.transactions_24h,
-
-metric.github_score,
-metric.github_stars,
-metric.github_forks,
-metric.github_recent_commits,
-metric.github_contributors,
-
-metric.audit_score,
-
-metric.linkedin_score,
-metric.followers,
-metric.total_experience,
-metric.big_companies,
-metric.education_count,
-
-        metric.seed_price,
-        metric.private_price,
-        metric.public_price,
-
-        metric.fair_buy_price,
-        metric.fair_sell_price,
-
-        metric.ath_price,
-        metric.atl_price,
-
-        metric.funding_amount,
-
-        metric.team_score,
-        metric.investor_score,
-        metric.partner_score,
-        metric.tokenomics_score,
-        metric.community_score,
-        metric.development_score,
-        metric.financial_score,
-        metric.onchain_score,
-
-        metric.total_score,
-
-        metric.risk_level,
-
-        now,
-        now
-
-    ];
-
-    console.log("VALUES LENGTH =", values.length);
-
-console.log("SQL =");
-console.log(sql);
-const columns =
-    sql
-        .split("VALUES")[0]
-        .match(/\(([\s\S]*)\)/)[1]
-        .split(",")
-        .map(s => s.trim())
-        .filter(Boolean);
-
-const placeholders =
-    (sql.match(/\?/g) || []).length;
-
-console.log("COLUMN COUNT:", columns.length);
-console.log("PLACEHOLDER COUNT:", placeholders);
-console.log("VALUES COUNT:", values.length);
-
-try {
-
-    const [result] =
-        await db.query(sql, values);
-
-    return result.insertId;
-
-}
-catch(err){
-
-    console.log("========== INSERT METRICS ERROR ==========");
-    console.log(err.message);
-
-    throw err;
-
-}
-
-    return result.insertId;
+    }
 
 }
 
@@ -543,164 +510,65 @@ catch(err){
 
 async function updateMetrics(projectId, data = {}) {
 
-   const metric = {
-
-    ...defaultMetrics(),
-
-    ...normalizeMetrics(data)
-
-};
-
     const now = Date.now();
 
+    const metric = {
+
+        ...defaultMetrics(),
+
+        ...normalizeMetrics(data),
+
+        updated_at: now
+
+    };
+
+    delete metric.created_at;
+
+    const columns =
+    METRIC_COLUMNS.filter(
+
+        c=>
+
+        c!=="project_id"
+
+        &&
+
+        c!=="created_at"
+
+    );
+
+    const setClause =
+        columns
+            .map(c => `${c}=?`)
+            .join(",");
+
     const sql = `
-        UPDATE airdrop_project_metrics
-        SET
 
-            token_symbol=?,
+UPDATE
+    airdrop_project_metrics
 
-            current_price=?,
+SET
 
-            total_supply=?,
-            circulating_supply=?,
-            max_supply=?,
+${setClause}
 
-            market_cap=?,
-            fdv=?,
+WHERE
+    project_id=?
 
-            volume_24h=?,
+`;
 
-            liquidity=?,
-            price_change_24h=?,
-            tvl=?,
-tvl_growth_7d=?,
-tvl_growth_30d=?,
+    const values = [
 
-protocol_fee=?,
-protocol_revenue=?,
-revenue_growth_30d=?,
+        ...columns.map(c => metric[c]),
 
-treasury=?,
-cash_runway_months=?,
+        projectId
 
-stablecoin_reserve=?,
-
-token_buyback=?,
-token_burn=?,
-
-holders=?,
-transactions_24h=?,
-github_score=?,
-github_stars=?,
-github_forks=?,
-github_recent_commits=?,
-github_contributors=?,
-
-audit_score=?,
-
-linkedin_score=?,
-followers=?,
-total_experience=?,
-big_companies=?,
-education_count=?,
-            seed_price=?,
-            private_price=?,
-            public_price=?,
-
-            fair_buy_price=?,
-            fair_sell_price=?,
-
-            ath_price=?,
-            atl_price=?,
-
-            funding_amount=?,
-
-            team_score=?,
-            investor_score=?,
-            partner_score=?,
-            tokenomics_score=?,
-            community_score=?,
-            development_score=?,
-            financial_score=?,
-            onchain_score=?,
-
-            total_score=?,
-
-            risk_level=?,
-
-            updated_at=?
-
-        WHERE project_id=?
-    `;
-const values = [
-
-    metric.token_symbol,
-
-    metric.current_price,
-
-    metric.total_supply,
-    metric.circulating_supply,
-    metric.max_supply,
-
-    metric.market_cap,
-    metric.fdv,
-
-    metric.volume_24h,
-
-    metric.liquidity,
-    metric.price_change_24h,
-    metric.tvl,
-metric.tvl_growth_7d,
-metric.tvl_growth_30d,
-
-metric.protocol_fee,
-metric.protocol_revenue,
-metric.revenue_growth_30d,
-
-metric.treasury,
-metric.cash_runway_months,
-
-metric.stablecoin_reserve,
-
-metric.token_buyback,
-metric.token_burn,
-
-metric.holders,
-metric.transactions_24h,
-
-    metric.seed_price,
-    metric.private_price,
-    metric.public_price,
-
-    metric.fair_buy_price,
-    metric.fair_sell_price,
-
-    metric.ath_price,
-    metric.atl_price,
-
-    metric.funding_amount,
-
-    metric.team_score,
-    metric.investor_score,
-    metric.partner_score,
-    metric.tokenomics_score,
-    metric.community_score,
-    metric.development_score,
-    metric.financial_score,
-    metric.onchain_score,
-
-    metric.total_score,
-
-    metric.risk_level,
-
-    now,
-
-    projectId
-
-];
+    ];
 
     const [result] =
-        await db.query(sql, values);
+        await db.query(
+            sql,
+            values
+        );
 
     return result.affectedRows > 0;
 
