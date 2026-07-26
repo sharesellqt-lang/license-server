@@ -54,89 +54,118 @@ async function fetchToken(
 
         const attr =
             token.attributes || {};
+/* =====================================
+   SUPPLY
+===================================== */
 
-        /* =====================================
-           SUPPLY
-        ===================================== */
+const totalSupply =
+    Number(
+        attr.normalized_total_supply ||
+        attr.total_supply ||
+        0
+    );
 
-        const totalSupply =
-            Number(
-                attr.normalized_total_supply ||
-                attr.total_supply ||
-                0
-            );
+let circulatingSupply = 0;
 
-        let circulatingSupply = 0;
+if(attr.circulating_supply){
 
-        if(attr.circulating_supply){
-
-            circulatingSupply =
-                Number(
-                    attr.circulating_supply
-                );
-
-        }
-        else if(
-
-            attr.market_cap_usd &&
-            attr.price_usd
-
-        ){
-
-            circulatingSupply =
-
-                Number(attr.market_cap_usd)
-
-                /
-
-                Number(attr.price_usd);
-
-        }
-
-        let maxSupply =
-
-            Number(
-                attr.max_supply || 0
-            );
-
-        if(
-
-            maxSupply === 0 &&
-            totalSupply > 0
-
-        ){
-
-            maxSupply =
-                totalSupply;
-
-        }
-
-        console.log(
-            "========== ATTR =========="
+    circulatingSupply =
+        Number(
+            attr.circulating_supply
         );
 
-        console.log(
-            JSON.stringify(
-                attr,
-                null,
-                2
-            )
-        );
+}
+else if(
 
-        console.log({
+    attr.market_cap_usd &&
+    attr.price_usd
 
-            total_supply:
-                totalSupply,
+){
 
-            circulating_supply:
-                circulatingSupply,
+    circulatingSupply =
 
-            max_supply:
-                maxSupply
+        Number(attr.market_cap_usd)
 
-        });
+        /
 
-        return {
+        Number(attr.price_usd);
+
+}
+
+let maxSupply =
+
+    Number(
+        attr.max_supply || 0
+    );
+
+if(
+
+    maxSupply === 0 &&
+    totalSupply > 0
+
+){
+
+    maxSupply =
+        totalSupply;
+
+}
+
+/* =====================================
+   FIX SUPPLY
+===================================== */
+
+if (
+
+    totalSupply > 0 &&
+
+    circulatingSupply > totalSupply
+
+){
+
+    circulatingSupply =
+        totalSupply;
+
+}
+
+if (
+
+    circulatingSupply <= 0 &&
+
+    totalSupply > 0
+
+){
+
+    circulatingSupply =
+        totalSupply;
+
+}
+
+console.log(
+    "========== ATTR =========="
+);
+
+console.log(
+    JSON.stringify(
+        attr,
+        null,
+        2
+    )
+);
+
+console.log({
+
+    total_supply:
+        totalSupply,
+
+    circulating_supply:
+        circulatingSupply,
+
+    max_supply:
+        maxSupply
+
+});
+
+return {
 
             /* =========================
                BASIC
