@@ -246,7 +246,21 @@ async function fetchById(
             "=============================="
         );
 
-        throw err;
+        if(
+
+    err.response?.status === 429
+
+){
+
+    console.log(
+        "CoinGecko rate limit"
+    );
+
+    return {};
+
+}
+
+throw err;
 
     }
 

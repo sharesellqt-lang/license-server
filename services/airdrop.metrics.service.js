@@ -1113,6 +1113,23 @@ const data = {
 
 };
 
+if (
+
+    !data.market_cap &&
+    !data.current_price &&
+    !data.fdv &&
+    !data.volume_24h
+
+){
+
+    console.log(
+        "No market data collected, skip save."
+    );
+
+    return {};
+
+}
+
 console.log(
     "========== FINAL METRICS =========="
 );
