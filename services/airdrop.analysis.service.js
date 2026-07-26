@@ -262,31 +262,39 @@ async function analyzeProject(
     userId,
     projectId
 ){
-
     console.log("========== ANALYZE ==========");
     console.log("projectId =", projectId);
 
     const context =
         await contextService.getProjectContext(
+
             userId,
+
             projectId
+
         );
 
-    const analysis =
-        await analyze(context);
 
-    console.log("analysis =", analysis);
+   const analysis =
+    await analyze(
+        context
+    );
 
-    console.log("===== SCORE RESULT =====");
-    console.table(analysis.score);
+console.log("analysis =", analysis);
 
-    console.log("===== RISK RESULT =====");
-    console.log(analysis.risk);
+console.log("===== SCORE RESULT =====");
 
-    console.log("===== TOKENOMICS =====");
-    console.log(analysis.tokenomics);
+console.log(analysis.score);
 
-    await db.query(
+console.log("===== RISK RESULT =====");
+
+console.log(analysis.risk);
+
+console.log("===== TOKENOMICS =====");
+
+console.log(analysis.tokenomics);
+
+await db.query(
 `
 UPDATE airdrop_project_metrics
 SET
@@ -320,105 +328,105 @@ updated_at=?
 WHERE project_id=?
 `,
 [
-    safeNumber(
-        analysis.tokenomics?.circulating_percent
-    ),
 
-    safeNumber(
-        analysis.tokenomics?.locked_percent
-    ),
+safeNumber(
+    analysis.tokenomics?.circulating_percent
+),
 
-    safeNumber(
-        analysis.tokenomics?.inflation
-    ),
+safeNumber(
+    analysis.tokenomics?.locked_percent
+),
 
-    safeNumber(
-        analysis.risk?.risk_score
-    ),
+safeNumber(
+    analysis.tokenomics?.inflation
+),
 
-    analysis.risk?.risk_level || "medium",
 
-    safeNumber(
-        analysis.roi?.seed_roi
-    ),
+safeNumber(
+    analysis.risk?.risk_score
+),
 
-    safeNumber(
-        analysis.roi?.private_roi
-    ),
+analysis.risk?.risk_level || "medium",
 
-    safeNumber(
-        analysis.roi?.public_roi
-    ),
 
-    // SCORE
-    safeNumber(
-        analysis.score?.team
-    ),
+safeNumber(
+    analysis.roi?.seed_roi
+),
 
-    safeNumber(
-        analysis.score?.investor
-    ),
+safeNumber(
+    analysis.roi?.private_roi
+),
 
-    safeNumber(
-        analysis.score?.partner
-    ),
+safeNumber(
+    analysis.roi?.public_roi
+),
 
-    safeNumber(
-        analysis.score?.tokenomics
-    ),
 
-    safeNumber(
-        analysis.score?.financial
-    ),
+safeNumber(
+    analysis.score?.team
+),
 
-    safeNumber(
-        analysis.score?.community
-    ),
+safeNumber(
+    analysis.score?.investor_score
+),
 
-    safeNumber(
-        analysis.score?.development
-    ),
+safeNumber(
+    analysis.score?.partner_score
+),
 
-    safeNumber(
-        analysis.score?.onchain
-    ),
+safeNumber(
+    analysis.score?.tokenomics_score
+),
 
-    safeNumber(
-        analysis.score?.overall
-    ),
+safeNumber(
+    analysis.score?.financial_score
+),
 
-    analysis.recommendation?.recommendation ?? null,
+safeNumber(
+    analysis.score?.community_score
+),
 
-    Date.now(),
+safeNumber(
+    analysis.score?.development_score
+),
 
-    projectId
+safeNumber(
+    analysis.score?.onchain_score
+),
+
+
+safeNumber(
+    analysis.score?.overall_score
+),
+
+analysis.recommendation?.recommendation ?? null,
+
+Date.now(),
+
+projectId
+
 ]
-    );
+);
 
+const [result] =
     await db.query(
-`
-UPDATE airdrop_projects
-SET
-    score=?,
-    risk=?,
-    updated_at=?
-WHERE id=?
-`,
-[
-    safeNumber(
-        analysis.score?.overall
-    ),
-
-    safeNumber(
-        analysis.risk?.risk_score
-    ),
-
-    Date.now(),
-
-    projectId
-]
+        `
+        UPDATE airdrop_projects
+        SET
+            score=?,
+            risk=?,
+            updated_at=?
+        WHERE id=?
+        `,
+        [
+            analysis.score?.overall_score || 0,
+            analysis.risk?.risk_score || 0,
+            Date.now(),
+            projectId
+        ]
     );
 
+console.log(result);
     return analysis;
 
 }
