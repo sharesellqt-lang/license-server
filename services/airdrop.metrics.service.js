@@ -1118,6 +1118,27 @@ console.log(
 );
 
 console.log(data);
+console.log("========== FINAL METRICS ==========");
+
+console.table({
+
+market_cap:data.market_cap,
+
+fdv:data.fdv,
+
+volume_24h:data.volume_24h,
+
+circulating_supply:data.circulating_supply,
+
+holders:data.holders,
+
+tvl:data.tvl,
+
+github_score:data.github_score,
+
+github_stars:data.github_stars
+
+});
 
     await saveMetrics(
 
