@@ -2117,43 +2117,74 @@ function calculate(data = {}) {
 
         onchain;
 
+        /* =====================================
+   INVESTMENT SCORE
+===================================== */
+
+const investmentScore =
+
+    (
+        financial * 0.30 +
+
+        tokenomics * 0.25 +
+
+        onchain * 0.20 +
+
+        team * 0.15 +
+
+        community * 0.10
+
+    );
+
     console.log("OVERALL =", overall);
 
     return {
 
-        team_score:
-            team,
+    team_score:
+        team,
 
-        investor_score:
-            investor,
+    investor_score:
+        investor,
 
-        partner_score:
-            partner,
+    partner_score:
+        partner,
 
-        tokenomics_score:
-            tokenomics,
+    tokenomics_score:
+        tokenomics,
 
-        financial_score:
-            financial,
+    financial_score:
+        financial,
 
-        community_score:
-            community,
+    community_score:
+        community,
 
-        development_score:
-            development,
+    development_score:
+        development,
 
-        onchain_score:
-            onchain,
+    onchain_score:
+        onchain,
 
-        overall_score:
 
-            clamp(
-                Math.round(overall),
-                0,
-                100
-            )
+    investment_score:
 
-    };
+        clamp(
+            Number(
+                investmentScore.toFixed(2)
+            ),
+            0,
+            100
+        ),
+
+
+    overall_score:
+
+        clamp(
+            Math.round(overall),
+            0,
+            100
+        )
+
+};
 
 }
 

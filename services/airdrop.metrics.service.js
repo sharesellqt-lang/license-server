@@ -258,6 +258,12 @@ function defaultMetrics() {
 
         total_score: 0,
 
+        investment_score: 0,
+
+        investment_rating: "UNKNOWN",
+
+        investment_action: "",
+
         risk_level: "medium",
 
         risk_score: 0,
@@ -334,6 +340,12 @@ const METRIC_COLUMNS = [
     "onchain_score",
 
     "total_score",
+
+    "investment_score",
+
+    "investment_rating",
+
+    "investment_action",
 
     "risk_level",
 

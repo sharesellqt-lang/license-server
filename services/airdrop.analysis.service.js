@@ -28,6 +28,9 @@ require("../db");
 const contextService =
 require("./airdrop.context.service");
 
+const investment =
+require("./analysis/investment");
+
 /* =========================================
    ANALYZE
 ========================================= */
@@ -165,6 +168,23 @@ const source = {
 
         });
 
+        /* -------------------------------------
+   INVESTMENT
+------------------------------------- */
+
+const investmentData =
+investment.calculate({
+
+    ...source,
+
+    ...scoreData,
+
+    ...riskData,
+
+    ...tokenomicsData
+
+});
+
     /* -------------------------------------
        RECOMMENDATION
     ------------------------------------- */
@@ -231,6 +251,9 @@ return {
     project,
 
     metrics: source,
+
+    investment:
+    investmentData,
 
     investors,
 
@@ -321,6 +344,12 @@ onchain_score=?,
 
 total_score=?,
 
+investment_score=?,
+
+investment_rating=?,
+
+investment_action=?,
+
 recommendation=?,
 
 updated_at=?
@@ -398,6 +427,20 @@ safeNumber(
 safeNumber(
     analysis.score?.overall_score
 ),
+
+safeNumber(
+    analysis.investment?.investment_score
+),
+
+
+analysis.investment?.investment_rating
+||
+"UNKNOWN",
+
+
+analysis.investment?.investment_action
+||
+"",
 
 analysis.recommendation?.recommendation ?? null,
 

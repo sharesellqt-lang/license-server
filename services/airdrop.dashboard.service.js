@@ -65,26 +65,55 @@ async function getDashboard(userId) {
     /* =====================================
        SUMMARY STATS
     ===================================== */
+const total = projects.length;
 
-    const total = projects.length;
 
-    const avgScore =
-        total
-            ? projects.reduce(
-                (sum, p) =>
-                    sum + (p.metrics.total_score || 0),
-                0
-              ) / total
-            : 0;
+const avgScore =
+    total
+        ? projects.reduce(
+            (sum, p) =>
+                sum + Number(
+                    p.metrics?.total_score || 0
+                ),
+            0
+          ) / total
+        : 0;
 
-    const riskCount = {
 
-        low: 0,
-        medium: 0,
-        high: 0,
-        "very-high": 0
 
-    };
+const avgInvestmentScore =
+
+    total
+
+        ? projects.reduce(
+
+            (sum, p) =>
+
+                sum +
+
+                Number(
+                    p.metrics?.investment_score || 0
+                ),
+
+            0
+
+          ) / total
+
+        : 0;
+
+
+
+const riskCount = {
+
+    low: 0,
+
+    medium: 0,
+
+    high: 0,
+
+    "very-high": 0
+
+};
 
     projects.forEach(p => {
 
@@ -104,17 +133,27 @@ async function getDashboard(userId) {
 
     return {
 
-        summary: {
+      summary: {
 
-            total_projects: total,
+    total_projects: total,
 
-            average_score:
-                Number(avgScore.toFixed(2)),
 
-            risk_distribution:
-                riskCount
+    average_score:
+        Number(
+            avgScore.toFixed(2)
+        ),
 
-        },
+
+    average_investment_score:
+        Number(
+            avgInvestmentScore.toFixed(2)
+        ),
+
+
+    risk_distribution:
+        riskCount
+
+},
 
         top_projects:
             topProjects,
