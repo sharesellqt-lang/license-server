@@ -363,40 +363,39 @@ safeNumber(
 
 
 safeNumber(
-    analysis.score?.team_score
+    analysis.score?.team
 ),
 
 safeNumber(
-    analysis.score?.investor_score
+    analysis.score?.investor
 ),
 
 safeNumber(
-    analysis.score?.partner_score
+    analysis.score?.partner
 ),
 
 safeNumber(
-    analysis.score?.tokenomics_score
+    analysis.score?.tokenomics
 ),
 
 safeNumber(
-    analysis.score?.financial_score
+    analysis.score?.financial
 ),
 
 safeNumber(
-    analysis.score?.community_score
+    analysis.score?.community
 ),
 
 safeNumber(
-    analysis.score?.development_score
+    analysis.score?.development
 ),
 
 safeNumber(
-    analysis.score?.onchain_score
+    analysis.score?.onchain
 ),
 
-
 safeNumber(
-    analysis.score?.overall_score
+    analysis.score?.overall
 ),
 
 analysis.recommendation?.recommendation ?? null,
@@ -419,7 +418,7 @@ const [result] =
         WHERE id=?
         `,
         [
-            analysis.score?.overall_score || 0,
+            analysis.score?.overall || 0,
             analysis.risk?.risk_score || 0,
             Date.now(),
             projectId
