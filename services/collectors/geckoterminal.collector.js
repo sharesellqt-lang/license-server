@@ -92,39 +92,17 @@ console.log(
 
             total_supply:
                 Number(
-
-                    attr.normalized_total_supply ||
-
-                    attr.total_supply ||
-
-                    0
-
+                    attr.normalized_total_supply || 0
                 ),
 
             circulating_supply:
                 Number(
-
-                    attr.circulating_supply ||
-
-                    attr.normalized_total_supply ||
-
-                    attr.total_supply ||
-
-                    0
-
+                    attr.circulating_supply || 0
                 ),
 
             max_supply:
                 Number(
-
-                    attr.max_supply ||
-
-                    attr.normalized_total_supply ||
-
-                    attr.total_supply ||
-
-                    0
-
+                    attr.max_supply || 0
                 ),
 
             market_cap:
