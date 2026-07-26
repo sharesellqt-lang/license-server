@@ -55,31 +55,99 @@ async function fetchToken(
         const attr =
             token.attributes || {};
 
-            console.log("========== ATTR ==========");
-console.log(
-    JSON.stringify(attr, null, 2)
-);
+        /* =====================================
+           SUPPLY
+        ===================================== */
+
+        const totalSupply =
+            Number(
+                attr.normalized_total_supply ||
+                attr.total_supply ||
+                0
+            );
+
+        let circulatingSupply = 0;
+
+        if(attr.circulating_supply){
+
+            circulatingSupply =
+                Number(
+                    attr.circulating_supply
+                );
+
+        }
+        else if(
+
+            attr.market_cap_usd &&
+            attr.price_usd
+
+        ){
+
+            circulatingSupply =
+
+                Number(attr.market_cap_usd)
+
+                /
+
+                Number(attr.price_usd);
+
+        }
+
+        let maxSupply =
+
+            Number(
+                attr.max_supply || 0
+            );
+
+        if(
+
+            maxSupply === 0 &&
+            totalSupply > 0
+
+        ){
+
+            maxSupply =
+                totalSupply;
+
+        }
+
+        console.log(
+            "========== ATTR =========="
+        );
+
+        console.log(
+            JSON.stringify(
+                attr,
+                null,
+                2
+            )
+        );
 
         console.log({
 
             total_supply:
-                attr.total_supply,
-
-            normalized_total_supply:
-                attr.normalized_total_supply,
+                totalSupply,
 
             circulating_supply:
-                attr.circulating_supply,
+                circulatingSupply,
 
             max_supply:
-                attr.max_supply
+                maxSupply
 
         });
 
         return {
 
+            /* =========================
+               BASIC
+            ========================= */
+
             token_symbol:
                 attr.symbol || "",
+
+            /* =========================
+               PRICE
+            ========================= */
 
             current_price:
                 Number(
@@ -90,20 +158,22 @@ console.log(
                     0
                 ),
 
+            /* =========================
+               SUPPLY
+            ========================= */
+
             total_supply:
-                Number(
-                    attr.normalized_total_supply || 0
-                ),
+                totalSupply,
 
             circulating_supply:
-                Number(
-                    attr.circulating_supply || 0
-                ),
+                circulatingSupply,
 
             max_supply:
-                Number(
-                    attr.max_supply || 0
-                ),
+                maxSupply,
+
+            /* =========================
+               MARKET
+            ========================= */
 
             market_cap:
                 Number(
@@ -114,6 +184,10 @@ console.log(
                 Number(
                     attr.fdv_usd || 0
                 ),
+
+            /* =========================
+               VOLUME
+            ========================= */
 
             volume_24h:
                 Number(
@@ -141,11 +215,7 @@ console.log(
     }
     catch(err){
 
-        if(
-
-            err.response
-
-        ){
+        if(err.response){
 
             console.log(
                 "========== GECKOTERMINAL ERROR =========="
