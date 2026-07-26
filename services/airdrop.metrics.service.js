@@ -501,6 +501,20 @@ metric.education_count,
 
 console.log("SQL =");
 console.log(sql);
+const columns =
+    sql
+        .split("VALUES")[0]
+        .match(/\(([\s\S]*)\)/)[1]
+        .split(",")
+        .map(s => s.trim())
+        .filter(Boolean);
+
+const placeholders =
+    (sql.match(/\?/g) || []).length;
+
+console.log("COLUMN COUNT:", columns.length);
+console.log("PLACEHOLDER COUNT:", placeholders);
+console.log("VALUES COUNT:", values.length);
 
 try {
 
