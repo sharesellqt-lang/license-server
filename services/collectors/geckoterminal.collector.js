@@ -55,6 +55,11 @@ async function fetchToken(
         const attr =
             token.attributes || {};
 
+            console.log("========== ATTR ==========");
+console.log(
+    JSON.stringify(attr, null, 2)
+);
+
         console.log({
 
             total_supply:
