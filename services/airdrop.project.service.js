@@ -89,21 +89,80 @@ function validateProject(data) {
 function normalizeProjectInput(data = {}) {
 
     return {
-        name: String(data.name || "").trim(),
-        url: String(data.url || "").trim(),
-        wallet: String(data.wallet || "").trim(),
-        start_date: data.startDate || null,
-        end_date: data.endDate || null,
-        tasks: String(data.tasks || "").trim(),
-        interactions: Number(data.interactions || 0),
-        status: data.status || "on",
-        result: data.result || "pending",
-        fees: data.fees || null,
-        source: data.source || "manual",
-        network: String(data.network || "").trim(),
-        contract_address: String(data.contract_address || "").trim(),
-        coingecko_id: String(data.coingecko_id || "").trim(),
+
+        name:
+            String(data.name || "").trim(),
+
+        url:
+            String(data.url || "").trim(),
+
+        wallet:
+            String(data.wallet || "").trim(),
+
+        network:
+            String(data.network || "").trim(),
+
+        contract_address:
+            String(
+                data.contract_address || ""
+            ).trim(),
+
+        coingecko_id:
+            String(
+                data.coingecko_id || ""
+            ).trim(),
+
+        start_date:
+            data.start_date ??
+            data.startDate ??
+            null,
+
+        end_date:
+            data.end_date ??
+            data.endDate ??
+            null,
+
+        tasks:
+            String(data.tasks || "").trim(),
+
+        interactions:
+            Number(data.interactions || 0),
+
+        status:
+            data.status || "on",
+
+        result:
+            data.result || "pending",
+
+        fees:
+            data.fees || null,
+
+        source:
+            data.source || "manual",
+
+        watchlist:
+            Number(data.watchlist || 0),
+
+        difficulty:
+            data.difficulty || "medium",
+
+        expected_reward:
+            Number(data.expected_reward || 0),
+
+        risk:
+            Number(data.risk || 0),
+
+        ai_confidence:
+            Number(data.ai_confidence || 0),
+
+        notes:
+            data.notes || null,
+
+        tags:
+            data.tags || null
+
     };
+
 }
 
 /* =========================================
@@ -378,42 +437,84 @@ async function updateProject(userId, id, data) {
 
     const p = normalizeProjectInput(data);
 
-    const sql = `
-        UPDATE airdrop_projects
-        SET
-            name=?,
-            url=?,
-            wallet=?,
-            start_date=?,
-            end_date=?,
-            tasks=?,
-            interactions=?,
-            status=?,
-            result=?,
-            fees=?,
-            source=?,
-            updated_at=?
-        WHERE id=? AND user_id=?
-    `;
+   const sql = `
+UPDATE airdrop_projects
+SET
+    name=?,
+    url=?,
+    wallet=?,
+
+    network=?,
+    contract_address=?,
+
+    start_date=?,
+    end_date=?,
+
+    tasks=?,
+    interactions=?,
+
+    status=?,
+    result=?,
+
+    fees=?,
+
+    watchlist=?,
+
+    source=?,
+
+    difficulty=?,
+    expected_reward=?,
+    risk=?,
+    ai_confidence=?,
+
+    notes=?,
+    tags=?,
+
+    updated_at=?
+
+WHERE id=? AND user_id=?
+`;
 
     const now = Date.now();
 
-    const values = [
-        p.name,
-        p.url,
-        p.wallet,
-        p.start_date,
-        p.end_date,
-        p.tasks,
-        p.interactions,
-        p.status,
-        p.result,
-        p.fees,
-        p.source,
-        now,
-        id,
-        userId
-    ];
+const values = [
+
+    p.name,
+    p.url,
+    p.wallet,
+
+    p.network,
+    p.contract_address,
+
+    p.start_date,
+    p.end_date,
+
+    p.tasks,
+    p.interactions,
+
+    p.status,
+    p.result,
+
+    p.fees,
+
+    p.watchlist,
+
+    p.source,
+
+    p.difficulty,
+    p.expected_reward,
+    p.risk,
+    p.ai_confidence,
+
+    p.notes,
+    p.tags,
+
+    now,
+
+    id,
+    userId
+
+];
 
     const [result] = await db.query(sql, values);
 
