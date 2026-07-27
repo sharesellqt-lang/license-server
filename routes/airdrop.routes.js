@@ -143,8 +143,8 @@ router.get("/export/csv", authMiddleware, async (req, res) => {
 
 router.get(
     "/portfolio",
-    auth,
-    async (req, res) => {
+    authMiddleware,
+    async (req,res)=>{
 
         try {
 
