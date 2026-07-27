@@ -22,6 +22,7 @@ async function getDashboard(userId) {
             m.market_cap,
             m.fdv,
             m.total_score,
+            m.investment_score,
             m.risk_level
         FROM airdrop_projects p
         LEFT JOIN airdrop_project_metrics m
@@ -50,12 +51,13 @@ async function getDashboard(userId) {
                 status: p.status,
 
                 metrics: {
-                    current_price: p.current_price,
-                    market_cap: p.market_cap,
-                    fdv: p.fdv,
-                    total_score: p.total_score,
-                    risk_level: p.risk_level
-                },
+                current_price: p.current_price,
+                market_cap: p.market_cap,
+                fdv: p.fdv,
+                total_score: p.total_score,
+                investment_score: p.investment_score,
+                risk_level: p.risk_level
+            },
 
                 analysis
             };
