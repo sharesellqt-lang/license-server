@@ -1,5 +1,5 @@
 // =========================================
-// routes/airdrop.routes.js
+// routes/airdrop.routes.js -updated
 // =========================================
 
 "use strict";
@@ -33,9 +33,6 @@ const loadEntity =
 const scanService =
     require("../services/airdrop.scan.service");
 
-const walletService =
-    require("../services/airdrop.wallet.service");
-
 const projectService =
     require("../services/airdrop.project.service");
 
@@ -68,6 +65,10 @@ const rankingService =
 
 const alertService =
     require("../services/airdrop.alert.service");
+
+const walletService =
+    require("../services/airdrop.wallet.intelligence.service");
+
 
 /* =========================================
    GET
@@ -135,6 +136,58 @@ router.get("/export/csv", authMiddleware, async (req, res) => {
     res.setHeader("Content-Type", "text/csv");
     res.send(data);
 });
+
+/* =========================================
+   GET PORTFOLIO
+========================================= */
+
+router.get(
+    "/portfolio",
+    auth,
+    async (req, res) => {
+
+        try {
+
+            const portfolio =
+                await walletService.getPortfolio(
+                    req.user.id
+                );
+
+
+            const summary =
+                walletService.analyzePortfolio(
+                    portfolio
+                );
+
+
+            res.json({
+
+                success:true,
+
+                summary,
+
+                tokens:portfolio
+
+            });
+
+        }
+
+        catch(err){
+
+            console.error(err);
+
+            res.status(500).json({
+
+                success:false,
+
+                message:err.message
+
+            });
+
+        }
+
+    }
+);
 
 /* =========================================
    POST
@@ -209,43 +262,6 @@ router.post(
     }
 );
 
-/* =========================================
-   GET
-   /api/airdrop/wallet/portfolio
-========================================= */
-
-router.get(
-    "/wallet/portfolio",
-    authMiddleware,
-    async (req, res) => {
-
-        try {
-
-            const walletService =
-                require("../services/airdrop.wallet.intelligence.service");
-
-            const rows =
-                await walletService.getPortfolio(req.user.id);
-
-            const analysis =
-                walletService.analyzePortfolio(rows);
-
-            return res.json({
-                success: true,
-                ...analysis
-            });
-
-        } catch (err) {
-
-            console.error("[Wallet Portfolio]", err);
-
-            return res.status(500).json({
-                success: false,
-                message: "Failed to load portfolio"
-            });
-        }
-    }
-);
 
 /* =========================================
    Get
@@ -280,6 +296,9 @@ router.post(
     "/projects",
     authMiddleware,
     async (req, res) => {
+
+        console.log("========== POST PROJECT ==========");
+    console.log(req.body);
 
         try {
 
@@ -2448,9 +2467,6 @@ router.get(
 
         const projectService =
             require("../services/airdrop.project.service");
-
-        const walletService =
-            require("../services/airdrop.wallet.intelligence.service");
 
         const project =
             await projectService.getProjectById(
