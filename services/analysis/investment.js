@@ -1,63 +1,102 @@
 "use strict";
 
+/* =========================================
+   INVESTMENT SCORE
+========================================= */
+
+function n(value) {
+
+    value = Number(value);
+
+    return Number.isFinite(value)
+        ? value
+        : 0;
+
+}
+
+function clamp(value, min, max) {
+
+    return Math.max(
+        min,
+        Math.min(max, value)
+    );
+
+}
 
 function calculate(data = {}) {
 
+    const team =
+        n(data.team_score);
 
-    const score =
-        Number(
-            data.total_score || 0
-        );
+    const investor =
+        n(data.investor_score);
 
-
-    const risk =
-        Number(
-            data.risk_score || 0
-        );
-
-
-    const financial =
-        Number(
-            data.financial_score || 0
-        );
-
+    const partner =
+        n(data.partner_score);
 
     const tokenomics =
-        Number(
-            data.tokenomics_score || 0
+        n(data.tokenomics_score);
+
+    const financial =
+        n(data.financial_score);
+
+    const community =
+        n(data.community_score);
+
+    const development =
+        n(data.development_score);
+
+    const onchain =
+        n(data.onchain_score);
+
+    const risk =
+        clamp(
+            n(data.risk_score),
+            0,
+            100
         );
 
+    /* =====================================
+       SAFE SCORE
+       risk 0 = safest
+       risk 100 = most dangerous
+    ===================================== */
+
+    const safeScore =
+        100 - risk;
+
+    /* =====================================
+       INVESTMENT SCORE
+       Max = 100
+    ===================================== */
 
     const investment_score =
 
-        (
-            score * 0.5
-        )
-        +
-        (
-            risk * 0.2
-        )
-        +
-        (
-            financial * 0.15
-        )
-        +
-        (
-            tokenomics * 0.15
-        );
+        financial * 0.30 +
 
+        tokenomics * 0.25 +
+
+        onchain * 0.15 +
+
+        team * 0.10 +
+
+        investor * 0.05 +
+
+        partner * 0.05 +
+
+        community * 0.05 +
+
+        development * 0.05 +
+
+        safeScore * 0.05;
 
     let rating =
         "AVOID";
 
-
     let action =
         "Avoid";
 
-
-    if(
-        investment_score >= 80
-    ){
+    if (investment_score >= 80) {
 
         rating =
             "STRONG BUY";
@@ -67,9 +106,7 @@ function calculate(data = {}) {
 
     }
 
-    else if(
-        investment_score >=65
-    ){
+    else if (investment_score >= 65) {
 
         rating =
             "BUY";
@@ -79,9 +116,7 @@ function calculate(data = {}) {
 
     }
 
-    else if(
-        investment_score >=50
-    ){
+    else if (investment_score >= 50) {
 
         rating =
             "WATCH";
@@ -91,9 +126,7 @@ function calculate(data = {}) {
 
     }
 
-    else if(
-        investment_score >=35
-    ){
+    else if (investment_score >= 35) {
 
         rating =
             "SPECULATIVE";
@@ -103,10 +136,38 @@ function calculate(data = {}) {
 
     }
 
+    console.log(
+        "===== INVESTMENT SCORE ====="
+    );
+
+    console.table({
+
+        financial,
+
+        tokenomics,
+
+        onchain,
+
+        team,
+
+        investor,
+
+        partner,
+
+        community,
+
+        development,
+
+        safeScore,
+
+        investment_score
+
+    });
 
     return {
 
         investment_score:
+
             Number(
                 investment_score.toFixed(2)
             ),
@@ -119,9 +180,7 @@ function calculate(data = {}) {
 
     };
 
-
 }
-
 
 module.exports = {
 

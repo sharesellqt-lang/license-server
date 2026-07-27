@@ -2117,24 +2117,9 @@ function calculate(data = {}) {
 
         onchain;
 
-        /* =====================================
+/* =====================================
    INVESTMENT SCORE
 ===================================== */
-
-const investmentScore =
-
-    (
-        financial * 0.30 +
-
-        tokenomics * 0.25 +
-
-        onchain * 0.20 +
-
-        team * 0.15 +
-
-        community * 0.10
-
-    );
 
     console.log("OVERALL =", overall);
 
@@ -2163,18 +2148,6 @@ const investmentScore =
 
     onchain_score:
         onchain,
-
-
-    investment_score:
-
-        clamp(
-            Number(
-                investmentScore.toFixed(2)
-            ),
-            0,
-            100
-        ),
-
 
     overall_score:
 
