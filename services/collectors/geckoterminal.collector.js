@@ -5,6 +5,48 @@ const axios = require("axios");
 const BASE =
     "https://api.geckoterminal.com/api/v2";
 
+    function mapNetwork(network = "") {
+
+    switch (String(network).toLowerCase()) {
+
+        case "eth":
+        case "ethereum":
+            return "ethereum";
+
+        case "bsc":
+        case "bnb":
+            return "bsc";
+
+        case "polygon":
+        case "matic":
+            return "polygon_pos";
+
+        case "arb":
+        case "arbitrum":
+            return "arbitrum";
+
+        case "op":
+        case "optimism":
+            return "optimism";
+
+        case "avax":
+        case "avalanche":
+            return "avalanche";
+
+        case "base":
+            return "base";
+
+        case "sol":
+        case "solana":
+            return "solana";
+
+        default:
+            return String(network).toLowerCase();
+
+    }
+
+}
+
 /* =========================================
    FETCH TOKEN
 ========================================= */
@@ -14,8 +56,21 @@ async function fetchToken(
     tokenAddress
 ){
 
-    const url =
-`${BASE}/networks/${network}/tokens/${tokenAddress}`;
+const apiNetwork =
+    mapNetwork(network);
+
+const url =
+`${BASE}/networks/${apiNetwork}/tokens/${tokenAddress}`;
+
+console.log("========== GECKOTERMINAL ==========");
+
+console.log("NETWORK =", network);
+
+console.log("API NETWORK =", apiNetwork);
+
+console.log("TOKEN =", tokenAddress);
+
+console.log("URL =", url);
 
     try{
 
@@ -244,40 +299,50 @@ return {
     }
     catch(err){
 
-        if(err.response){
+        if (err.response) {
 
-            console.log(
-                "========== GECKOTERMINAL ERROR =========="
-            );
+    console.log(
+        "========== GECKOTERMINAL ERROR =========="
+    );
 
-            console.log(
-                "Status:",
-                err.response.status
-            );
+    console.log(
+        "Status:",
+        err.response.status
+    );
 
-            console.log(
-                JSON.stringify(
-                    err.response.data,
-                    null,
-                    2
-                )
-            );
+    console.log(
+        JSON.stringify(
+            err.response.data,
+            null,
+            2
+        )
+    );
 
-            if(
+    if (err.response.status === 404) {
 
-                err.response.status === 429
+        console.log(
+            "Token API not found."
+        );
 
-            ){
+        console.log(
+            "Try GeckoTerminal Search API..."
+        );
 
-                throw new Error(
-                    "GeckoTerminal rate limit"
-                );
+        return null;
 
-            }
+    }
 
-        }
+    if (err.response.status === 429) {
 
-        throw err;
+        throw new Error(
+            "GeckoTerminal rate limit"
+        );
+
+    }
+
+}
+
+throw err;
 
     }
 

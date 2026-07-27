@@ -771,40 +771,40 @@ async function syncMarketData(project){
 
 };
 
-    /*
-    ======================================
-    GECKOTERMINAL
-    ======================================
-    */
+if (
+    project.network &&
+    project.contract_address
+) {
 
-    if(
-        project.network &&
-        project.contract_address
-    ){
+    try {
 
-        try{
-
-            marketData =
-                await gecko.fetchToken(
-
-                    project.network,
-
-                    project.contract_address
-
-                ) || {};
-
-        }
-
-        catch(err){
-
-            console.log(
-                "GeckoTerminal:",
-                err.message
+        const geckoData =
+            await gecko.fetchToken(
+                project.network,
+                project.contract_address
             );
+
+        if (geckoData) {
+
+            marketData = {
+                ...marketData,
+                ...geckoData
+            };
 
         }
 
     }
+
+    catch (err) {
+
+        console.log(
+            "GeckoTerminal:",
+            err.message
+        );
+
+    }
+
+}
 
     /*
     ======================================
