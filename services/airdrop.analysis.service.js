@@ -390,9 +390,8 @@ safeNumber(
     analysis.roi?.public_roi
 ),
 
-
 safeNumber(
-    analysis.score?.team
+    analysis.score?.team_score
 ),
 
 safeNumber(

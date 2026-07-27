@@ -25,29 +25,16 @@ function clamp(value, min, max) {
 
 function calculate(data = {}) {
 
-    const team =
-        n(data.team_score);
+    /* =====================================
+       INPUT
+    ===================================== */
 
-    const investor =
-        n(data.investor_score);
-
-    const partner =
-        n(data.partner_score);
-
-    const tokenomics =
-        n(data.tokenomics_score);
-
-    const financial =
-        n(data.financial_score);
-
-    const community =
-        n(data.community_score);
-
-    const development =
-        n(data.development_score);
-
-    const onchain =
-        n(data.onchain_score);
+    const overall =
+        clamp(
+            n(data.overall_score),
+            0,
+            100
+        );
 
     const risk =
         clamp(
@@ -58,8 +45,8 @@ function calculate(data = {}) {
 
     /* =====================================
        SAFE SCORE
-       risk 0 = safest
-       risk 100 = most dangerous
+       risk = 0   -> safe = 100
+       risk = 100 -> safe = 0
     ===================================== */
 
     const safeScore =
@@ -67,28 +54,20 @@ function calculate(data = {}) {
 
     /* =====================================
        INVESTMENT SCORE
-       Max = 100
+
+       80% Project Quality
+       20% Risk
     ===================================== */
 
     const investment_score =
 
-        financial * 0.30 +
+        overall * 0.80 +
 
-        tokenomics * 0.25 +
+        safeScore * 0.20;
 
-        onchain * 0.15 +
-
-        team * 0.10 +
-
-        investor * 0.05 +
-
-        partner * 0.05 +
-
-        community * 0.05 +
-
-        development * 0.05 +
-
-        safeScore * 0.05;
+    /* =====================================
+       RATING
+    ===================================== */
 
     let rating =
         "AVOID";
@@ -142,21 +121,9 @@ function calculate(data = {}) {
 
     console.table({
 
-        financial,
+        overall,
 
-        tokenomics,
-
-        onchain,
-
-        team,
-
-        investor,
-
-        partner,
-
-        community,
-
-        development,
+        risk,
 
         safeScore,
 
