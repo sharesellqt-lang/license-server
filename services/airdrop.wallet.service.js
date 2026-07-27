@@ -256,10 +256,6 @@ module.exports = {
 
     checkWallets,
 
-    getPortfolio,
-
-    analyzePortfolio
-
     summarize
 
 };
