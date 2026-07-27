@@ -588,19 +588,47 @@ async function updateWatchlist(
 async function getProjectsByUser(userId) {
 
     const sql = `
-        SELECT *
-        FROM airdrop_projects
-        WHERE user_id=?
-        ORDER BY created_at DESC
+        SELECT
+
+            p.*,
+
+            m.current_price,
+            m.market_cap,
+            m.fdv,
+            m.volume_24h,
+            m.liquidity,
+
+            m.total_score,
+            m.risk_level,
+
+            m.investment_score,
+            m.investment_rating,
+            m.investment_action
+
+        FROM airdrop_projects p
+
+        LEFT JOIN airdrop_project_metrics m
+
+            ON p.id = m.project_id
+
+        WHERE p.user_id = ?
+
+        ORDER BY p.created_at DESC
     `;
 
-    const [rows] = await db.query(sql, [userId]);
+    const [rows] =
+        await db.query(sql, [userId]);
 
     return {
+
         success: true,
+
         data: rows || [],
+
         count: rows?.length || 0
+
     };
+
 }
 
 /* =========================================
