@@ -79,7 +79,14 @@ const avgScore =
           ) / total
         : 0;
 
-
+const avgInvestmentScore =
+    total
+        ? projects.reduce(
+            (sum, p) =>
+                sum + Number(p.metrics.investment_score || 0),
+            0
+        ) / total
+        : 0;
 
 const avgInvestmentScore =
 
@@ -133,22 +140,15 @@ const riskCount = {
 
     return {
 
-      summary: {
+    summary: {
 
     total_projects: total,
 
-
     average_score:
-        Number(
-            avgScore.toFixed(2)
-        ),
-
+        Number(avgScore.toFixed(2)),
 
     average_investment_score:
-        Number(
-            avgInvestmentScore.toFixed(2)
-        ),
-
+        Number(avgInvestmentScore.toFixed(2)),
 
     risk_distribution:
         riskCount
