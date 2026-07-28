@@ -2145,45 +2145,45 @@ const partner_score =
 
     console.log("===== SCORE RESULT =====");
 
-    console.table({
+ console.table({
 
-        team,
+    team_score,
 
-        investor,
+    investor_score,
 
-        partner,
+    partner_score,
 
-        tokenomics,
+    tokenomics,
 
-        financial,
+    financial,
 
-        community,
+    community,
 
-        development,
+    development,
 
-        onchain
+    onchain
 
-    });
+});
 
 
 
-    const overall =
+  const overall =
 
-        team_score +
+    team_score +
 
-        investor_score +
+    investor_score +
 
-        partner_score +
+    partner_score +
 
-        tokenomics +
+    tokenomics +
 
-        financial +
+    financial +
 
-        community +
+    community +
 
-        development +
+    development +
 
-        onchain;
+    onchain;
 
 
 
