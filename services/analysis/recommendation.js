@@ -362,25 +362,26 @@ function generate(data = {}) {
         (
             score * 0.7
             +
-            (100-riskScore) * 0.3
+            (100 - riskScore) * 0.3
         )
     );
 
-    return {
 
+return {
 
-        recommendation,
+    recommendation,
 
-        action,
+    action,
 
-        badge,
+    badge,
 
-        reasons,
+    confidence,
 
-        warnings
+    reasons,
 
+    warnings
 
-    };
+};
 
 
 }
