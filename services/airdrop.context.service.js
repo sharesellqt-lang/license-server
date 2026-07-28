@@ -94,62 +94,13 @@ async function getProjectContext(userId, projectId) {
 
             : (metricsResult || {});
 
-
-
-    /*
-    =========================================
-       MERGE ANALYSIS DATA
-    =========================================
-    */
-
-    const analysisData = {
-
-        ...metrics,
-
-        ...tokenomicsResult,
-
-        ...valuationResult
-
-    };
-
-
-
-
-    /*
-    =========================================
-       decision
-    =========================================
-    */
-    const decisionResult =
-    decision.calculate({
-
-        ...scoreResult,
-
-        ...riskResult
-
-    });
-    /*
-    =========================================
-       RECOMMENDATION
-    =========================================
-    */
-
-    const recommendationResult =
-        recommendation.generate({
-
-            ...analysisData,
-
-            ...riskResult,
-
-            ...scoreResult
-
-        });
-
 /*
 =========================================
-ROI
+   ANALYSIS CALCULATION
 =========================================
 */
+
+
 const riskResult =
     risk.calculate(
         metrics
@@ -187,42 +138,73 @@ const scoreResult =
 
     });
 
-    const analysis = {
+
+
+const decisionResult =
+    decision.calculate({
+
+        ...scoreResult,
+
+        ...riskResult
+
+    });
+
+
+
+const recommendationResult =
+    recommendation.generate({
+
+        ...metrics,
+
+        ...riskResult,
+
+        ...tokenomicsResult,
+
+        ...valuationResult,
+
+        ...scoreResult,
+
+        ...decisionResult
+
+    });
+
+
+
+const analysis = {
+
 
     recommendation:
 
-        recommendation.generate({
+        recommendationResult,
 
-            ...metrics,
 
-            ...riskResult,
+    decision:
 
-            ...tokenomicsResult,
-
-            ...valuationResult,
-
-            ...scoreResult
-
-        }),
+        decisionResult,
 
 
     risk:
+
         riskResult,
 
 
     score:
+
         scoreResult,
 
 
     roi:
+
         roiResult,
 
 
     tokenomics:
+
         tokenomicsResult,
 
 
     valuation:
+
         valuationResult
 
 };
