@@ -150,7 +150,6 @@ async function getProjectContext(userId, projectId) {
 ROI
 =========================================
 */
-
 const riskResult =
     risk.calculate(
         metrics
@@ -188,9 +187,10 @@ const scoreResult =
 
     });
 
-const analysis = {
+    const analysis = {
 
     recommendation:
+
         recommendation.generate({
 
             ...metrics,
@@ -205,20 +205,43 @@ const analysis = {
 
         }),
 
+
     risk:
         riskResult,
+
 
     score:
         scoreResult,
 
+
     roi:
         roiResult,
+
 
     tokenomics:
         tokenomicsResult,
 
+
     valuation:
         valuationResult
+
+};
+
+return {
+
+    project,
+
+    metrics,
+
+    investors,
+
+    partners,
+
+    team,
+
+    notes,
+
+    analysis
 
 };
 
