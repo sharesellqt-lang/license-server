@@ -290,14 +290,13 @@ router.get("/projects", authMiddleware, async (req, res) => {
    Post
    /api/airdrop/projects
 ========================================= */
-
 router.post(
     "/projects",
     authMiddleware,
     async (req, res) => {
 
         console.log("========== POST PROJECT ==========");
-    console.log(req.body);
+        console.log(req.body);
 
         try {
 
@@ -307,32 +306,30 @@ router.post(
                     req.body
                 );
 
-                if (
-    req.body.projectWallet
-) {
+            if (req.body.wallet) {
 
-    await walletService.addWallet(
+                await walletService.addWallet(
 
-        req.user.id,
+                    req.user.id,
 
-        {
+                    {
 
-            address:
-                req.body.projectWallet,
+                        address:
+                            req.body.wallet,
 
-            chain:
-                req.body.projectNetwork,
+                        chain:
+                            req.body.network,
 
-            label:
-                req.body.walletLabel ||
+                        label:
+                            req.body.walletLabel ||
 
-                req.body.projectName
+                            req.body.name
 
-        }
+                    }
 
-    );
+                );
 
-}
+            }
 
             return res.json({
                 success: true,
@@ -347,7 +344,9 @@ router.post(
                 success: false,
                 message: err.message || "Create failed"
             });
+
         }
+
     }
 );
 
