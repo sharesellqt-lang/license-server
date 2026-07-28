@@ -132,11 +132,7 @@ module.exports = {
 
     getPortfolio,
 
-    analyzePortfolio,
-
-    checkWallets,
-
-    summarize
+    analyzePortfolio
 
 };
 
