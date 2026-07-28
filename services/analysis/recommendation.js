@@ -357,15 +357,17 @@ function generate(data = {}) {
 
     }
 
-   const confidence =
-    Math.round(
-        (
-            score * 0.7
-            +
-            (100 - riskScore) * 0.3
+ const confidence =
+    Math.min(
+        100,
+        Math.max(
+            0,
+            Math.round(
+                score * 0.7 +
+                (100-riskScore) * 0.3
+            )
         )
     );
-
 
 return {
 
