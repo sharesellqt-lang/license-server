@@ -131,6 +131,12 @@ function analyzePortfolio(rows) {
 module.exports = {
 
     getPortfolio,
-    analyzePortfolio
+
+    analyzePortfolio,
+
+    checkWallets,
+
+    summarize
+
 };
 
