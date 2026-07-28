@@ -95,17 +95,7 @@ async function getProjectContext(userId, projectId) {
             : (metricsResult || {});
 
 
-    /*
-    =========================================
-       TOKENOMICS
-    =========================================
-    */
-
-    const tokenomicsResult =
-        tokenomics.calculate(
-            metrics
-        );
-
+  
 
     /*
     =========================================
