@@ -306,30 +306,29 @@ router.post(
                     req.body
                 );
 
-            if (req.body.wallet) {
+          if (req.body.wallet) {
 
-                await walletService.addWallet(
+    console.log("CALL addWallet");
 
-                    req.user.id,
+    await walletService.addWallet(
 
-                    {
+        req.user.id,
 
-                        address:
-                            req.body.wallet,
+        {
 
-                        chain:
-                            req.body.network,
+            address: req.body.wallet,
 
-                        label:
-                            req.body.walletLabel ||
+            chain: req.body.network,
 
-                            req.body.name
+            label: req.body.walletLabel || req.body.name
 
-                    }
+        }
 
-                );
+    );
 
-            }
+    console.log("DONE addWallet");
+
+}
 
             return res.json({
                 success: true,
