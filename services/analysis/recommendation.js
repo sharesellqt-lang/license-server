@@ -357,7 +357,14 @@ function generate(data = {}) {
 
     }
 
-
+   const confidence =
+    Math.round(
+        (
+            score * 0.7
+            +
+            (100-riskScore) * 0.3
+        )
+    );
 
     return {
 
