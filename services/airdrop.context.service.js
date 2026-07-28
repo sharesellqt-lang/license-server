@@ -36,6 +36,9 @@ const tokenomics =
 const valuation =
     require("./analysis/valuation");
 
+const decision =
+    require("./analysis/decision");
+
 
 /* =========================================
    GET PROJECT CONTEXT
@@ -160,7 +163,19 @@ async function getProjectContext(userId, projectId) {
 
         });
 
+    /*
+    =========================================
+       decision
+    =========================================
+    */
+    const decisionResult =
+    decision.calculate({
 
+        ...scoreResult,
+
+        ...riskResult
+
+    });
     /*
     =========================================
        RECOMMENDATION
@@ -214,7 +229,11 @@ async function getProjectContext(userId, projectId) {
 
 
         valuation:
-            valuationResult
+            valuationResult,
+
+        decision:
+            decisionResult
+
 
     };
 
