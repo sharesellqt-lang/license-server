@@ -67,6 +67,9 @@ const alertService =
     require("../services/airdrop.alert.service");
 
 const walletService =
+    require("../services/airdrop.wallet.service");
+
+const walletIntelligenceService =
     require("../services/airdrop.wallet.intelligence.service");
 
 
@@ -140,47 +143,44 @@ router.get("/export/csv", authMiddleware, async (req, res) => {
 /* =========================================
    GET PORTFOLIO
 ========================================= */
-
 router.get(
     "/portfolio",
     authMiddleware,
-    async (req,res)=>{
+    async (req, res) => {
 
         try {
 
             const portfolio =
-                await walletService.getPortfolio(
+                await walletIntelligenceService.getPortfolio(
                     req.user.id
                 );
 
-
             const summary =
-                walletService.analyzePortfolio(
+                walletIntelligenceService.analyzePortfolio(
                     portfolio
                 );
 
-
             res.json({
 
-                success:true,
+                success: true,
 
                 summary,
 
-                tokens:portfolio
+                tokens: portfolio
 
             });
 
         }
 
-        catch(err){
+        catch (err) {
 
             console.error(err);
 
             res.status(500).json({
 
-                success:false,
+                success: false,
 
-                message:err.message
+                message: err.message
 
             });
 
@@ -188,7 +188,6 @@ router.get(
 
     }
 );
-
 /* =========================================
    POST
    /api/airdrop/wallet-check
@@ -2493,6 +2492,51 @@ router.get(
             success: true,
             ...result
         });
+    }
+);
+
+/* =========================================
+   ADD WALLET
+========================================= */
+
+router.post(
+    "/wallets",
+    authMiddleware,
+    async (req, res) => {
+
+        try {
+
+            const result =
+                await walletService.addWallet(
+
+                    req.user.id,
+
+                    req.body
+
+                );
+
+            res.json({
+
+                success: true,
+
+                wallet: result
+
+            });
+
+        }
+
+        catch (err) {
+
+            res.status(500).json({
+
+                success: false,
+
+                message: err.message
+
+            });
+
+        }
+
     }
 );
 

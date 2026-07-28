@@ -26,6 +26,8 @@
 /* =========================================
    HELPERS
 ========================================= */
+const db =
+    require("../db");
 
 function isValidWallet(wallet = "") {
 
@@ -243,6 +245,141 @@ function summarize(results = []) {
 }
 
 /* =========================================
+   ADD WALLET
+========================================= */
+
+async function addWallet(
+    userId,
+    data
+) {
+
+    const address =
+        String(data.address || "")
+            .trim();
+
+    const chain =
+        String(data.chain || "")
+            .trim()
+            .toUpperCase();
+
+    const label =
+        String(data.label || "")
+            .trim();
+
+    if (!address) {
+
+        throw new Error(
+            "Wallet address required."
+        );
+
+    }
+
+    if (!isValidWallet(address)) {
+
+        throw new Error(
+            "Invalid wallet."
+        );
+
+    }
+
+    const [exists] =
+        await db.query(
+
+            `
+            SELECT id
+            FROM airdrop_wallets
+            WHERE
+                user_id = ?
+            AND
+                address = ?
+            LIMIT 1
+            `,
+
+            [
+                userId,
+                address
+            ]
+
+        );
+
+    if (exists.length) {
+
+        throw new Error(
+            "Wallet already exists."
+        );
+
+    }
+
+    const [result] =
+        await db.query(
+
+            `
+            INSERT INTO
+            airdrop_wallets
+
+            (
+
+                user_id,
+
+                address,
+
+                chain,
+
+                label,
+
+                created_at
+
+            )
+
+            VALUES
+
+            (
+
+                ?,
+
+                ?,
+
+                ?,
+
+                ?,
+
+                ?
+
+            )
+            `,
+
+            [
+
+                userId,
+
+                address,
+
+                chain,
+
+                label,
+
+                Date.now()
+
+            ]
+
+        );
+
+    return {
+
+        id:
+            result.insertId,
+
+        address,
+
+        chain,
+
+        label
+
+    };
+
+}
+
+/* =========================================
    EXPORTS
 ========================================= */
 
@@ -252,6 +389,8 @@ module.exports = {
 
     detectChains,
 
+    addWallet,
+
     checkWallet,
 
     checkWallets,
@@ -259,3 +398,5 @@ module.exports = {
     summarize
 
 };
+
+
