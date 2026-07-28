@@ -203,7 +203,48 @@ function normalize(
 
 }
 
+function calculateTeamScore(team=[]){
 
+    if(!Array.isArray(team))
+        return 0;
+
+
+    return Math.min(
+        20,
+        team.length * 5
+    );
+
+}
+
+
+
+function calculateInvestorScore(investors=[]){
+
+    if(!Array.isArray(investors))
+        return 0;
+
+
+    return Math.min(
+        20,
+        investors.length * 5
+    );
+
+}
+
+
+
+function calculatePartnerScore(partners=[]){
+
+    if(!Array.isArray(partners))
+        return 0;
+
+
+    return Math.min(
+        20,
+        partners.length * 5
+    );
+
+}
 /* =========================================
    TEAM
 ========================================= */
@@ -2057,55 +2098,82 @@ function calculateOnchain(data){
 
 }
 
+
 /* =========================================
    TOTAL
 ========================================= */
 
 function calculate(data = {}) {
 
-    const team =
-        calculateTeam(data);
 
-    const investor =
-        calculateInvestor(data);
+  const team_score =
+    calculateTeamScore(
+        data.team
+    );
 
-    const partner =
-        calculatePartner(data);
+const investor_score =
+    calculateInvestorScore(
+        data.investors
+    );
+
+const partner_score =
+    calculatePartnerScore(
+        data.partners
+    );
+
 
     const tokenomics =
         calculateTokenomics(data);
 
+
     const financial =
         calculateFinancial(data);
+
 
     const community =
         calculateCommunity(data);
 
+
     const development =
         calculateDevelopment(data);
+
 
     const onchain =
         calculateOnchain(data);
 
+
+
     console.log("===== SCORE RESULT =====");
+
     console.table({
+
         team,
+
         investor,
+
         partner,
+
         tokenomics,
+
         financial,
+
         community,
+
         development,
+
         onchain
+
     });
+
+
 
     const overall =
 
-        team +
+        team_score +
 
-        investor +
+        investor_score +
 
-        partner +
+        partner_score +
 
         tokenomics +
 
@@ -2117,47 +2185,55 @@ function calculate(data = {}) {
 
         onchain;
 
-/* =====================================
-   INVESTMENT SCORE
-===================================== */
 
-    console.log("OVERALL =", overall);
+
+    console.log(
+        "OVERALL =",
+        overall
+    );
+
+
 
     return {
 
-    team_score:
-        team,
 
-    investor_score:
-        investor,
+        team_score,
 
-    partner_score:
-        partner,
+        investor_score,
 
-    tokenomics_score:
-        tokenomics,
+        partner_score,
 
-    financial_score:
-        financial,
 
-    community_score:
-        community,
+        tokenomics_score:
+            tokenomics,
 
-    development_score:
-        development,
 
-    onchain_score:
-        onchain,
+        financial_score:
+            financial,
 
-    overall_score:
 
-        clamp(
-            Math.round(overall),
-            0,
-            100
-        )
+        community_score:
+            community,
 
-};
+
+        development_score:
+            development,
+
+
+        onchain_score:
+            onchain,
+
+
+        overall_score:
+
+            clamp(
+                Math.round(overall),
+                0,
+                100
+            )
+
+
+    };
 
 }
 

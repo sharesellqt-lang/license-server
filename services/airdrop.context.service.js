@@ -134,10 +134,20 @@ const scoreResult =
 
         ...tokenomicsResult,
 
-        ...valuationResult
+        ...valuationResult,
+
+
+        // thêm dữ liệu project
+
+        investors,
+
+        partners,
+
+        team,
+
+        notes
 
     });
-
 
 
 const decisionResult =
