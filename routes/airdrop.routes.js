@@ -307,6 +307,33 @@ router.post(
                     req.body
                 );
 
+                if (
+    req.body.projectWallet
+) {
+
+    await walletService.addWallet(
+
+        req.user.id,
+
+        {
+
+            address:
+                req.body.projectWallet,
+
+            chain:
+                req.body.projectNetwork,
+
+            label:
+                req.body.walletLabel ||
+
+                req.body.projectName
+
+        }
+
+    );
+
+}
+
             return res.json({
                 success: true,
                 project
