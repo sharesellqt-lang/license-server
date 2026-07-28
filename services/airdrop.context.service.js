@@ -95,19 +95,6 @@ async function getProjectContext(userId, projectId) {
             : (metricsResult || {});
 
 
-  
-
-    /*
-    =========================================
-       VALUATION
-    =========================================
-    */
-
-    const valuationResult =
-        valuation.calculate(
-            metrics
-        );
-
 
     /*
     =========================================
