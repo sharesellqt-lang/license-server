@@ -6,7 +6,13 @@ function calculate(data = {}) {
 
     const score =
         Number(
-            data.investment_score || 0
+            data.overall_score || 0
+        );
+
+
+    const riskScore =
+        Number(
+            data.risk_score || 50
         );
 
 
@@ -14,7 +20,8 @@ function calculate(data = {}) {
         data.risk_level || "medium";
 
 
-    let decision = "WATCH";
+    let decision =
+        "WATCH";
 
 
     if (
@@ -25,26 +32,45 @@ function calculate(data = {}) {
         )
     ) {
 
-        decision = "BUY";
+        decision =
+            "BUY";
 
     }
 
     else if (
+
         score < 40 ||
+
         risk === "very-high"
+
     ) {
 
-        decision = "AVOID";
+        decision =
+            "AVOID";
 
     }
+
+
+
+    const confidence =
+        Math.min(
+            100,
+            Math.max(
+                0,
+                Math.round(
+                    score * 0.7 +
+                    (100 - riskScore) * 0.3
+                )
+            )
+        );
+
 
 
     return {
 
         decision,
 
-        confidence:
-            score,
+        confidence
 
     };
 
