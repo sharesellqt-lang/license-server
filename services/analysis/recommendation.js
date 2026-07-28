@@ -367,8 +367,6 @@ return {
 
     badge,
 
-    confidence,
-
     reasons,
 
     warnings
