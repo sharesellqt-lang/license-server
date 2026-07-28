@@ -193,68 +193,98 @@ async function getProjectContext(userId, projectId) {
 
         });
 
+/*
+=========================================
+ROI
+=========================================
+*/
 
-    /*
-    =========================================
-       ROI
-    =========================================
-    */
-
-    const roiResult =
-        roi.calculate(
-            analysisData
-        );
-
-
-    const analysis = {
-
-        recommendation:
-            recommendationResult,
+const roiResult =
+    roi.calculate(
+        metrics
+    );
 
 
-        risk:
-            riskResult,
+const tokenomicsResult =
+    tokenomics.calculate(
+        metrics
+    );
 
 
-        score:
-            scoreResult,
+const valuationResult =
+    valuation.calculate(
+        metrics
+    );
 
 
-        roi:
-            roiResult,
+const riskResult =
+    risk.calculate(
+        metrics
+    );
 
 
-        tokenomics:
-            tokenomicsResult,
+const scoreResult =
+    score.calculate(
+        metrics
+    );
 
 
-        valuation:
-            valuationResult,
+const analysis = {
 
-        decision:
-            decisionResult
+    recommendation:
+        recommendation.generate({
+
+            ...metrics,
+
+            ...tokenomicsResult,
+
+            ...valuationResult,
+
+            ...riskResult,
+
+            ...scoreResult
+
+        }),
 
 
-    };
+    risk:
+        riskResult,
 
 
-    return {
+    score:
+        scoreResult,
 
-        project,
 
-        metrics,
+    roi:
+        roiResult,
 
-        investors,
 
-        partners,
+    tokenomics:
+        tokenomicsResult,
 
-        team,
 
-        notes,
+    valuation:
+        valuationResult
 
-        analysis
+};
 
-    };
+return {
+
+    project,
+
+    metrics,
+
+    investors,
+
+    partners,
+
+    team,
+
+    notes,
+
+    analysis
+
+};
 
 }
 
