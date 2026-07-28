@@ -43,11 +43,11 @@ const valuation =
 
 async function getProjectContext(userId, projectId) {
 
-   const project =
-    await projectRepository.getProjectById(
-        userId,
-        projectId
-    );
+    const project =
+        await projectRepository.getProjectById(
+            userId,
+            projectId
+        );
 
     if (!project) {
 
@@ -55,12 +55,19 @@ async function getProjectContext(userId, projectId) {
 
     }
 
+
     const [
-        metrics,
+
+        metricsResult,
+
         investors,
+
         partners,
+
         team,
+
         notes
+
     ] = await Promise.all([
 
         metricsService.getMetrics(projectId),
@@ -76,14 +83,159 @@ async function getProjectContext(userId, projectId) {
     ]);
 
 
-return {
-    project,
-    metrics,
-    investors,
-    partners,
-    team,
-    notes
-};
+    const metrics =
+
+        Array.isArray(metricsResult)
+
+            ? (metricsResult[0] || {})
+
+            : (metricsResult || {});
+
+
+    /*
+    =========================================
+       TOKENOMICS
+    =========================================
+    */
+
+    const tokenomicsResult =
+        tokenomics.calculate(
+            metrics
+        );
+
+
+    /*
+    =========================================
+       VALUATION
+    =========================================
+    */
+
+    const valuationResult =
+        valuation.calculate(
+            metrics
+        );
+
+
+    /*
+    =========================================
+       MERGE ANALYSIS DATA
+    =========================================
+    */
+
+    const analysisData = {
+
+        ...metrics,
+
+        ...tokenomicsResult,
+
+        ...valuationResult
+
+    };
+
+
+    /*
+    =========================================
+       RISK
+    =========================================
+    */
+
+    const riskResult =
+        risk.calculate(
+            analysisData
+        );
+
+
+    /*
+    =========================================
+       SCORE
+    =========================================
+    */
+
+    const scoreResult =
+        score.calculate({
+
+            ...analysisData,
+
+            ...riskResult
+
+        });
+
+
+    /*
+    =========================================
+       RECOMMENDATION
+    =========================================
+    */
+
+    const recommendationResult =
+        recommendation.generate({
+
+            ...analysisData,
+
+            ...riskResult,
+
+            ...scoreResult
+
+        });
+
+
+    /*
+    =========================================
+       ROI
+    =========================================
+    */
+
+    const roiResult =
+        roi.calculate(
+            analysisData
+        );
+
+
+    const analysis = {
+
+        recommendation:
+            recommendationResult,
+
+
+        risk:
+            riskResult,
+
+
+        score:
+            scoreResult,
+
+
+        roi:
+            roiResult,
+
+
+        tokenomics:
+            tokenomicsResult,
+
+
+        valuation:
+            valuationResult
+
+    };
+
+
+    return {
+
+        project,
+
+        metrics,
+
+        investors,
+
+        partners,
+
+        team,
+
+        notes,
+
+        analysis
+
+    };
 
 }
 

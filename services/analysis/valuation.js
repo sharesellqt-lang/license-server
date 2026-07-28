@@ -12,12 +12,17 @@ function calculate(m = {}) {
         Number(m.max_supply || 0);
 
     const marketCap =
-        currentPrice *
-        circulating;
+        Number(
+            m.market_cap ||
+            currentPrice * circulating
+        );
+
 
     const fdv =
-        currentPrice *
-        maxSupply;
+        Number(
+            m.fdv ||
+            currentPrice * maxSupply
+        );
 
     return {
 
