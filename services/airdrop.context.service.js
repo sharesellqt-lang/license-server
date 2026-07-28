@@ -113,32 +113,7 @@ async function getProjectContext(userId, projectId) {
     };
 
 
-    /*
-    =========================================
-       RISK
-    =========================================
-    */
 
-    const riskResult =
-        risk.calculate(
-            analysisData
-        );
-
-
-    /*
-    =========================================
-       SCORE
-    =========================================
-    */
-
-    const scoreResult =
-        score.calculate({
-
-            ...analysisData,
-
-            ...riskResult
-
-        });
 
     /*
     =========================================
@@ -176,8 +151,8 @@ ROI
 =========================================
 */
 
-const roiResult =
-    roi.calculate(
+const riskResult =
+    risk.calculate(
         metrics
     );
 
@@ -194,17 +169,24 @@ const valuationResult =
     );
 
 
-const riskResult =
-    risk.calculate(
+const roiResult =
+    roi.calculate(
         metrics
     );
 
 
 const scoreResult =
-    score.calculate(
-        metrics
-    );
+    score.calculate({
 
+        ...metrics,
+
+        ...riskResult,
+
+        ...tokenomicsResult,
+
+        ...valuationResult
+
+    });
 
 const analysis = {
 
@@ -213,53 +195,30 @@ const analysis = {
 
             ...metrics,
 
+            ...riskResult,
+
             ...tokenomicsResult,
 
             ...valuationResult,
-
-            ...riskResult,
 
             ...scoreResult
 
         }),
 
-
     risk:
         riskResult,
-
 
     score:
         scoreResult,
 
-
     roi:
         roiResult,
-
 
     tokenomics:
         tokenomicsResult,
 
-
     valuation:
         valuationResult
-
-};
-
-return {
-
-    project,
-
-    metrics,
-
-    investors,
-
-    partners,
-
-    team,
-
-    notes,
-
-    analysis
 
 };
 
