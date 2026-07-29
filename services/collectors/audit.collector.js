@@ -1,7 +1,7 @@
 "use strict";
 
 /* =========================================
-   AUDIT COLLECTOR
+  \services\collectors\audit.collector.js
 ========================================= */
 
 const fetch =

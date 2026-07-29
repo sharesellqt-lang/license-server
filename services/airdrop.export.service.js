@@ -4,7 +4,8 @@
 
 "use strict";
 
-const repo = require("./airdrop.repository");
+const projectService =
+    require("./airdrop.project.service");
 
 /* =========================================
    JSON EXPORT
@@ -12,8 +13,11 @@ const repo = require("./airdrop.repository");
 
 async function exportJson(userId) {
 
-    const data =
-        await repo.getProjectsByUser(userId);
+   const result =
+    await projectService.getProjectsByUser(userId);
+
+const data =
+    result.data || [];
 
     return JSON.stringify(data, null, 2);
 }
@@ -24,8 +28,11 @@ async function exportJson(userId) {
 
 async function exportCsv(userId) {
 
-    const data =
-        await repo.getProjectsByUser(userId);
+   const result =
+    await projectService.getProjectsByUser(userId);
+
+const data =
+    result.data || [];
 
     const header = [
         "id",

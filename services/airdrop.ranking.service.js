@@ -3,7 +3,7 @@
 const db = require("../db");
 
 /* =========================================
-   GET RANKING
+   airdrop.ranking.service.js
 ========================================= */
 
 async function getRanking(userId, filter = {}) {
