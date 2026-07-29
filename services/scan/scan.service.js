@@ -26,13 +26,24 @@ const historyService =
 =========================================
 */
 
+const projectService =
+    require("../airdrop.project.service");
+
+
+const metricsService =
+    require("../airdrop.metrics.service");
+
+
+const historyService =
+    require("../airdrop.project.history.service");
+
+
 
 const {
     scanWebsite
 }
 =
 require("./scan.website");
-
 
 
 const {
@@ -42,13 +53,11 @@ const {
 require("./scan.github");
 
 
-
 const {
     scanCoinGecko
 }
 =
 require("./scan.coingecko");
-
 
 
 const {
@@ -58,13 +67,11 @@ const {
 require("./scan.geckoterminal");
 
 
-
 const {
     scanDefiLlama
 }
 =
 require("./scan.defillama");
-
 
 
 const {
@@ -74,13 +81,11 @@ const {
 require("./scan.audit");
 
 
-
 const {
     scanTeam
 }
 =
 require("./scan.team");
-
 
 
 const {
@@ -90,13 +95,11 @@ const {
 require("./scan.partner");
 
 
-
 const {
     scanInvestor
 }
 =
 require("./scan.investor");
-
 
 
 const {
@@ -106,12 +109,18 @@ const {
 require("./scan.tokenomics");
 
 
-
 const {
     scanNote
 }
 =
 require("./scan.note");
+
+
+const {
+    createScoreSummary
+}
+=
+require("./scan.utils");
 
 
 

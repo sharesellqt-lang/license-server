@@ -31,7 +31,7 @@ const loadEntity =
 ========================================= */
 
 const scanService =
-    require("../services/airdrop.scan.service");
+    require("../services/scan/scan.service");
 
 const projectService =
     require("../services/airdrop.project.service");
@@ -85,37 +85,37 @@ router.get(
 
         try {
 
-            const projects =
-                await scanService.scan();
+            const result =
+                await scanService.scanUserProjects(
+                    req.user.id
+                );
+
 
             return res.json({
 
-                success: true,
+                success:true,
 
-                total:
-                    projects.length,
-
-                projects
+                result
 
             });
 
         }
 
-        catch (err) {
+        catch(err){
 
             console.error(
                 "[Airdrop Scan]",
                 err
             );
 
+
             return res.status(500).json({
 
-                success: false,
+                success:false,
 
                 message:
                     err.message ||
-
-                    "Scan failed."
+                    "Scan failed"
 
             });
 
