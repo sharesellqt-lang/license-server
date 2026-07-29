@@ -2489,8 +2489,6 @@ router.get(
         const decisionEngine =
             require("../services/ai/airdrop.decision.engine");
 
-        const projectService =
-            require("../services/airdrop.project.service");
 
         const project =
             await projectService.getProjectById(
