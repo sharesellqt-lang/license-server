@@ -1,299 +1,270 @@
 // =========================================
-// services/coinmarketcap.collector.js
+// services/collectors/coinmarketcap.collector.js
 // =========================================
 
 "use strict";
 
-
 const axios = require("axios");
 
-
+const BASE_URL =
+    "https://pro-api.coinmarketcap.com/v1";
 
 const API_KEY =
     process.env.COINMARKETCAP_API_KEY;
 
-
-
-const BASE_URL =
-    "https://pro-api.coinmarketcap.com";
-
-
-
 /* =========================================
-   HEADERS
+   AXIOS
 ========================================= */
 
-function headers(){
+const api = axios.create({
 
-    return {
+    baseURL: BASE_URL,
+
+    timeout: 10000,
+
+    headers: {
+
+        Accept: "application/json",
 
         "X-CMC_PRO_API_KEY":
-            API_KEY,
+            API_KEY
 
-        Accept:
-            "application/json"
+    }
 
-    };
+});
+
+/* =========================================
+   HELPERS
+========================================= */
+
+function number(value){
+
+    value = Number(value);
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+    return value;
 
 }
 
-
-
 /* =========================================
-   FIND TOKEN BY SYMBOL
+   NORMALIZE
 ========================================= */
-
-async function getTokenBySymbol(symbol){
-
-
-    if(!symbol){
-
-        throw new Error(
-            "Token symbol required"
-        );
-
-    }
-
-
-
-    if(!API_KEY){
-
-        throw new Error(
-            "Missing COINMARKETCAP_API_KEY"
-        );
-
-    }
-
-
-
-    const url =
-        `${BASE_URL}/v1/cryptocurrency/quotes/latest`;
-
-
-
-    const response =
-        await axios.get(
-            url,
-            {
-                headers: headers(),
-
-                params: {
-
-                    symbol:
-                        symbol.toUpperCase(),
-
-                    convert:
-                        "USD"
-
-                }
-
-            }
-        );
-
-
-
-    const data =
-        response.data?.data;
-
-
-
-    const token =
-        data?.[symbol.toUpperCase()];
-
-
-
-    if(!token){
-
-        return null;
-
-    }
-
-
-
-    return normalizeToken(token);
-
-
-}
-
-
-
-/* =========================================
-   NORMALIZE DATA
-========================================= */
-
 
 function normalizeToken(token){
 
+    if(!token){
+
+        return {};
+
+    }
 
     const quote =
         token.quote?.USD || {};
 
-
-
     return {
 
+        token_symbol:
 
-        id:
-            token.id,
-
+            token.symbol || "",
 
         name:
-            token.name,
 
+            token.name || "",
 
-        symbol:
-            token.symbol,
+        current_price:
 
-
-
-        price:
-
-            Number(
-                quote.price || 0
+            number(
+                quote.price
             ),
-
-
 
         market_cap:
 
-            Number(
-                quote.market_cap || 0
+            number(
+                quote.market_cap
             ),
-
-
 
         volume_24h:
 
-            Number(
-                quote.volume_24h || 0
+            number(
+                quote.volume_24h
             ),
 
+        fdv:
 
-
-        percent_change_24h:
-
-            Number(
-                quote.percent_change_24h || 0
+            number(
+                quote.fully_diluted_market_cap
             ),
-
-
 
         circulating_supply:
 
-            Number(
-                token.circulating_supply || 0
+            number(
+                token.circulating_supply
             ),
-
-
 
         total_supply:
 
-            Number(
-                token.total_supply || 0
+            number(
+                token.total_supply
             ),
-
-
 
         max_supply:
 
-            Number(
-                token.max_supply || 0
+            number(
+                token.max_supply
             ),
-
-
 
         cmc_rank:
 
-            token.cmc_rank || null
+            number(
+                token.cmc_rank
+            ),
 
+        price_change_24h:
+
+            number(
+                quote.percent_change_24h
+            ),
+
+        price_change_7d:
+
+            number(
+                quote.percent_change_7d
+            ),
+
+        price_change_30d:
+
+            number(
+                quote.percent_change_30d
+            )
 
     };
 
-
 }
 
-
-
 /* =========================================
-   GET MARKET DATA
+   FETCH BY SYMBOL
 ========================================= */
 
+async function fetchBySymbol(symbol){
 
-async function getMarketData(symbol){
+    if(!symbol){
 
-
-    const token =
-        await getTokenBySymbol(symbol);
-
-
-
-    if(!token){
-
-        return null;
+        return {};
 
     }
 
+    if(!API_KEY){
 
+        console.log(
+            "CoinMarketCap API key missing."
+        );
 
-    return {
+        return {};
 
+    }
 
-        token_symbol:
-            token.symbol,
+    try{
 
+        const res =
+            await api.get(
 
-        current_price:
-            token.price,
+                "/cryptocurrency/quotes/latest",
 
+                {
 
-        market_cap:
-            token.market_cap,
+                    params:{
 
+                        symbol:
+                            symbol.toUpperCase(),
 
-        total_supply:
-            token.total_supply,
+                        convert:
+                            "USD"
 
+                    }
 
-        circulating_supply:
-            token.circulating_supply,
+                }
 
+            );
 
-        max_supply:
-            token.max_supply,
+        const token =
 
+            res.data?.data?.[
+                symbol.toUpperCase()
+            ];
 
-        volume_24h:
-            token.volume_24h,
+        if(!token){
 
+            return {};
 
-        change_24h:
-            token.percent_change_24h,
+        }
 
+        return normalizeToken(token);
 
-        rank:
-            token.cmc_rank
+    }
 
+    catch(err){
 
-    };
+        console.log(
+            "========== COINMARKETCAP ERROR =========="
+        );
 
+        console.log(
+            "Status:",
+            err.response?.status
+        );
+
+        console.log(
+            "Message:",
+            err.message
+        );
+
+        if(
+
+            err.response?.status === 429
+
+        ){
+
+            console.log(
+                "CoinMarketCap rate limit."
+            );
+
+            return {};
+
+        }
+
+        if(
+
+            err.response?.status === 401
+
+        ){
+
+            console.log(
+                "CoinMarketCap invalid API key."
+            );
+
+            return {};
+
+        }
+
+        return {};
+
+    }
 
 }
 
-
-
 /* =========================================
-   EXPORTS
+   EXPORT
 ========================================= */
-
 
 module.exports = {
 
-
-    getTokenBySymbol,
-
-    getMarketData,
+    fetchBySymbol,
 
     normalizeToken
-
 
 };

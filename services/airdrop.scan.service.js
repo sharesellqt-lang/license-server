@@ -4,8 +4,6 @@
 
 "use strict";
 
-const scoreService =
-    require("./airdrop.score.service");
 
 /* =========================================
    MOCK PROJECTS -update
@@ -20,68 +18,8 @@ function getProjectsFromFile() {
     return JSON.parse(raw);
 }
 
-/* =========================================
-   NORMALIZE
-========================================= */
-
-function normalizeProject(project) {
-
-    const analyzed =
-        scoreService.analyzeProject(project);
-
-    return {
-
-        id:
-            analyzed.id,
-
-        title:
-            analyzed.title ||
-            analyzed.name ||
-            "",
-
-        source:
-            analyzed.source ||
-            "Unknown",
-
-        url:
-            analyzed.url ||
-            "",
-
-        funding:
-            analyzed.funding || 0,
-
-        community:
-            analyzed.community || 0,
-
-        investors:
-            Array.isArray(
-                analyzed.investors
-            )
-                ? analyzed.investors
-                : [],
-
-        token:
-            Boolean(
-                analyzed.token
-            ),
-
-        deadline:
-            analyzed.deadline ||
-            "",
-
-        score:
-            analyzed.score,
-
-        rank:
-            analyzed.rank,
-
-        recommendation:
-            analyzed.recommendation
-
-    };
-
-}
-
+const scan =
+require("./scan/scan.service");
 /* =========================================
    SORT
 ========================================= */

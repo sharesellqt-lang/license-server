@@ -1,53 +1,64 @@
 "use strict";
 
 /* =========================================
-  \services\collectors\audit.collector.js
+   AUDIT COLLECTOR
+   services/collectors/audit.collector.js
+
+   Sources:
+   - Certik
+   - Hacken
+   - Cyberscope
+   - SolidProof
+   - Coinsult
+   - SlowMist
+
+   Output normalized:
+
+   {
+       audit_provider,
+       audited,
+       audit_score,
+       security_score,
+       findings,
+       report_url,
+       last_audit
+   }
+
 ========================================= */
+
 
 const fetch =
     global.fetch ||
     require("node-fetch");
 
-/*
----------------------------------------------
-Supported Sources
 
-Hacken
-Certik
-Cyberscope
-SolidProof
-Coinsult
-SlowMist
 
-The collector attempts to normalize all
-audit providers into one common format.
----------------------------------------------
-*/
+const TIMEOUT = 10000;
+
+
 
 const SOURCES = [
 
-    "https://skynet.certik.com",
-
-    "https://hacken.io",
-
-    "https://www.cyberscope.io",
-
-    "https://solidproof.io",
-
-    "https://coinsult.net",
-
-    "https://slowmist.com"
+    "Certik",
+    "Hacken",
+    "Cyberscope",
+    "SolidProof",
+    "Coinsult",
+    "SlowMist"
 
 ];
+
+
 
 /* =========================================
    HELPERS
 ========================================= */
 
+
 function number(value){
 
-    value =
-        Number(value);
+    value = Number(value);
+
 
     if(
         !Number.isFinite(value)
@@ -57,127 +68,236 @@ function number(value){
 
     }
 
+
     return value;
 
 }
 
-function normalizeProvider(name){
 
-    if(!name){
 
-        return "";
+function clamp(
+    value,
+    min,
+    max
+){
 
-    }
+    return Math.min(
+        Math.max(
+            number(value),
+            min
+        ),
+        max
+    );
+
+}
+
+
+
+
+function normalizeProvider(
+    name=""
+){
 
     name =
         String(name)
         .toLowerCase();
 
-    if(name.includes("certik")){
 
+
+    if(name.includes("certik"))
         return "Certik";
 
-    }
 
-    if(name.includes("hacken")){
-
+    if(name.includes("hacken"))
         return "Hacken";
 
-    }
 
-    if(name.includes("cyberscope")){
-
+    if(name.includes("cyberscope"))
         return "Cyberscope";
 
-    }
 
-    if(name.includes("solid")){
-
+    if(
+        name.includes("solid")
+    )
         return "SolidProof";
 
-    }
 
-    if(name.includes("coinsult")){
-
+    if(
+        name.includes("coinsult")
+    )
         return "Coinsult";
 
-    }
 
-    if(name.includes("slowmist")){
-
+    if(
+        name.includes("slow")
+    )
         return "SlowMist";
 
-    }
 
-    return name;
+
+    return "";
 
 }
 
+
+
 /* =========================================
-   CERTIK
+   SAFE FETCH
 ========================================= */
 
-async function fetchCertik(project){
 
-    if(
-        !project
-    ){
-
-        return null;
-
-    }
+async function request(
+    url,
+    options={}
+){
 
     try{
 
-        const res =
-            await fetch(
 
-                `https://skynet.certik.com/api/v1/projects/${project}`
+        const controller =
+            new AbortController();
 
+
+
+        const timer =
+            setTimeout(
+                ()=>controller.abort(),
+                TIMEOUT
             );
 
-        if(!res.ok){
+
+
+        const res =
+            await fetch(
+                url,
+                {
+                    ...options,
+                    signal:
+                        controller.signal
+                }
+            );
+
+
+
+        clearTimeout(timer);
+
+
+
+        if(
+            !res.ok
+        ){
 
             return null;
 
         }
 
+
+
+        return res;
+
+
+    }
+    catch(err){
+
+        return null;
+
+    }
+
+}
+
+
+
+/* =========================================
+   CERTIK
+========================================= */
+
+
+async function fetchCertik(
+    projectId
+){
+
+    if(
+        !projectId
+    ){
+
+        return null;
+
+    }
+
+
+
+    const url =
+        `https://skynet.certik.com/api/v1/projects/${projectId}`;
+
+
+
+    const res =
+        await request(url);
+
+
+
+    if(!res){
+
+        return null;
+
+    }
+
+
+
+    try{
+
+
         const json =
             await res.json();
 
+
+
         return {
 
-            provider:
+            audit_provider:
                 "Certik",
+
 
             audited:
                 true,
 
-            score:
-                number(
-                    json.securityScore
+
+            security_score:
+
+                clamp(
+                    json.securityScore,
+                    0,
+                    100
                 ),
 
-            report_url:
-                json.auditReport ||
 
-                "",
-
-            last_audit:
-                json.updatedAt ||
-
-                "",
 
             findings:
 
                 number(
                     json.findings
-                )
+                ),
+
+
+
+            report_url:
+
+                json.auditReport
+                ||
+                "",
+
+
+
+            last_audit:
+
+                json.updatedAt
+                ||
+                ""
 
         };
 
-    }
 
+    }
     catch(_){
 
         return null;
@@ -186,77 +306,249 @@ async function fetchCertik(project){
 
 }
 
+
+
 /* =========================================
-   GENERIC URL CHECK
+   AUDIT URL CHECK
 ========================================= */
 
-async function checkAuditUrl(url){
 
-    try{
+async function checkAuditUrl(
+    url
+){
 
-        const res =
-            await fetch(
-
-                url,
-
-                {
-
-                    method:"HEAD"
-
-                }
-
-            );
-
-        return res.ok;
-
-    }
-
-    catch(_){
+    if(!url){
 
         return false;
 
     }
 
-}
 
-/* =========================================
-   MAIN
-========================================= */
-
-async function fetchAudit(data={}){
 
     /*
-    Priority
+       Try HEAD first
+    */
 
-    1 Certik Project
 
-    2 Audit URL
+    let res =
+        await request(
+            url,
+            {
+                method:"HEAD"
+            }
+        );
+
+
+
+    if(res){
+
+        return true;
+
+    }
+
+
+
+    /*
+       Some audit pages block HEAD
+       fallback GET
+    */
+
+
+    res =
+        await request(
+            url,
+            {
+                method:"GET"
+            }
+        );
+
+
+
+    return !!res;
+
+}
+
+
+
+/* =========================================
+   PROVIDER SCORE
+========================================= */
+
+
+function providerScore(
+    provider
+){
+
+    const scores = {
+
+
+        Certik:
+            20,
+
+
+        Hacken:
+            18,
+
+
+        SlowMist:
+            18,
+
+
+        Cyberscope:
+            15,
+
+
+        SolidProof:
+            15,
+
+
+        Coinsult:
+            12
+
+    };
+
+
+
+    return scores[provider] || 10;
+
+}
+
+
+
+/* =========================================
+   CALCULATE SCORE
+========================================= */
+
+
+function calculateScore(
+    audit={}
+){
+
+
+    if(
+        !audit.audited
+    ){
+
+        return 0;
+
+    }
+
+
+
+    let score = 0;
+
+
+
+    /*
+       Security score
+    */
+
+
+    score +=
+
+        clamp(
+            audit.security_score,
+            0,
+            60
+        );
+
+
+
+    /*
+       Provider reputation
+    */
+
+
+    score +=
+
+        providerScore(
+            audit.audit_provider
+        );
+
+
+
+    /*
+       Findings
+    */
+
+
+    const findings =
+        number(
+            audit.findings
+        );
+
+
+
+    if(
+        findings === 0
+    ){
+
+        score += 20;
+
+    }
+
+    else if(
+        findings <=5
+    ){
+
+        score +=10;
+
+    }
+
+
+
+    return clamp(
+        Math.round(score),
+        0,
+        100
+    );
+
+}
+
+
+
+/* =========================================
+   MAIN COLLECTOR
+========================================= */
+
+
+async function fetchAudit(
+    data={}
+){
+
+
+    /*
+       Priority:
+
+       1. Certik project
+       2. Manual audit URL
 
     */
+
+
 
     if(
         data.certik_project
     ){
 
-        const result =
+        const certik =
             await fetchCertik(
-
                 data.certik_project
-
             );
 
-        if(result){
+
+
+        if(certik){
+
 
             return {
 
-                ...result,
+                ...certik,
 
                 audit_score:
 
                     calculateScore(
-
-                        result
-
+                        certik
                     )
 
             };
@@ -264,76 +556,105 @@ async function fetchAudit(data={}){
         }
 
     }
+
+
+
+
 
     if(
         data.audit_url
     ){
 
+
         const exists =
             await checkAuditUrl(
-
                 data.audit_url
-
             );
 
+
+
         if(exists){
+
 
             const provider =
                 normalizeProvider(
 
-                    data.audit_provider ||
-
+                    data.audit_provider
+                    ||
                     data.audit_url
 
                 );
 
-            const result = {
 
-                provider,
 
-                audited:true,
+            const audit = {
+
+
+                audit_provider:
+
+                    provider,
+
+
+                audited:
+
+                    true,
+
+
+                security_score:
+
+                    80,
+
+
+                findings:
+
+                    0,
+
 
                 report_url:
 
                     data.audit_url,
 
-                findings:0,
-
-                score:80,
 
                 last_audit:
 
-                    data.audit_date ||
-
+                    data.audit_date
+                    ||
                     ""
 
             };
 
+
+
             return {
 
-                ...result,
+
+                ...audit,
+
 
                 audit_score:
 
                     calculateScore(
-
-                        result
-
+                        audit
                     )
 
             };
+
 
         }
 
     }
 
+
+
+
+
     return {
 
-        provider:"",
+        audit_provider:"",
 
         audited:false,
 
-        score:0,
+        security_score:0,
 
         findings:0,
 
@@ -347,132 +668,29 @@ async function fetchAudit(data={}){
 
 }
 
-/* =========================================
-   SCORE
-========================================= */
 
-function calculateScore(audit={}){
-
-    if(
-        !audit.audited
-    ){
-
-        return 0;
-
-    }
-
-    let score = 0;
-
-    score +=
-
-        Math.min(
-
-            60,
-
-            number(
-                audit.score
-            )
-
-        );
-
-    if(
-
-        audit.provider ===
-        "Certik"
-
-    ){
-
-        score += 20;
-
-    }
-
-    else if(
-
-        audit.provider ===
-        "Hacken"
-
-    ){
-
-        score += 18;
-
-    }
-
-    else if(
-
-        audit.provider ===
-        "SlowMist"
-
-    ){
-
-        score += 18;
-
-    }
-
-    else if(
-
-        audit.provider ===
-        "Cyberscope"
-
-    ){
-
-        score += 15;
-
-    }
-
-    else{
-
-        score += 10;
-
-    }
-
-    if(
-
-        number(
-            audit.findings
-        ) === 0
-
-    ){
-
-        score += 20;
-
-    }
-
-    else if(
-
-        number(
-            audit.findings
-        ) <= 5
-
-    ){
-
-        score += 10;
-
-    }
-
-    if(
-        score > 100
-    ){
-
-        score = 100;
-
-    }
-
-    return score;
-
-}
 
 /* =========================================
    EXPORT
 ========================================= */
 
+
 module.exports = {
+
+
+    SOURCES,
+
 
     fetchAudit,
 
+
     fetchCertik,
+
 
     calculateScore,
 
-    SOURCES
+
+    normalizeProvider
+
 
 };

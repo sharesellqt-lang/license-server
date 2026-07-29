@@ -1,30 +1,25 @@
-"use strict";
+// =========================================
+// services/collectors/linkedin.collector.js
+// =========================================
 
-/* =========================================
-   LINKEDIN COLLECTOR
-========================================= */
+"use strict";
 
 const fetch =
     global.fetch ||
     require("node-fetch");
 
 /*
----------------------------------------------
-NOTE
+======================================================
+LINKEDIN COLLECTOR
 
-LinkedIn does NOT provide a public API for
-profile scraping.
-
-This collector is designed to consume data
-from:
-
+Supported Provider:
 - Proxycurl
-- People Data Labs
-- RapidAPI
-- Internal scraper
 
-If no API key exists it safely returns null.
----------------------------------------------
+If no API key exists or request fails,
+the collector safely returns an empty profile.
+
+No exception is thrown.
+======================================================
 */
 
 const API =
@@ -39,12 +34,9 @@ const API_KEY =
 
 function number(value){
 
-    value =
-        Number(value);
+    value = Number(value);
 
-    if(
-        !Number.isFinite(value)
-    ){
+    if(!Number.isFinite(value)){
 
         return 0;
 
@@ -53,6 +45,10 @@ function number(value){
     return value;
 
 }
+
+/* =========================================
+   YEAR DIFFERENCE
+========================================= */
 
 function yearsBetween(date){
 
@@ -65,18 +61,43 @@ function yearsBetween(date){
     const start =
         new Date(date);
 
+    if(Number.isNaN(start.getTime())){
+
+        return 0;
+
+    }
+
     const now =
         new Date();
 
-    return Math.max(
-
-        0,
-
+    let years =
         now.getFullYear() -
+        start.getFullYear();
 
-        start.getFullYear()
+    const monthDiff =
+        now.getMonth() -
+        start.getMonth();
 
-    );
+    if(
+
+        monthDiff < 0 ||
+
+        (
+
+            monthDiff === 0 &&
+
+            now.getDate() <
+            start.getDate()
+
+        )
+
+    ){
+
+        years--;
+
+    }
+
+    return Math.max(0, years);
 
 }
 
@@ -84,43 +105,92 @@ function yearsBetween(date){
    REQUEST
 ========================================= */
 
-async function request(url){
+async function request(profileUrl){
 
-    if(
-        !API_KEY
-    ){
+    if(!API_KEY){
+
+        console.log(
+            "LinkedIn: Proxycurl disabled (missing API key)"
+        );
 
         return null;
 
     }
 
-    const res =
-        await fetch(
+    const controller =
+        new AbortController();
 
-            `${API}?url=${encodeURIComponent(url)}`,
+    const timeout =
+        setTimeout(
+            ()=>controller.abort(),
+            10000
+        );
 
-            {
+    try{
 
-                headers:{
+        const res =
+            await fetch(
 
-                    Authorization:
-                        `Bearer ${API_KEY}`
+                `${API}?url=${encodeURIComponent(profileUrl)}`,
+
+                {
+
+                    headers:{
+
+                        Authorization:
+                            `Bearer ${API_KEY}`,
+
+                        Accept:
+                            "application/json"
+
+                    },
+
+                    signal:
+                        controller.signal
 
                 }
 
-            }
+            );
+
+        clearTimeout(timeout);
+
+        if(!res.ok){
+
+            console.log(
+
+                "LinkedIn:",
+
+                res.status
+
+            );
+
+            return null;
+
+        }
+
+        return await res.json();
+
+    }
+
+    catch(err){
+
+        console.log(
+
+            "LinkedIn:",
+
+            err.message
 
         );
-
-    if(
-        !res.ok
-    ){
 
         return null;
 
     }
 
-    return await res.json();
+    finally{
+
+        clearTimeout(timeout);
+
+    }
 
 }
 
@@ -128,27 +198,31 @@ async function request(url){
    EXPERIENCE
 ========================================= */
 
-function calculateExperience(data={}){
+function calculateExperience(profile={}){
 
     const jobs =
-        data.experiences || [];
+        Array.isArray(profile.experiences)
+            ? profile.experiences
+            : [];
 
     let total = 0;
 
-    jobs.forEach(job=>{
+    for(const job of jobs){
+
+        const start =
+
+            job.starts_at?.date ||
+
+            job.starts_at ||
+
+            job.start_date ||
+
+            null;
 
         total +=
-            yearsBetween(
+            yearsBetween(start);
 
-                job.starts_at?.date ||
-
-                job.starts_at ||
-
-                job.start_date
-
-            );
-
-    });
+    }
 
     return total;
 
@@ -158,57 +232,53 @@ function calculateExperience(data={}){
    BIG COMPANIES
 ========================================= */
 
-function countBigCompanies(data={}){
+function countBigCompanies(profile={}){
 
     const jobs =
-        data.experiences || [];
+        Array.isArray(profile.experiences)
+            ? profile.experiences
+            : [];
 
     const keywords = [
 
         "google",
-
         "meta",
-
+        "facebook",
         "microsoft",
-
         "amazon",
+        "apple",
 
         "binance",
-
         "coinbase",
-
-        "polygon",
-
         "consensys",
-
+        "polygon",
         "ethereum",
-
         "solana",
-
-        "ripple",
-
         "chainlink",
-
-        "aave",
-
+        "arbitrum",
         "optimism",
-
-        "arbitrum"
+        "aave",
+        "ripple"
 
     ];
 
     let count = 0;
 
-    jobs.forEach(job=>{
+    for(const job of jobs){
 
         const company =
+
             String(
 
                 job.company ||
 
+                job.company_name ||
+
                 ""
 
-            ).toLowerCase();
+            )
+
+            .toLowerCase();
 
         if(
 
@@ -224,7 +294,7 @@ function countBigCompanies(data={}){
 
         }
 
-    });
+    }
 
     return count;
 
@@ -234,15 +304,13 @@ function countBigCompanies(data={}){
    EDUCATION
 ========================================= */
 
-function countEducation(data={}){
+function countEducation(profile={}){
 
-    return (
+    return Array.isArray(profile.education)
 
-        data.education ||
+        ? profile.education.length
 
-        []
-
-    ).length;
+        : 0;
 
 }
 
@@ -250,13 +318,13 @@ function countEducation(data={}){
    FOLLOWERS
 ========================================= */
 
-function followers(data={}){
+function followerCount(profile={}){
 
     return number(
 
-        data.follower_count ||
+        profile.follower_count ||
 
-        data.followers ||
+        profile.followers ||
 
         0
 
@@ -265,34 +333,135 @@ function followers(data={}){
 }
 
 /* =========================================
-   MAIN
+   SCORE
 ========================================= */
 
-async function fetchProfile(url){
+function calculateScore(data={}){
 
-    if(!url){
+    let score = 0;
 
-        return null;
+    /* experience */
+
+    if(data.total_experience >= 10){
+
+        score += 30;
 
     }
 
-    const profile =
-        await request(url);
+    else if(data.total_experience >= 5){
 
-    if(!profile){
+        score += 20;
+
+    }
+
+    else if(data.total_experience >= 2){
+
+        score += 10;
+
+    }
+
+    /* companies */
+
+    if(data.big_companies >= 3){
+
+        score += 35;
+
+    }
+
+    else if(data.big_companies >= 2){
+
+        score += 25;
+
+    }
+
+    else if(data.big_companies >= 1){
+
+        score += 15;
+
+    }
+
+    /* education */
+
+    if(data.education_count >= 2){
+
+        score += 10;
+
+    }
+
+    else if(data.education_count >= 1){
+
+        score += 5;
+
+    }
+
+    /* followers */
+
+    if(data.followers >= 10000){
+
+        score += 25;
+
+    }
+
+    else if(data.followers >= 3000){
+
+        score += 15;
+
+    }
+
+    else if(data.followers >= 1000){
+
+        score += 8;
+
+    }
+
+    return Math.min(score,100);
+
+}
+
+/* =========================================
+   MAIN
+========================================= */
+
+async function fetchProfile(profileUrl){
+
+    if(!profileUrl){
 
         return {
 
-            linkedin_url:
-                url,
-
+            linkedin_url:"",
             linkedin_score:0
 
         };
 
     }
 
-    const experience =
+    const profile =
+        await request(profileUrl);
+
+    if(!profile){
+
+        return {
+
+            linkedin_url:
+                profileUrl,
+
+            full_name:"",
+            headline:"",
+            location:"",
+            followers:0,
+            total_experience:0,
+            big_companies:0,
+            education_count:0,
+            current_company:"",
+            profile_photo:"",
+            public_identifier:"",
+            linkedin_score:0
+
+        };
+
+    }
+
+    const totalExperience =
         calculateExperience(profile);
 
     const companies =
@@ -301,36 +470,46 @@ async function fetchProfile(url){
     const education =
         countEducation(profile);
 
-    const followerCount =
-        followers(profile);
+    const followers =
+        followerCount(profile);
 
-    const score =
+    const linkedinScore =
         calculateScore({
 
-            experience,
+            total_experience:
+                totalExperience,
 
-            companies,
+            big_companies:
+                companies,
 
-            education,
+            education_count:
+                education,
 
-            followerCount
+            followers
 
         });
 
-    return {
+    const result = {
 
         linkedin_url:
+            profileUrl,
 
-            url,
+        profile_id:
+            profile.profile_id ||
+
+            "",
+
+        public_identifier:
+            profile.public_identifier ||
+
+            "",
 
         full_name:
-
             profile.full_name ||
 
             "",
 
         headline:
-
             profile.headline ||
 
             "",
@@ -339,22 +518,19 @@ async function fetchProfile(url){
 
             profile.city ||
 
+            profile.location ||
+
             "",
 
-        followers:
-
-            followerCount,
+        followers,
 
         total_experience:
-
-            experience,
+            totalExperience,
 
         big_companies:
-
             companies,
 
         education_count:
-
             education,
 
         current_company:
@@ -370,142 +546,33 @@ async function fetchProfile(url){
             "",
 
         linkedin_score:
-
-            score
+            linkedinScore
 
     };
 
-}
+    console.table({
 
-/* =========================================
-   SCORE
-========================================= */
+        name:
+            result.full_name,
 
-function calculateScore(data={}){
+        followers:
+            result.followers,
 
-    let score = 0;
+        experience:
+            result.total_experience,
 
-    if(
+        companies:
+            result.big_companies,
 
-        data.total_experience >= 10
+        education:
+            result.education_count,
 
-    ){
+        score:
+            result.linkedin_score
 
-        score += 30;
+    });
 
-    }
-
-    else if(
-
-        data.total_experience >= 5
-
-    ){
-
-        score += 20;
-
-    }
-
-    else if(
-
-        data.total_experience >= 2
-
-    ){
-
-        score += 10;
-
-    }
-
-    if(
-
-        data.big_companies >= 3
-
-    ){
-
-        score += 35;
-
-    }
-
-    else if(
-
-        data.big_companies >= 2
-
-    ){
-
-        score += 25;
-
-    }
-
-    else if(
-
-        data.big_companies >= 1
-
-    ){
-
-        score += 15;
-
-    }
-
-    if(
-
-        data.education_count >= 2
-
-    ){
-
-        score += 10;
-
-    }
-
-    else if(
-
-        data.education_count >= 1
-
-    ){
-
-        score += 5;
-
-    }
-
-    if(
-
-        data.followers >= 10000
-
-    ){
-
-        score += 25;
-
-    }
-
-    else if(
-
-        data.followers >= 3000
-
-    ){
-
-        score += 15;
-
-    }
-
-    else if(
-
-        data.followers >= 1000
-
-    ){
-
-        score += 8;
-
-    }
-
-    if(
-
-        score > 100
-
-    ){
-
-        score = 100;
-
-    }
-
-    return score;
+    return result;
 
 }
 

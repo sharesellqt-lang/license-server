@@ -1,25 +1,25 @@
-"use strict";
+// =========================================
+// services/collectors/defillama.collector.js
+// =========================================
 
-/* =========================================
-   DEFI LLAMA COLLECTOR
-========================================= */
+"use strict";
 
 const fetch =
     global.fetch ||
     require("node-fetch");
 
-const API =
+const BASE_URL =
     "https://api.llama.fi";
 
 /* =========================================
    HELPERS
 ========================================= */
 
-function number(value) {
+function number(value){
 
     value = Number(value);
 
-    if (!Number.isFinite(value)) {
+    if(!Number.isFinite(value)){
 
         return 0;
 
@@ -29,22 +29,47 @@ function number(value) {
 
 }
 
-async function request(path) {
+async function request(path){
 
-    const res =
-        await fetch(
-            API + path
+    const controller =
+        new AbortController();
+
+    const timeout =
+        setTimeout(
+            ()=>controller.abort(),
+            10000
         );
 
-    if (!res.ok) {
+    try{
 
-        throw new Error(
-            `DefiLlama ${res.status}`
-        );
+        const res =
+            await fetch(
+                BASE_URL + path,
+                {
+                    signal:
+                        controller.signal
+                }
+            );
+
+        clearTimeout(timeout);
+
+        if(!res.ok){
+
+            throw new Error(
+                `DefiLlama ${res.status}`
+            );
+
+        }
+
+        return await res.json();
 
     }
 
-    return await res.json();
+    finally{
+
+        clearTimeout(timeout);
+
+    }
 
 }
 
@@ -52,15 +77,54 @@ async function request(path) {
    TVL HISTORY
 ========================================= */
 
-function calculateGrowth(history = []) {
+function extractHistory(protocol){
 
-    if (
+    if(!protocol){
+
+        return [];
+
+    }
+
+    if(
+
+        protocol.chainTvls &&
+
+        protocol.chains?.length
+
+    ){
+
+        const firstChain =
+            protocol.chains[0];
+
+        const chain =
+            protocol.chainTvls[firstChain];
+
+        if(
+
+            chain &&
+            Array.isArray(chain.tvl)
+
+        ){
+
+            return chain.tvl;
+
+        }
+
+    }
+
+    return [];
+
+}
+
+function calculateGrowth(history){
+
+    if(
 
         !Array.isArray(history) ||
 
         history.length < 2
 
-    ) {
+    ){
 
         return 0;
 
@@ -68,23 +132,15 @@ function calculateGrowth(history = []) {
 
     const latest =
         number(
-            history[
-                history.length - 1
-            ]?.totalLiquidityUSD
+            history.at(-1)?.totalLiquidityUSD
         );
 
     const previous =
         number(
-            history[
-                history.length - 2
-            ]?.totalLiquidityUSD
+            history.at(-2)?.totalLiquidityUSD
         );
 
-    if (
-
-        previous <= 0
-
-    ) {
+    if(previous<=0){
 
         return 0;
 
@@ -93,15 +149,20 @@ function calculateGrowth(history = []) {
     return Number(
 
         (
+
             (
 
                 latest -
 
                 previous
 
-            ) /
+            )
 
-            previous *
+            /
+
+            previous
+
+            *
 
             100
 
@@ -112,318 +173,174 @@ function calculateGrowth(history = []) {
 }
 
 /* =========================================
-   CHAINS
-========================================= */
-
-function parseChains(protocol) {
-
-    if (
-
-        !Array.isArray(
-            protocol.chains
-        )
-
-    ) {
-
-        return [];
-
-    }
-
-    return protocol.chains;
-
-}
-
-/* =========================================
-   CATEGORY
-========================================= */
-
-function parseCategory(protocol) {
-
-    return (
-
-        protocol.category ||
-
-        ""
-
-    );
-
-}
-
-/* =========================================
-   MAIN
-========================================= */
-
-async function fetchProtocol(slug) {
-
-    if (!slug) {
-
-        return null;
-
-    }
-
-    const protocol =
-        await request(
-
-            `/protocol/${slug}`
-
-        );
-
-    const currentTVL =
-        number(
-            protocol.tvl
-        );
-
-    const history =
-        protocol.chainTvls?.[
-            protocol.chains?.[0]
-        ]?.tvl ||
-        [];
-
-    const growth =
-        calculateGrowth(
-            history
-        );
-
-    return {
-
-        defillama_slug:
-
-            slug,
-
-        protocol_name:
-
-            protocol.name ||
-
-            "",
-
-        protocol_category:
-
-            parseCategory(
-                protocol
-            ),
-
-        protocol_chains:
-
-            parseChains(
-                protocol
-            ),
-
-        tvl:
-
-            currentTVL,
-
-        tvl_growth:
-
-            growth,
-
-        tvl_history_points:
-
-            history.length,
-
-        listed:
-
-            true,
-
-        audits:
-
-            protocol.audits ||
-
-            [],
-
-        audit_count:
-
-            Array.isArray(
-                protocol.audits
-            )
-
-                ? protocol.audits.length
-
-                : 0,
-
-        github:
-
-            protocol.github ||
-
-            [],
-
-        twitter:
-
-            protocol.twitter ||
-
-            "",
-
-        website:
-
-            protocol.url ||
-
-            "",
-
-        defillama_score:
-
-            calculateScore({
-
-                tvl:
-                    currentTVL,
-
-                growth,
-
-                audits:
-                    protocol.audits
-
-            })
-
-    };
-
-}
-
-/* =========================================
    SCORE
 ========================================= */
 
-function calculateScore(data = {}) {
+function calculateScore(data={}){
 
     let score = 0;
 
     const tvl =
-        number(
-            data.tvl
-        );
+        number(data.tvl);
 
-    if (
-
-        tvl >= 1000000000
-
-    ) {
+    if(tvl>=1_000_000_000){
 
         score += 40;
 
     }
-
-    else if (
-
-        tvl >= 100000000
-
-    ) {
+    else if(tvl>=100_000_000){
 
         score += 30;
 
     }
-
-    else if (
-
-        tvl >= 10000000
-
-    ) {
+    else if(tvl>=10_000_000){
 
         score += 20;
 
     }
-
-    else if (
-
-        tvl >= 1000000
-
-    ) {
+    else if(tvl>=1_000_000){
 
         score += 10;
 
     }
 
     const growth =
-        number(
-            data.growth
-        );
+        number(data.tvl_growth);
 
-    if (
-
-        growth >= 20
-
-    ) {
+    if(growth>=20){
 
         score += 25;
 
     }
-
-    else if (
-
-        growth >= 10
-
-    ) {
+    else if(growth>=10){
 
         score += 18;
 
     }
-
-    else if (
-
-        growth >= 5
-
-    ) {
+    else if(growth>=5){
 
         score += 12;
 
     }
-
-    else if (
-
-        growth > 0
-
-    ) {
+    else if(growth>0){
 
         score += 5;
 
     }
 
     const audits =
-        Array.isArray(
-            data.audits
-        )
+        number(data.audit_count);
 
-            ? data.audits.length
-
-            : 0;
-
-    if (
-
-        audits >= 3
-
-    ) {
+    if(audits>=3){
 
         score += 35;
 
     }
-
-    else if (
-
-        audits >= 2
-
-    ) {
+    else if(audits>=2){
 
         score += 25;
 
     }
-
-    else if (
-
-        audits >= 1
-
-    ) {
+    else if(audits>=1){
 
         score += 15;
 
     }
 
-    if (
+    return Math.min(score,100);
 
-        score > 100
+}
 
-    ) {
+/* =========================================
+   FETCH PROTOCOL
+========================================= */
 
-        score = 100;
+async function fetchProtocol(slug){
+
+    if(!slug){
+
+        return {};
 
     }
 
-    return score;
+    try{
+
+        const protocol =
+            await request(
+                `/protocol/${slug}`
+            );
+
+        const history =
+            extractHistory(protocol);
+
+        const tvlGrowth =
+            calculateGrowth(history);
+
+        const result = {
+
+            defillama_slug:
+                slug,
+
+            protocol_name:
+                protocol.name || "",
+
+            protocol_category:
+                protocol.category || "",
+
+            protocol_chains:
+                protocol.chains || [],
+
+            tvl:
+                number(protocol.tvl),
+
+            tvl_growth:
+                tvlGrowth,
+
+            tvl_history_points:
+                history.length,
+
+            listed:true,
+
+            audits:
+                protocol.audits || [],
+
+            audit_count:
+
+                Array.isArray(protocol.audits)
+
+                    ? protocol.audits.length
+
+                    : 0,
+
+            github:
+                protocol.github || [],
+
+            twitter:
+                protocol.twitter || "",
+
+            website:
+                protocol.url || ""
+
+        };
+
+        result.defillama_score =
+            calculateScore(result);
+
+        return result;
+
+    }
+
+    catch(err){
+
+        console.log(
+            "========== DEFILLAMA ERROR =========="
+        );
+
+        console.log(err.message);
+
+        return {};
+
+    }
 
 }
 

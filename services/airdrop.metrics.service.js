@@ -24,150 +24,573 @@ const linkedin =
 
 const teamService =
     require("./airdrop.team.service");
-function normalizeMetrics(data = {}) {
+
+    function normalizeMetrics(data = {}) {
 
     return {
 
+
+        // =====================================
+        // BASIC TOKEN
+        // =====================================
+
         token_symbol:
-            String(data.token_symbol || "").trim(),
+            String(
+                data.token_symbol || ""
+            ).trim(),
+
 
         current_price:
-            Number(data.current_price || 0),
+            Number(
+                data.current_price || 0
+            ),
+
 
         total_supply:
-            Number(data.total_supply || 0),
+            Number(
+                data.total_supply || 0
+            ),
+
 
         circulating_supply:
-            Number(data.circulating_supply || 0),
+            Number(
+                data.circulating_supply || 0
+            ),
+
 
         max_supply:
-            Number(data.max_supply || 0),
+            Number(
+                data.max_supply || 0
+            ),
+
+
+
+        // =====================================
+        // MARKET
+        // =====================================
 
         market_cap:
-            Number(data.market_cap || 0),
+            Number(
+                data.market_cap || 0
+            ),
+
 
         fdv:
-            Number(data.fdv || 0),
+            Number(
+                data.fdv || 0
+            ),
+
 
         volume_24h:
-            Number(data.volume_24h || 0),
+            Number(
+                data.volume_24h || 0
+            ),
 
-            tvl:
-    Number(data.tvl || 0),
-
-tvl_growth_7d:
-    Number(data.tvl_growth_7d || 0),
-
-tvl_growth_30d:
-    Number(data.tvl_growth_30d || 0),
-
-protocol_fee:
-    Number(data.protocol_fee || 0),
-
-protocol_revenue:
-    Number(data.protocol_revenue || 0),
-
-revenue_growth_30d:
-    Number(data.revenue_growth_30d || 0),
-
-treasury:
-    Number(data.treasury || 0),
-
-cash_runway_months:
-    Number(data.cash_runway_months || 0),
-
-stablecoin_reserve:
-    Number(data.stablecoin_reserve || 0),
-
-token_buyback:
-    Number(data.token_buyback || 0),
-
-token_burn:
-    Number(data.token_burn || 0),
-
-holders:
-    Number(data.holders || 0),
-
-github_score:
-    Number(data.github_score || 0),
-
-github_stars:
-    Number(data.github_stars || 0),
-
-github_forks:
-    Number(data.github_forks || 0),
-
-github_recent_commits:
-    Number(data.github_recent_commits || 0),
-
-github_contributors:
-    Number(data.github_contributors || 0),
-
-audit_score:
-    Number(data.audit_score || 0),
-
-transactions_24h:
-    Number(data.transactions_24h || 0),
 
         liquidity:
-            Number(data.liquidity || 0),
+            Number(
+                data.liquidity || 0
+            ),
+
 
         price_change_24h:
-            Number(data.price_change_24h || 0),
+            Number(
+                data.price_change_24h || 0
+            ),
+
+
+
+        // =====================================
+        // DEFI LLAMA
+        // =====================================
+
+        tvl:
+            Number(
+                data.tvl
+                ??
+                data.defillama?.tvl
+                ??
+                0
+            ),
+
+
+        tvl_growth_7d:
+            Number(
+                data.tvl_growth_7d
+                ??
+                data.defillama?.tvl_growth_7d
+                ??
+                0
+            ),
+
+
+        tvl_growth_30d:
+            Number(
+                data.tvl_growth_30d
+                ??
+                data.defillama?.tvl_growth_30d
+                ??
+                0
+            ),
+
+
+        protocol_fee:
+            Number(
+                data.protocol_fee
+                ??
+                data.defillama?.protocol_fee
+                ??
+                0
+            ),
+
+
+        protocol_revenue:
+            Number(
+                data.protocol_revenue
+                ??
+                data.defillama?.revenue
+                ??
+                0
+            ),
+
+
+        revenue_growth_30d:
+            Number(
+                data.revenue_growth_30d
+                ??
+                0
+            ),
+
+
+        treasury:
+            Number(
+                data.treasury
+                ??
+                data.defillama?.treasury
+                ??
+                0
+            ),
+
+
+        cash_runway_months:
+            Number(
+                data.cash_runway_months
+                ??
+                data.defillama?.cash_runway
+                ??
+                0
+            ),
+
+
+        stablecoin_reserve:
+            Number(
+                data.stablecoin_reserve
+                ??
+                0
+            ),
+
+
+        token_buyback:
+            Number(
+                data.token_buyback
+                ??
+                0
+            ),
+
+
+        token_burn:
+            Number(
+                data.token_burn
+                ??
+                0
+            ),
+
+
+
+        // =====================================
+        // ONCHAIN
+        // =====================================
+
+        holders:
+            Number(
+                data.holders
+                ??
+                0
+            ),
+
+
+        transactions_24h:
+            Number(
+                data.transactions_24h
+                ??
+                0
+            ),
+
+
+
+        // =====================================
+        // TOKENOMICS
+        // =====================================
 
         seed_price:
-            Number(data.seed_price || 0),
+            Number(
+                data.seed_price || 0
+            ),
+
 
         private_price:
-            Number(data.private_price || 0),
+            Number(
+                data.private_price || 0
+            ),
+
 
         public_price:
-            Number(data.public_price || 0),
+            Number(
+                data.public_price || 0
+            ),
+
 
         fair_buy_price:
-            Number(data.fair_buy_price || 0),
+            Number(
+                data.fair_buy_price || 0
+            ),
+
 
         fair_sell_price:
-            Number(data.fair_sell_price || 0),
+            Number(
+                data.fair_sell_price || 0
+            ),
+
 
         ath_price:
-            Number(data.ath_price || 0),
+            Number(
+                data.ath_price || 0
+            ),
+
 
         atl_price:
-            Number(data.atl_price || 0),
+            Number(
+                data.atl_price || 0
+            ),
+
 
         funding_amount:
-            Number(data.funding_amount || 0),
+            Number(
+                data.funding_amount || 0
+            ),
+
+
+
+        circulating_percent:
+            Number(
+                data.circulating_percent || 0
+            ),
+
+
+        locked_percent:
+            Number(
+                data.locked_percent || 0
+            ),
+
+
+        inflation:
+            Number(
+                data.inflation || 0
+            ),
+
+
+
+        // =====================================
+        // SCORES
+        // =====================================
+
 
         team_score:
-            Number(data.team_score || 0),
+
+            Number(
+                data.team?.team_score
+                ??
+                data.team_score
+                ??
+                0
+            ),
+
+
 
         investor_score:
-            Number(data.investor_score || 0),
+
+            Number(
+                data.investor?.investor_score
+                ??
+                data.investor_score
+                ??
+                0
+            ),
+
+
 
         partner_score:
-            Number(data.partner_score || 0),
+
+            Number(
+                data.partner?.partner_score
+                ??
+                data.partner_score
+                ??
+                0
+            ),
+
+
 
         tokenomics_score:
-            Number(data.tokenomics_score || 0),
+
+            Number(
+                data.tokenomics?.tokenomics_score
+                ??
+                data.tokenomics_score
+                ??
+                0
+            ),
+
+
 
         community_score:
-            Number(data.community_score || 0),
+
+            Number(
+                data.website?.community_score
+                ??
+                data.community_score
+                ??
+                0
+            ),
+
+
 
         development_score:
-            Number(data.development_score || 0),
+
+            Number(
+                data.github?.github_score
+                ??
+                data.github_score
+                ??
+                0
+            ),
+
+
 
         financial_score:
-            Number(data.financial_score || 0),
+
+            Number(
+                data.defillama?.defillama_score
+                ??
+                data.financial_score
+                ??
+                0
+            ),
+
+
 
         onchain_score:
-            Number(data.onchain_score || 0),
+
+            Number(
+                data.geckoterminal?.onchain_score
+                ??
+                data.onchain_score
+                ??
+                0
+            ),
+
+
 
         total_score:
-            Number(data.total_score || 0),
+
+            Number(
+                data.total_score
+                ??
+                data.overall_score
+                ??
+                0
+            ),
+
+
+
+        risk_score:
+
+            Number(
+                data.risk_score || 0
+            ),
+
+
 
         risk_level:
-            data.risk_level || "medium"
+
+            data.risk_level
+            ||
+            "medium",
+
+
+
+        recommendation:
+
+            data.recommendation
+            ||
+            null,
+
+
+
+        // =====================================
+        // ROI
+        // =====================================
+
+
+        seed_roi:
+            Number(
+                data.seed_roi || 0
+            ),
+
+
+        private_roi:
+            Number(
+                data.private_roi || 0
+            ),
+
+
+        public_roi:
+            Number(
+                data.public_roi || 0
+            ),
+
+
+
+        // =====================================
+        // GITHUB
+        // =====================================
+
+
+        github_score:
+
+            Number(
+                data.github?.github_score
+                ??
+                data.github_score
+                ??
+                0
+            ),
+
+
+        github_stars:
+
+            Number(
+                data.github?.github_stars
+                ??
+                0
+            ),
+
+
+        github_forks:
+
+            Number(
+                data.github?.github_forks
+                ??
+                0
+            ),
+
+
+        github_watchers:
+
+            Number(
+                data.github?.github_watchers
+                ??
+                0
+            ),
+
+
+        github_contributors:
+
+            Number(
+                data.github?.github_contributors
+                ??
+                0
+            ),
+
+
+        github_recent_commits:
+
+            Number(
+                data.github?.github_recent_commits
+                ??
+                0
+            ),
+
+
+        github_releases:
+
+            Number(
+                data.github?.github_releases
+                ??
+                0
+            ),
+
+
+
+        // =====================================
+        // LINKEDIN TEAM
+        // =====================================
+
+
+        linkedin_score:
+
+            Number(
+                data.team?.linkedin_score
+                ??
+                data.linkedin_score
+                ??
+                0
+            ),
+
+
+        followers:
+
+            Number(
+                data.team?.followers
+                ??
+                data.followers
+                ??
+                0
+            ),
+
+
+        total_experience:
+
+            Number(
+                data.team?.total_experience
+                ??
+                data.total_experience
+                ??
+                0
+            ),
+
+
+        big_companies:
+
+            Number(
+                data.team?.big_companies
+                ??
+                data.big_companies
+                ??
+                0
+            ),
+
+
+        education_count:
+
+            Number(
+                data.team?.education_count
+                ??
+                data.education_count
+                ??
+                0
+            )
+
 
     };
 
@@ -177,109 +600,258 @@ transactions_24h:
    DEFAULT METRICS
 ========================================= */
 
-function defaultMetrics() {
+function defaultMetrics(){
 
     return {
+
+
+        // =====================================
+        // TOKEN BASIC
+        // =====================================
 
         token_symbol: "",
 
         current_price: 0,
 
         total_supply: 0,
+
         circulating_supply: 0,
+
         max_supply: 0,
 
+
+
+        // =====================================
+        // MARKET
+        // =====================================
+
         market_cap: 0,
+
         fdv: 0,
 
         volume_24h: 0,
+
         liquidity: 0,
+
         price_change_24h: 0,
 
+
+
+        // =====================================
+        // DEFI / FINANCIAL
+        // =====================================
+
         tvl: 0,
+
         tvl_growth_7d: 0,
+
         tvl_growth_30d: 0,
 
+
         protocol_fee: 0,
+
         protocol_revenue: 0,
+
         revenue_growth_30d: 0,
 
+
         treasury: 0,
+
         cash_runway_months: 0,
+
         stablecoin_reserve: 0,
 
+
         token_buyback: 0,
+
         token_burn: 0,
 
+
+
+        // =====================================
+        // ONCHAIN
+        // =====================================
+
         holders: 0,
+
         transactions_24h: 0,
 
+
+
+        // =====================================
+        // TOKENOMICS
+        // =====================================
+
         circulating_percent: 0,
+
         locked_percent: 0,
+
         inflation: 0,
 
-        github_score: 0,
-        github_stars: 0,
-        github_forks: 0,
-        github_watchers: 0,
-        github_contributors: 0,
-        github_recent_commits: 0,
-        github_releases: 0,
-
-        audit_score: 0,
-
-        linkedin_score: 0,
-        followers: 0,
-        total_experience: 0,
-        big_companies: 0,
-        education_count: 0,
 
         seed_price: 0,
+
         private_price: 0,
+
         public_price: 0,
 
+
         fair_buy_price: 0,
+
         fair_sell_price: 0,
 
+
         ath_price: 0,
+
         atl_price: 0,
+
 
         funding_amount: 0,
 
+
+
+        // =====================================
+        // GITHUB
+        // =====================================
+
+        github_score: 0,
+
+        github_stars: 0,
+
+        github_forks: 0,
+
+        github_watchers: 0,
+
+        github_contributors: 0,
+
+        github_recent_commits: 0,
+
+        github_releases: 0,
+
+
+
+        // =====================================
+        // AUDIT
+        // =====================================
+
+        audit_score: 0,
+
+
+
+        // =====================================
+        // TEAM / LINKEDIN
+        // =====================================
+
+        linkedin_score: 0,
+
+        followers: 0,
+
+        total_experience: 0,
+
+        big_companies: 0,
+
+        education_count: 0,
+
+
+
+        // =====================================
+        // SCORE ENGINE
+        // =====================================
+
         team_score: 0,
+
         investor_score: 0,
+
         partner_score: 0,
 
         tokenomics_score: 0,
+
         community_score: 0,
+
         development_score: 0,
+
         financial_score: 0,
+
         onchain_score: 0,
+
 
         total_score: 0,
 
+
+
+        // =====================================
+        // INVESTMENT ENGINE
+        // =====================================
+
         investment_score: 0,
 
-        investment_rating: "UNKNOWN",
 
-        investment_action: "",
+        investment_rating:
 
-        risk_level: "medium",
+            "UNKNOWN",
 
-        risk_score: 0,
+
+        investment_action:
+
+            "",
+
+
+
+        // =====================================
+        // RISK ENGINE
+        // =====================================
+
+        risk_level:
+
+            "medium",
+
+
+        risk_score:
+
+            0,
+
+
+
+        // =====================================
+        // ROI
+        // =====================================
 
         seed_roi: 0,
+
         private_roi: 0,
+
         public_roi: 0,
 
-        recommendation: "",
 
-        created_at: 0,
-        updated_at: 0
+
+        // =====================================
+        // AI RECOMMENDATION
+        // =====================================
+
+        recommendation:
+
+            "",
+
+
+
+        // =====================================
+        // TIME
+        // =====================================
+
+        created_at:
+
+            0,
+
+
+        updated_at:
+
+            0
+
 
     };
 
 }
+
 const METRIC_COLUMNS = [
 
     "project_id",
@@ -299,6 +871,8 @@ const METRIC_COLUMNS = [
     "liquidity",
     "price_change_24h",
 
+
+    // DEFI LLAMA
     "tvl",
     "tvl_growth_7d",
     "tvl_growth_30d",
@@ -309,14 +883,19 @@ const METRIC_COLUMNS = [
 
     "treasury",
     "cash_runway_months",
+
     "stablecoin_reserve",
 
     "token_buyback",
     "token_burn",
 
+
+    // ONCHAIN
     "holders",
     "transactions_24h",
 
+
+    // TOKEN PRICE
     "seed_price",
     "private_price",
     "public_price",
@@ -327,55 +906,98 @@ const METRIC_COLUMNS = [
     "ath_price",
     "atl_price",
 
+
+    // FUNDING
     "funding_amount",
 
+
+    // SCORE
     "team_score",
     "investor_score",
     "partner_score",
 
     "tokenomics_score",
+
     "community_score",
+
     "development_score",
+
     "financial_score",
+
     "onchain_score",
 
     "total_score",
 
+
+    // INVESTMENT AI
     "investment_score",
 
     "investment_rating",
 
     "investment_action",
 
+
+    // RISK
     "risk_level",
-
-    "created_at",
-    "updated_at",
-
-    "circulating_percent",
-    "locked_percent",
-    "inflation",
 
     "risk_score",
 
+
+    // TIME
+    "created_at",
+
+    "updated_at",
+
+
+    // TOKENOMICS
+    "circulating_percent",
+
+    "locked_percent",
+
+    "inflation",
+
+
+    // ROI
     "seed_roi",
+
     "private_roi",
+
     "public_roi",
 
+
+    // AI RECOMMENDATION
     "recommendation",
 
+
+    // AUDIT
+    "audit_score",
+
+
+    // GITHUB
     "github_score",
+
     "github_stars",
+
     "github_forks",
+
     "github_watchers",
+
     "github_contributors",
+
     "github_recent_commits",
+
     "github_releases",
 
+
+    // LINKEDIN TEAM
     "linkedin_score",
+
     "followers",
+
     "total_experience",
+
     "big_companies",
+
     "education_count"
 
 ];
@@ -413,24 +1035,38 @@ return rows[0] || null;
 async function getAllMetrics(userId){
 
     const sql = `
+
         SELECT
+
             m.*
+
         FROM airdrop_project_metrics m
+
         INNER JOIN airdrop_projects p
+
             ON p.id = m.project_id
-        WHERE p.user_id=?
+
+        WHERE p.user_id = ?
+
+        ORDER BY m.updated_at DESC
+
     `;
+
 
     const [rows] =
         await db.query(
             sql,
-            [userId]
+            [
+                userId
+            ]
         );
+
 
     console.log(
         "METRICS LOADED:",
         rows.length
     );
+
 
     return rows || [];
 
@@ -440,79 +1076,205 @@ async function getAllMetrics(userId){
    CREATE
 ========================================= */
 
-async function createMetrics(projectId, data = {}) {
+async function createMetrics(
+    projectId,
+    data = {}
+){
 
-    const now = Date.now();
+
+    const now =
+        Date.now();
+
+
+
+    const normalized =
+        normalizeMetrics(
+            data
+        );
+
+
 
     const metric = {
 
+
         ...defaultMetrics(),
 
-        ...normalizeMetrics(data),
 
-        project_id: projectId,
+        ...normalized,
 
-        created_at: now,
 
-        updated_at: now
+        project_id:
+            projectId,
+
+
+        created_at:
+            now,
+
+
+        updated_at:
+            now
+
 
     };
+
+
+
 
     const columns =
         METRIC_COLUMNS;
 
+
+
+
     const placeholders =
         columns
-            .map(() => "?")
+            .map(
+                ()=>"?"
+            )
             .join(",");
+
+
+
+
+
+    const updates =
+
+        columns
+
+        .filter(
+
+            c =>
+
+            c !== "project_id"
+
+            &&
+
+            c !== "created_at"
+
+        )
+
+        .map(
+
+            c =>
+
+            `${c}=VALUES(${c})`
+
+        )
+
+        .join(",");
+
+
+
+
 
     const sql = `
 
-INSERT INTO airdrop_project_metrics(
+
+INSERT INTO airdrop_project_metrics
+
+(
 
 ${columns.join(",")}
 
 )
 
-VALUES(
+VALUES
+
+(
 
 ${placeholders}
 
 )
 
+
+ON DUPLICATE KEY UPDATE
+
+
+${updates}
+
+
 `;
 
+
+
+
     const values =
+
         columns.map(
 
-            c => metric[c] ?? null
+            c =>
+
+            metric[c] ?? null
 
         );
 
-    console.log("COLUMN COUNT =", columns.length);
-    console.log("PLACEHOLDER COUNT =", placeholders.split(",").length);
-    console.log("VALUES COUNT =", values.length);
 
-    try {
 
-        const [result] =
-            await db.query(
-                sql,
-                values
-            );
 
-        return result.insertId;
+    console.log(
+        "COLUMN COUNT =",
+        columns.length
+    );
+
+
+    console.log(
+        "VALUES COUNT =",
+        values.length
+    );
+
+
+
+    try{
+
+
+        const [
+
+            result
+
+        ] =
+
+        await db.query(
+
+            sql,
+
+            values
+
+        );
+
+
+
+        return (
+
+            result.insertId
+
+            ||
+
+            projectId
+
+        );
+
 
     }
 
-    catch (err) {
 
-        console.log("========== INSERT METRICS ERROR ==========");
-        console.log(err.message);
+    catch(err){
+
+
+        console.log(
+            "========== INSERT METRICS ERROR =========="
+        );
+
+
+        console.log(
+            err.message
+        );
+
 
         throw err;
 
+
     }
+
 
 }
 

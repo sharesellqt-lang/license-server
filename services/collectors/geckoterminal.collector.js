@@ -1,13 +1,35 @@
+// =========================================
+// services/collectors/geckoterminal.collector.js
+// =========================================
+
 "use strict";
 
 const axios = require("axios");
 
-const BASE =
+const BASE_URL =
     "https://api.geckoterminal.com/api/v2";
 
-    function mapNetwork(network = "") {
+/* =========================================
+   HELPERS
+========================================= */
 
-    switch (String(network).toLowerCase()) {
+function number(value){
+
+    value = Number(value);
+
+    if(!Number.isFinite(value)){
+
+        return 0;
+
+    }
+
+    return value;
+
+}
+
+function mapNetwork(network = ""){
+
+    switch(String(network).toLowerCase()){
 
         case "eth":
         case "ethereum":
@@ -56,21 +78,22 @@ async function fetchToken(
     tokenAddress
 ){
 
-const apiNetwork =
-    mapNetwork(network);
+    if(!network || !tokenAddress){
 
-const url =
-`${BASE}/networks/${apiNetwork}/tokens/${tokenAddress}`;
+        return {};
 
-console.log("========== GECKOTERMINAL ==========");
+    }
 
-console.log("NETWORK =", network);
+    const apiNetwork =
+        mapNetwork(network);
 
-console.log("API NETWORK =", apiNetwork);
+    const url =
+        `${BASE_URL}/networks/${apiNetwork}/tokens/${tokenAddress}`;
 
-console.log("TOKEN =", tokenAddress);
-
-console.log("URL =", url);
+    console.log("========== GECKOTERMINAL ==========");
+    console.log("NETWORK :", network);
+    console.log("API     :", apiNetwork);
+    console.log("TOKEN   :", tokenAddress);
 
     try{
 
@@ -82,271 +105,277 @@ console.log("URL =", url);
                 }
             );
 
-        console.log(
-            JSON.stringify(
-                response.data,
-                null,
-                2
-            )
-        );
+        const token =
+            response.data?.data;
 
-        if(
+        if(!token){
 
-            !response.data ||
-
-            !response.data.data
-
-        ){
-
-            throw new Error(
-                "Token not found"
-            );
+            return {};
 
         }
 
-        const token =
-            response.data.data;
-
         const attr =
             token.attributes || {};
-/* =====================================
-   SUPPLY
-===================================== */
 
-const totalSupply =
-    Number(
-        attr.normalized_total_supply ||
-        attr.total_supply ||
-        0
-    );
+        /* =====================================
+           SUPPLY
+        ===================================== */
 
-let circulatingSupply = 0;
+        const totalSupply =
+            number(
 
-if(attr.circulating_supply){
+                attr.normalized_total_supply ||
 
-    circulatingSupply =
-        Number(
-            attr.circulating_supply
-        );
+                attr.total_supply
 
-}
-else if(
+            );
 
-    attr.market_cap_usd &&
-    attr.price_usd
+        let circulatingSupply =
 
-){
+            number(
+                attr.circulating_supply
+            );
 
-    circulatingSupply =
+        if(
 
-        Number(attr.market_cap_usd)
+            circulatingSupply <= 0 &&
 
-        /
+            number(attr.market_cap_usd) > 0 &&
 
-        Number(attr.price_usd);
+            number(attr.price_usd) > 0
 
-}
+        ){
 
-let maxSupply =
+            circulatingSupply =
 
-    Number(
-        attr.max_supply || 0
-    );
+                number(attr.market_cap_usd)
 
-if(
+                /
 
-    maxSupply === 0 &&
-    totalSupply > 0
+                number(attr.price_usd);
 
-){
+        }
 
-    maxSupply =
-        totalSupply;
+        let maxSupply =
+            number(attr.max_supply);
 
-}
+        if(
 
-/* =====================================
-   FIX SUPPLY
-===================================== */
+            maxSupply <= 0 &&
 
-if (
+            totalSupply > 0
 
-    totalSupply > 0 &&
+        ){
 
-    circulatingSupply > totalSupply
+            maxSupply =
+                totalSupply;
 
-){
+        }
 
-    circulatingSupply =
-        totalSupply;
+        if(
 
-}
+            totalSupply > 0 &&
 
-if (
+            circulatingSupply > totalSupply
 
-    circulatingSupply <= 0 &&
+        ){
 
-    totalSupply > 0
+            circulatingSupply =
+                totalSupply;
 
-){
+        }
 
-    circulatingSupply =
-        totalSupply;
+        if(
 
-}
+            circulatingSupply <= 0 &&
 
-console.log(
-    "========== ATTR =========="
-);
+            totalSupply > 0
 
-console.log(
-    JSON.stringify(
-        attr,
-        null,
-        2
-    )
-);
+        ){
 
-console.log({
+            circulatingSupply =
+                totalSupply;
 
-    total_supply:
-        totalSupply,
+        }
 
-    circulating_supply:
-        circulatingSupply,
+        /* =====================================
+           NORMALIZED DATA
+        ===================================== */
 
-    max_supply:
-        maxSupply
-
-});
-
-return {
-
-            /* =========================
-               BASIC
-            ========================= */
+        const result = {
 
             token_symbol:
+
                 attr.symbol || "",
 
-            /* =========================
-               PRICE
-            ========================= */
-
             current_price:
-                Number(
+
+                number(
+
                     attr.price_usd ||
 
                     attr.base_token_price_usd ||
 
-                    0
+                    attr.price
+
                 ),
 
-            /* =========================
-               SUPPLY
-            ========================= */
-
             total_supply:
+
                 totalSupply,
 
             circulating_supply:
+
                 circulatingSupply,
 
             max_supply:
+
                 maxSupply,
 
-            /* =========================
-               MARKET
-            ========================= */
-
             market_cap:
-                Number(
-                    attr.market_cap_usd || 0
+
+                number(
+
+                    attr.market_cap_usd ||
+
+                    attr.market_cap ||
+
+                    attr.fdv_usd
+
                 ),
 
             fdv:
-                Number(
-                    attr.fdv_usd || 0
+
+                number(
+                    attr.fdv_usd
                 ),
 
-            /* =========================
-               VOLUME
-            ========================= */
-
             volume_24h:
-                Number(
-                    attr.volume_usd?.h24 || 0
+
+                number(
+
+                    attr.volume_usd?.h24 ||
+
+                    attr.volume_usd?.["24h"] ||
+
+                    attr.volume_24h
+
                 ),
 
             liquidity:
-                Number(
+
+                number(
 
                     attr.total_reserve_in_usd ||
 
                     attr.reserve_in_usd ||
 
-                    0
+                    attr.liquidity_usd
 
                 ),
 
             price_change_24h:
-                Number(
-                    attr.price_change_percentage?.h24 || 0
+
+                number(
+
+                    attr.price_change_percentage?.h24 ||
+
+                    attr.price_change_percentage?.["24h"]
+
                 )
 
         };
 
+        console.table({
+
+            price:
+
+                result.current_price,
+
+            market_cap:
+
+                result.market_cap,
+
+            fdv:
+
+                result.fdv,
+
+            volume:
+
+                result.volume_24h,
+
+            liquidity:
+
+                result.liquidity
+
+        });
+
+        return result;
+
     }
+
     catch(err){
 
-        if (err.response) {
-
-    console.log(
-        "========== GECKOTERMINAL ERROR =========="
-    );
-
-    console.log(
-        "Status:",
-        err.response.status
-    );
-
-    console.log(
-        JSON.stringify(
-            err.response.data,
-            null,
-            2
-        )
-    );
-
-    if (err.response.status === 404) {
-
         console.log(
-            "Token API not found."
+            "========== GECKOTERMINAL ERROR =========="
         );
 
-        console.log(
-            "Try GeckoTerminal Search API..."
-        );
+        if(err.response){
 
-        return null;
+            console.log(
+                "Status :",
+                err.response.status
+            );
 
-    }
+            if(err.response.status === 404){
 
-    if (err.response.status === 429) {
+                console.log(
+                    "Token not found."
+                );
 
-        throw new Error(
-            "GeckoTerminal rate limit"
-        );
+            }
+
+            else if(err.response.status === 429){
+
+                console.log(
+                    "Rate limit reached."
+                );
+
+            }
+
+            else{
+
+                console.log(
+                    err.response.data
+                );
+
+            }
+
+        }
+
+        else{
+
+            console.log(
+                err.message
+            );
+
+        }
+
+        /*
+        Không throw để tránh
+        làm hỏng toàn bộ
+        metrics pipeline.
+        */
+
+        return {};
 
     }
 
 }
 
-throw err;
-
-    }
-
-}
+/* =========================================
+   EXPORTS
+========================================= */
 
 module.exports = {
 
