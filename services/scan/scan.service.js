@@ -4,21 +4,8 @@
 
 "use strict";
 
-
 const db =
     require("../../db");
-
-
-
-const projectService =
-    require("../airdrop.project.service");
-
-const metricsService =
-    require("../airdrop.metrics.service");
-
-const historyService =
-    require("../airdrop.project.history.service");
-
 
 /*
 =========================================
