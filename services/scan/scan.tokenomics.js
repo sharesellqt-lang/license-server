@@ -5,8 +5,8 @@
 "use strict";
 
 
-const metricsRepository =
-    require("../../repositories/metrics.repository");
+const metricsService =
+    require("../airdrop.metrics.service");
 
 
 
@@ -472,7 +472,7 @@ public_roi
 
     const metrics =
 
-        await metricsRepository.getByProject(
+        await metricsService.getByProject(
 
             projectId
 
