@@ -398,6 +398,10 @@ ANALYSIS
 
 try{
 console.log("CALL analyzeProject");
+await new Promise(
+    resolve => setTimeout(resolve,1000)
+);
+
     await analysisService.analyzeProject(
 
         userId,
