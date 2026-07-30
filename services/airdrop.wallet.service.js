@@ -282,32 +282,28 @@ async function addWallet(
 
     }
 
-    const [exists] =
-        await db.query(
+/* =========================================
 
-            `
-            SELECT id
-            FROM airdrop_wallets
-            WHERE
-                user_id = ?
-            AND
-                address = ?
-            LIMIT 1
-            `,
 
-            [
-                userId,
-                address
-            ]
+ const [exists] =
+    await db.query(
+        `
+        SELECT id
+        FROM airdrop_wallets
+        WHERE user_id = ?
+        AND address = ?
+        LIMIT 1
+        `,
+        [userId, address]
+    );
 
-        );
+if (exists.length > 0) {
 
-   if(existing){
-
-    return existing;
+    return exists[0];
 
 }
-
+  
+========================================= */
     const [result] =
         await db.query(
 
