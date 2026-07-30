@@ -18,9 +18,8 @@
 =========================================
 */
 
-
-const partnerRepository =
-    require("../../repositories/partner.repository");
+const partnerService =
+    require("../airdrop.partner.service");
 
 
 
@@ -456,35 +455,22 @@ async function scanPartner(
 
 
 
-    if(!projectId){
+if (!projectId) {
 
-      return {
+    return {
 
-partner_score,
+        partner_score: 0,
 
-partners,
+        partners: [],
 
-partner_count
+        partner_count: 0
+
+    };
 
 }
 
-    }
-
-
-
-
-
     const partners =
-
-        await partnerRepository.getByProject(
-
-            projectId
-
-        );
-
-
-
-
+    await partnerService.getPartners(projectId)
 
     const score =
 
@@ -493,10 +479,6 @@ partner_count
             partners
 
         );
-
-
-
-
 
     return {
 
