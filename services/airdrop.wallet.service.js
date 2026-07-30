@@ -302,13 +302,11 @@ async function addWallet(
 
         );
 
-    if (exists.length) {
+   if(existing){
 
-        throw new Error(
-            "Wallet already exists."
-        );
+    return existing;
 
-    }
+}
 
     const [result] =
         await db.query(
