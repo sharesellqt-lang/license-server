@@ -24,8 +24,8 @@
 */
 
 
-const investorRepository =
-    require("../../repositories/investor.repository");
+const investorService =
+    require("../airdrop.investor.service");
 
 
 
@@ -419,7 +419,7 @@ async function scanInvestor(
 
     const investors =
 
-        await investorRepository.getByProject(
+        await investorService.getByProject(
 
             projectId
 
