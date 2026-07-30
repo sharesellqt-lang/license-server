@@ -307,7 +307,35 @@ if (!result.insertId) {
 
 }
 
-    const projectId = result.insertId;
+   const projectId = result.insertId;
+
+
+/*
+-------------------------------------
+CREATE EMPTY METRICS
+-------------------------------------
+*/
+
+try {
+
+    await metricsService.createMetrics(
+        projectId
+    );
+
+    console.log(
+        "Created metrics for project:",
+        projectId
+    );
+
+}
+catch(err){
+
+    console.error(
+        "Create metrics error:",
+        err.message
+    );
+
+}
 
 /*
 -------------------------------------
