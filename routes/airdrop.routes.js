@@ -1,5 +1,5 @@
 // =========================================
-// routes/airdrop.routes.js -updated
+// routes/airdrop.routes.js
 // =========================================
 
 "use strict";
