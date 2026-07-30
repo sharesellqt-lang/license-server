@@ -312,31 +312,40 @@ if (!result.insertId) {
 
 /*
 -------------------------------------
-CREATE EMPTY METRICS
+CREATE DEFAULT METRICS
 -------------------------------------
 */
 
 try {
 
     await metricsService.createMetrics(
+        projectId,
+        {
+            token_symbol: "",
+            current_price: 0,
+            market_cap: 0,
+            fdv: 0,
+            volume_24h: 0,
+            liquidity: 0
+        }
+    );
+
+
+    console.log(
+        "CREATE METRICS SUCCESS:",
         projectId
     );
 
-    console.log(
-        "Created metrics for project:",
-        projectId
-    );
 
 }
 catch(err){
 
     console.error(
-        "Create metrics error:",
+        "CREATE METRICS ERROR:",
         err.message
     );
 
 }
-
 /*
 -------------------------------------
 SYNC MARKET
