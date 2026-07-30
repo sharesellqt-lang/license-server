@@ -4,10 +4,8 @@
 
 "use strict";
 
-
-const noteRepository =
-    require("../../repositories/note.repository");
-
+const noteService =
+    require("../airdrop.note.service");
 
 
 /* =========================================
@@ -440,7 +438,7 @@ async function scanNote(
 
     const notes =
 
-        await noteRepository.getByProject(
+        await noteService.getByProject(
 
             projectId
 
