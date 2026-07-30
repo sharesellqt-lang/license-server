@@ -152,21 +152,6 @@ const {
 require("./scan.onchain");
 
 
-
-/*
-=========================================
- SCORE UTILS
-=========================================
-*/
-
-const {
-
-    createScoreSummary
-
-}
-=
-require("./scan.utils");
-
 /*
 =========================================
  SAFE RUNNER
