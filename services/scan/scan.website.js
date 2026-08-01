@@ -4,30 +4,25 @@
 
 "use strict";
 
-
 const fetch =
     global.fetch ||
     require("node-fetch");
-
 
 
 /* =========================================
    HELPERS
 ========================================= */
 
-
 function number(value){
 
     value =
         Number(value);
-
 
     return Number.isFinite(value)
         ? value
         : 0;
 
 }
-
 
 
 function normalizeUrl(url){
@@ -37,7 +32,6 @@ function normalizeUrl(url){
         return null;
 
     }
-
 
     try{
 
@@ -53,179 +47,73 @@ function normalizeUrl(url){
 }
 
 
-
-/*
-=========================================
- CLEAN HTML TO TEXT
-=========================================
-*/
-
-function extractVisibleText(
-    html=""
-){
-
-    return String(html)
-
-        .replace(
-            /<script[\s\S]*?<\/script>/gi,
-            " "
-        )
-
-        .replace(
-            /<style[\s\S]*?<\/style>/gi,
-            " "
-        )
-
-        .replace(
-            /<svg[\s\S]*?<\/svg>/gi,
-            " "
-        )
-
-        .replace(
-            /<[^>]+>/g,
-            " "
-        )
-
-        .replace(
-            /&nbsp;/gi,
-            " "
-        )
-
-        .replace(
-            /\s+/g,
-            " "
-        )
-
-        .trim();
-
-}
-
-
-
-
-
-/*
-=========================================
- REQUEST
-=========================================
-*/
-
-
 async function request(url){
-
-    const controller =
-        new AbortController();
-
-
-    const timer =
-        setTimeout(
-
-            ()=>controller.abort(),
-
-            10000
-
-        );
-
-
 
     try{
 
-
         const res =
             await fetch(
-
                 url,
-
                 {
 
                     method:
                         "GET",
 
-
                     headers:{
 
-
                         "User-Agent":
-                            "Airdrop-Intelligence/1.0",
-
-
-                        "Accept":
-                            "text/html"
+                            "Airdrop-Intelligence"
 
                     },
 
-
-                    signal:
-                        controller.signal
+                    timeout:
+                        10000
 
                 }
-
             );
-
-
-
-        const text =
-            await res.text();
-
-
 
         return {
 
             ok:
                 res.ok,
 
-
             status:
                 res.status,
 
-
-            text
+            text:
+                await res.text()
 
         };
-
 
     }
     catch(_){
 
-
         return {
 
-            ok:false,
+            ok:
+                false,
 
+            status:
+                0,
 
-            status:0,
-
-
-            text:""
+            text:
+                ""
 
         };
-
-
-    }
-    finally{
-
-
-        clearTimeout(timer);
-
 
     }
 
 }
 
 
-
-
-
 /* =========================================
    SSL
 ========================================= */
-
 
 function checkSSL(url){
 
     const parsed =
         normalizeUrl(url);
-
 
     return !!parsed &&
         parsed.protocol === "https:";
@@ -233,202 +121,72 @@ function checkSSL(url){
 }
 
 
-
-
-
-/* =========================================
-   META
-========================================= */
-
-
-function extractMeta(
-    html=""
-){
-
-    const text =
-        html.toLowerCase();
-
-
-    return {
-
-
-        title:
-
-            (
-                html.match(
-                    /<title>(.*?)<\/title>/i
-                ) || []
-            )[1]
-            ||
-            "",
-
-
-
-        description:
-
-            (
-                html.match(
-                    /<meta[^>]+name=["']description["'][^>]+content=["'](.*?)["']/i
-                )
-                ||
-                []
-            )[1]
-            ||
-            "",
-
-
-
-        keywords:
-
-            text.includes("crypto") ||
-            text.includes("blockchain") ||
-            text.includes("web3")
-
-    };
-
-
-}
-
-
-
-
-
 /* =========================================
    SOCIAL
 ========================================= */
 
-
-function detectSocial(
-    html=""
-){
+function detectSocial(html=""){
 
     const text =
         html.toLowerCase();
 
-
-
     return {
 
-
         twitter:
-
-            text.includes(
-                "twitter.com"
-            )
-            ||
-            text.includes(
-                "x.com"
-            ),
-
-
+            text.includes("twitter.com") ||
+            text.includes("x.com"),
 
         discord:
-
-            text.includes(
-                "discord.gg"
-            ),
-
-
+            text.includes("discord.gg"),
 
         telegram:
-
-            text.includes(
-                "t.me"
-            ),
-
-
+            text.includes("t.me"),
 
         github:
-
-            text.includes(
-                "github.com"
-            ),
-
-
+            text.includes("github.com"),
 
         medium:
-
-            text.includes(
-                "medium.com"
-            )
+            text.includes("medium.com")
 
     };
 
-
 }
-
-
-
 
 
 /* =========================================
    DOCUMENTS
 ========================================= */
 
-
-function detectDocuments(
-    html=""
-){
+function detectDocuments(html=""){
 
     const text =
         html.toLowerCase();
 
-
-
     return {
 
-
         whitepaper:
-
-            text.includes(
-                "whitepaper"
-            )
-            ||
-            text.includes(
-                "litepaper"
-            ),
-
-
+            text.includes("whitepaper") ||
+            text.includes("litepaper"),
 
         docs:
-
-            text.includes(
-                "docs."
-            )
-            ||
-            text.includes(
-                "/docs"
-            ),
-
-
+            text.includes("docs.") ||
+            text.includes("/docs"),
 
         roadmap:
-
-            text.includes(
-                "roadmap"
-            )
+            text.includes("roadmap")
 
     };
 
-
 }
-
-
-
 
 
 /* =========================================
    SCORE
 ========================================= */
 
-
-function calculateWebsiteScore(
-    data={}
-){
+function calculateWebsiteScore(data={}){
 
     let score = 0;
-
-
 
     if(data.ssl){
 
@@ -436,17 +194,12 @@ function calculateWebsiteScore(
 
     }
 
-
-
     const socialCount =
-
         Object.values(
             data.social || {}
         )
         .filter(Boolean)
         .length;
-
-
 
     if(socialCount >= 5){
 
@@ -464,45 +217,29 @@ function calculateWebsiteScore(
 
     }
 
-
-
-    if(
-        data.documents?.whitepaper
-    ){
+    if(data.documents?.whitepaper){
 
         score += 20;
 
     }
 
-
-
-    if(
-        data.documents?.docs
-    ){
+    if(data.documents?.docs){
 
         score += 15;
 
     }
 
-
-
-    if(
-        data.documents?.roadmap
-    ){
+    if(data.documents?.roadmap){
 
         score += 10;
 
     }
-
-
 
     if(data.online){
 
         score += 15;
 
     }
-
-
 
     return Math.min(
         score,
@@ -512,107 +249,50 @@ function calculateWebsiteScore(
 }
 
 
-
-
-
 /* =========================================
    SCAN WEBSITE
 ========================================= */
 
-
-async function scanWebsite(
-    context={}
-){
+async function scanWebsite(context={}){
 
     const project =
         context.project || {};
 
-
-
     const url =
-
         project.website ||
-
         project.url ||
-
         project.site ||
-
         "";
-
-
-
 
     if(!url){
 
-
         return {
 
+            website_score:
+                0,
 
-            website_score:0,
-
-
-            community_score:0,
-
-
-            html:"",
-
-
-            text:""
+            community_score:
+                0
 
         };
 
-
     }
-
-
-
-
 
     const response =
         await request(url);
 
-
-
-
-    const html =
-        response.text || "";
-
-
-
-    const text =
-        extractVisibleText(
-            html
-        );
-
-
-
     const social =
         detectSocial(
-            html
+            response.text
         );
-
-
 
     const documents =
         detectDocuments(
-            html
+            response.text
         );
-
-
-
-    const meta =
-        extractMeta(
-            html
-        );
-
-
 
     const ssl =
-        checkSSL(
-            url
-        );
-
-
+        checkSSL(url);
 
     const score =
         calculateWebsiteScore({
@@ -628,105 +308,102 @@ async function scanWebsite(
 
         });
 
+   const result = {
+
+    /*
+    ===============================
+       WEBSITE INFO
+    ===============================
+    */
+
+    website_url:
+        url,
+
+
+    online:
+        response.ok,
+
+
+    ssl,
+
+
+    status:
+        response.status,
 
 
 
+    /*
+    ===============================
+       RAW HTML
+       dùng cho AI scanner
+    ===============================
+    */
 
-    return {
-
-
-        website_url:
-
-            url,
-
-
-
-        online:
-
-            response.ok,
+    html:
+        response.text || "",
 
 
 
-        status:
+    /*
+    ===============================
+       SOCIAL
+    ===============================
+    */
 
-            response.status,
-
-
-
-        ssl,
-
-
-
-        /*
-        RAW HTML
-        cho AI scanner
-        */
-
-        html,
+    social,
 
 
 
-        /*
-        CLEAN TEXT
-        cho team AI
-        */
+    /*
+    ===============================
+       DOCUMENTS
+    ===============================
+    */
 
-        text,
-
-
-
-        meta,
+    documents,
 
 
 
-        social,
+    /*
+    ===============================
+       SCORE
+    ===============================
+    */
+
+    website_score:
+        score,
 
 
+    community_score:
+        score
 
-        documents,
+};
 
+    console.log(
+        "========== WEBSITE RESULT =========="
+    );
 
+    console.log(
+        result
+    );
 
-        website_score:
-
-            score,
-
-
-
-        community_score:
-
-            score
-
-
-    };
-
+    return result;
 
 }
-
-
-
 
 
 /* =========================================
    EXPORT
 ========================================= */
 
-
 module.exports = {
-
 
     scanWebsite,
 
-
     calculateWebsiteScore,
-
 
     detectSocial,
 
-
-    detectDocuments,
-
-
-    extractVisibleText
+    detectDocuments
 
 };
