@@ -601,10 +601,7 @@ module.exports = {
     scanTeamAI,
 
 
-    extractMembers,
-
-
-    upsertMember
+    extractMembers
 
 
 };
