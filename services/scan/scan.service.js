@@ -569,8 +569,6 @@ const metrics = {
     ...results.audit.data,
 
     ...results.team.data,
-    
-    ...results.team_ai.data,
 
     ...results.partner.data,
 

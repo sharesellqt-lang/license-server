@@ -414,6 +414,34 @@ async function upsertMember(
 
 }
 
+async function findMember(
+    projectId,
+    memberName
+){
+
+    const sql = `
+        SELECT *
+        FROM airdrop_project_team
+        WHERE project_id=?
+        AND member_name=?
+        LIMIT 1
+    `;
+
+
+    const [rows] =
+        await db.query(
+            sql,
+            [
+                projectId,
+                memberName
+            ]
+        );
+
+
+    return rows[0] || null;
+
+}
+
 /* =========================================
    EXPORTS
 ========================================= */
@@ -434,6 +462,8 @@ module.exports = {
 
     deleteAll,
 
-    upsertMember
+    upsertMember,
+
+    findMember
 
 };

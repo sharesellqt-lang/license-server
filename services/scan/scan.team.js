@@ -8,7 +8,11 @@
 const teamService =
     require("../airdrop.team.service");
 
-
+const {
+    scanTeamAI
+}
+=
+require("./scan.team.ai");
 
 /* =========================================
    HELPERS
@@ -394,10 +398,84 @@ if (!projectId) {
 }
 
 
+/*
+=====================================
+   AI EXTRACT TEAM
+=====================================
+*/
+
+if(
+    context.html
+){
+
+    try{
+
+
+        const aiMembers =
+            await scanTeamAI({
+
+                html:
+                    context.html,
+
+                project
+
+            });
+
+
+
+        console.log(
+            "===== AI MEMBERS ====="
+        );
+
+
+        console.dir(
+            aiMembers,
+            {
+                depth:null
+            }
+        );
+
+
+
+        for(
+            const member of aiMembers
+        ){
+
+
+            await teamService.upsertMember(
+
+                projectId,
+
+                member
+
+            );
+
+
+        }
+
+
+    }
+    catch(error){
+
+
+        console.log(
+            "TEAM AI ERROR:",
+            error.message
+        );
+
+
+    }
+
+}
+
+
+
+
 const members =
     await teamService.getMembers(
         projectId
     );
+
 console.log("TEAM MEMBERS");
 console.dir(members, { depth: null });
 
@@ -430,28 +508,34 @@ console.log("TEAM SCORE =", score);
             members.length,
 
 
-        team_members:
+ team_members:
 
-            members.map(member=>({
+members.map(member=>({
 
-
-                name:
-                    member.name || "",
-
-
-                role:
-                    member.role || "",
+    name:
+        member.member_name || "",
 
 
-                linkedin:
-                    member.linkedin || "",
+    role:
+        member.position || "",
 
 
-                twitter:
-                    member.twitter || ""
+    linkedin:
+        member.linkedin || "",
 
 
-            })),
+    twitter:
+        member.twitter || "",
+
+
+    experience_years:
+        member.experience_years || 0,
+
+
+    verification:
+        member.verification_level || "unverified"
+
+}))
 
 
 

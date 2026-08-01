@@ -308,30 +308,76 @@ async function scanWebsite(context={}){
 
         });
 
-    const result = {
+   const result = {
 
-        website_url:
-            url,
+    /*
+    ===============================
+       WEBSITE INFO
+    ===============================
+    */
 
-        online:
-            response.ok,
+    website_url:
+        url,
 
-        ssl,
 
-        status:
-            response.status,
+    online:
+        response.ok,
 
-        social,
 
-        documents,
+    ssl,
 
-        website_score:
-            score,
 
-        community_score:
-            score
+    status:
+        response.status,
 
-    };
+
+
+    /*
+    ===============================
+       RAW HTML
+       dùng cho AI scanner
+    ===============================
+    */
+
+    html:
+        response.text || "",
+
+
+
+    /*
+    ===============================
+       SOCIAL
+    ===============================
+    */
+
+    social,
+
+
+
+    /*
+    ===============================
+       DOCUMENTS
+    ===============================
+    */
+
+    documents,
+
+
+
+    /*
+    ===============================
+       SCORE
+    ===============================
+    */
+
+    website_score:
+        score,
+
+
+    community_score:
+        score
+
+};
 
     console.log(
         "========== WEBSITE RESULT =========="

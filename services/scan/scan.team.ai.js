@@ -15,7 +15,7 @@ const teamService =
 ========================================= */
 
 
-function clean(value = "") {
+function clean(value=""){
 
     return String(value)
 
@@ -30,28 +30,65 @@ function clean(value = "") {
 
 
 
-function normalize(value = "") {
+function normalize(value=""){
 
-    return String(value)
-
-        .toLowerCase()
-
-        .trim();
+    return clean(value)
+        .toLowerCase();
 
 }
 
 
 
-/*
-=========================================
-REMOVE HTML
-=========================================
-*/
+function extractUrl(
+    text,
+    keyword
+){
+
+    const regex =
+        new RegExp(
+            `${keyword}[^\\s"']+`,
+            "i"
+        );
 
 
-function stripHtml(html = "") {
+    const match =
+        text.match(regex);
 
-    return html
+
+    return match
+        ? match[0]
+        : "";
+
+}
+
+
+
+
+
+/* =========================================
+   FIND PEOPLE
+========================================= */
+
+
+function extractMembers(
+    html=""
+){
+
+
+    const members=[];
+
+
+    if(!html){
+
+        return members;
+
+    }
+
+
+
+    const text =
+
+        html
 
         .replace(
             /<script[\s\S]*?<\/script>/gi,
@@ -68,169 +105,13 @@ function stripHtml(html = "") {
             " "
         );
 
-}
-
-
-
-
-/*
-=========================================
-SOCIAL FINDER
-=========================================
-*/
-
-
-function extractSocial(text = "") {
-
-
-    let linkedin = "";
-
-    let twitter = "";
-
-
-
-    const linkedinMatch =
-
-        text.match(
-            /https?:\/\/(www\.)?linkedin\.com\/[^\s"'<>]+/i
-        );
-
-
-    if(linkedinMatch){
-
-        linkedin =
-            linkedinMatch[0];
-
-    }
-
-
-
-    const twitterMatch =
-
-        text.match(
-            /https?:\/\/(twitter\.com|x\.com)\/[^\s"'<>]+/i
-        );
-
-
-    if(twitterMatch){
-
-        twitter =
-            twitterMatch[0];
-
-    }
-
-
-
-    return {
-
-        linkedin,
-
-        twitter
-
-    };
-
-
-}
-
-
-
-
-
-/*
-=========================================
-POSITION DETECT
-=========================================
-*/
-
-
-function detectPosition(
-    text=""
-){
-
-
-    const t =
-        normalize(text);
-
-
-
-    const roles = [
-
-
-        "ceo",
-
-        "cto",
-
-        "cfo",
-
-        "coo",
-
-        "founder",
-
-        "co-founder",
-
-        "chief executive",
-
-        "advisor",
-
-        "marketing",
-
-        "developer",
-
-        "engineer",
-
-        "lead"
-
-    ];
-
-
-
-    for(const role of roles){
-
-
-        if(
-            t.includes(role)
-        ){
-
-            return role;
-
-        }
-
-    }
-
-
-
-    return "";
-
-}
-
-
-
-
-
-/*
-=========================================
-TEAM EXTRACTION
-=========================================
-*/
-
-
-function extractTeamFromHTML(
-    html=""
-){
-
-
-    const text =
-        stripHtml(html);
-
 
 
     const lines =
 
         text
 
-        .split(
-            /\n|\r/
-        )
+        .split("\n")
 
         .map(clean)
 
@@ -241,127 +122,197 @@ function extractTeamFromHTML(
 
 
 
-    const members = [];
+
+    const roles = [
+
+        "founder",
+
+        "co-founder",
+
+        "ceo",
+
+        "cto",
+
+        "developer",
+
+        "engineer",
+
+        "advisor",
+
+        "team"
+
+    ];
 
 
 
-    for(
-        let i = 0;
-        i < lines.length;
-        i++
-    ){
+    lines.forEach(line=>{
 
 
-        const line =
-            lines[i];
+        const lower =
+            normalize(line);
 
 
 
-        const position =
-            detectPosition(
-                line
+        const hasRole =
+
+            roles.some(
+                role =>
+                lower.includes(role)
             );
 
 
 
-        if(!position)
-            continue;
+        if(!hasRole){
+
+            return;
+
+        }
 
 
 
-        const social =
-            extractSocial(
-                line
-            );
+        let position =
+            "";
 
 
 
-        let name =
-            line;
+        roles.forEach(role=>{
+
+            if(
+                lower.includes(role)
+            ){
+
+                position =
+                    role;
+
+            }
+
+        });
 
 
 
         /*
-        remove role
+        lấy tên phía trước role
+        ví dụ:
+        John Smith - CEO
         */
 
 
+        let name =
+            line
+
+            .split(
+                /[-|,:]/
+            )[0];
+
+
         name =
-            name
-
-            .replace(
-                /ceo|cto|cfo|coo|founder|advisor/gi,
-                ""
-            )
-
-            .trim();
+            clean(name);
 
 
 
         if(
-            name.length < 2
-        )
-            continue;
+            name.length < 3 ||
+            name.length > 80
+        ){
+
+            return;
+
+        }
 
 
 
-
-       members.push({
-
-    member_name: name,
-
-    position,
-
-    linkedin:
-        social.linkedin || "",
+        members.push({
 
 
-    twitter:
-        social.twitter || "",
+            member_name:
+
+                name,
 
 
-    previous_company:
-        "",
+            position:
+
+                position,
 
 
-    experience_years:
-        0,
+            linkedin:
+
+                extractUrl(
+                    line,
+                    "linkedin.com"
+                ),
 
 
-    github:
-        social.github || "",
+            twitter:
+
+                extractUrl(
+                    line,
+                    "twitter.com"
+                )
+                ||
+                extractUrl(
+                    line,
+                    "x.com"
+                ),
 
 
-    avatar:
-        "",
+            github:
+
+                extractUrl(
+                    line,
+                    "github.com"
+                ),
 
 
-    verification_level:
-        "low",
+            previous_company:
+
+                "",
 
 
-    source_url:
-        sourceUrl || "",
+            experience_years:
+
+                0,
 
 
-    influence_score:
-        0,
+            is_founder:
+
+                (
+                    position.includes(
+                        "founder"
+                    )
+                    ||
+                    position === "ceo"
+                )
+                ?1
+                :0,
 
 
-    is_founder:
-        0,
+            verification_level:
+
+                "low",
 
 
-    note:
-        line || ""
+            source_url:
 
-});
-
-    }
+                "",
 
 
+            influence_score:
 
-    return members;
+                0
+
+
+        });
+
+
+
+    });
+
+
+
+    return uniqueMembers(
+        members
+    );
+
 
 }
 
@@ -369,21 +320,17 @@ function extractTeamFromHTML(
 
 
 
-/*
-=========================================
-DEDUP
-=========================================
-*/
+/* =========================================
+   REMOVE DUPLICATE
+========================================= */
 
 
-function removeDuplicate(
+function uniqueMembers(
     members=[]
 ){
 
-
     const map =
         new Map();
-
 
 
     members.forEach(member=>{
@@ -394,6 +341,7 @@ function removeDuplicate(
             normalize(
                 member.member_name
             );
+
 
 
         if(
@@ -418,95 +366,51 @@ function removeDuplicate(
 
     ];
 
-
 }
 
 
 
 
 
-/*
-=========================================
-SAVE DATABASE
-=========================================
-*/
+/* =========================================
+   UPSERT
+========================================= */
 
 
-async function saveTeam(
+async function upsertMember(
     projectId,
-    members=[]
+    member
 ){
 
 
-    if(
-        !members.length
-    )
-        return;
+    const existing =
 
-
-
-    for(
-        const member of members
-    ){
-
-
-        await teamService.upsertMember(
-
+        await teamService.findMember(
             projectId,
+            member.member_name
+        );
+
+
+
+    if(existing){
+
+
+        await teamService.updateMember(
+
+            existing.id,
 
             member
 
         );
 
 
-    }
-
-
-}
-
-
-
-
-
-/*
-=========================================
-MAIN
-=========================================
-*/
-
-
-async function scanTeamAI(
-    context={}
-){
-
-
-    const project =
-        context.project || {};
-
-
-
-    const projectId =
-        context.projectId;
-
-
-
-    const html =
-        context.html ||
-        "";
-
-
-
-    if(
-        !projectId ||
-        !html
-    ){
-
-
         return {
 
-            team_count:0,
+            action:
+                "updated",
 
-            members:[]
+            id:
+                existing.id
 
         };
 
@@ -515,42 +419,116 @@ async function scanTeamAI(
 
 
 
+    const id =
 
-    let members =
+        await teamService.createMember(
 
-        extractTeamFromHTML(
+            projectId,
+
+            member
+
+        );
+
+
+
+    return {
+
+        action:
+            "inserted",
+
+        id
+
+    };
+
+
+}
+
+
+
+
+
+/* =========================================
+   SCAN TEAM AI
+========================================= */
+
+
+async function scanTeamAI(
+    context={}
+){
+
+    const projectId =
+        context.projectId;
+
+
+
+    const html =
+        context.html || "";
+
+
+
+    if(!projectId){
+
+
+        return {
+
+            team_score:
+                0,
+
+            members:
+                []
+
+        };
+
+    }
+
+
+
+    const members =
+
+        extractMembers(
             html
         );
 
 
 
-    members =
+    const saved=[];
 
-        removeDuplicate(
-            members
+
+
+    for(
+        const member of members
+    ){
+
+
+        const result =
+
+            await upsertMember(
+
+                projectId,
+
+                member
+
+            );
+
+
+        saved.push({
+
+            ...member,
+
+            ...result
+
+        });
+
+
+    }
+
+
+
+    const total =
+
+        await teamService.getMembers(
+            projectId
         );
-
-
-
-
-    await saveTeam(
-
-        projectId,
-
-        members
-
-    );
-
-
-
-    console.log(
-        "========== TEAM AI =========="
-    );
-
-
-    console.table(
-        members
-    );
 
 
 
@@ -559,10 +537,28 @@ async function scanTeamAI(
 
         team_count:
 
-            members.length,
+            total.length,
 
 
-        members
+        members:
+
+            total,
+
+
+        extracted:
+
+            saved,
+
+
+        team_score:
+
+            Math.min(
+
+                100,
+
+                total.length * 10
+
+            )
 
 
     };
@@ -574,16 +570,21 @@ async function scanTeamAI(
 
 
 
+/* =========================================
+   EXPORT
+========================================= */
+
+
 module.exports = {
 
 
     scanTeamAI,
 
 
-    extractTeamFromHTML,
+    extractMembers,
 
 
-    removeDuplicate
+    upsertMember
 
 
 };
