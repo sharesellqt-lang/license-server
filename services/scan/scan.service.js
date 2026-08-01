@@ -399,22 +399,31 @@ console.dir(results.geckoterminal, { depth: null });
         );
 
 
+const {
+    scanTeamAI
+}
+=
+require("./scan/scan.team.ai");
 
-    results.team =
+results.team_ai =
 
-        await safeRun(
+await safeRun(
 
-            "team",
+    "team_ai",
 
-            ()=>
-
-                scanTeam(
-                    context
-                )
-
-        );
+    ()=>
 
 
+        scanTeamAI({
+
+            ...context,
+
+            html:
+                results.website.data?.html || ""
+
+        })
+
+);
 
     results.partner =
 
@@ -560,6 +569,8 @@ const metrics = {
     ...results.audit.data,
 
     ...results.team.data,
+    
+    ...results.team_ai.data,
 
     ...results.partner.data,
 
@@ -576,52 +587,33 @@ const metrics = {
 };
 
 
-const scoreSummary =
+const scoreSummary = createScoreSummary({
 
-    createScoreSummary({
+    team_score:
+        metrics.team_score,
 
-        team:
+    investor_score:
+        metrics.investor_score,
 
-            metrics.team.team_score || 0,
+    partner_score:
+        metrics.partner_score,
 
+    tokenomics_score:
+        metrics.tokenomics_score,
 
-        investor:
+    financial_score:
+        metrics.financial_score,
 
-            metrics.investor.investor_score || 0,
+    community_score:
+        metrics.community_score,
 
+    development_score:
+        metrics.development_score,
 
-        partner:
+    onchain_score:
+        metrics.onchain_score
 
-            metrics.partner.partner_score || 0,
-
-
-        tokenomics:
-
-            metrics.tokenomics.tokenomics_score || 0,
-
-
-        financial:
-
-            metrics.defillama.defillama_score || 0,
-
-
-        community:
-
-            metrics.website.community_score || 0,
-
-
-        development:
-
-            metrics.github.github_score || 0,
-
-
-        onchain:
-
-            metrics.geckoterminal.onchain_score || 0
-
-
-    });
-
+});
 
 
 Object.assign(

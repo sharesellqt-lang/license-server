@@ -201,6 +201,218 @@ async function getAllMembers(userId) {
 
 }
 
+/* =========================================
+   UPSERT MEMBER
+========================================= */
+
+async function upsertMember(
+    projectId,
+    data={}
+){
+
+    const name =
+        String(
+            data.member_name || ""
+        ).trim();
+
+
+    if(!projectId || !name){
+
+        return null;
+
+    }
+
+
+
+    const [rows] =
+        await db.query(
+
+            `
+            SELECT id
+
+            FROM airdrop_project_team
+
+            WHERE project_id=?
+
+            AND LOWER(member_name)=LOWER(?)
+
+            LIMIT 1
+            `,
+
+            [
+                projectId,
+                name
+            ]
+
+        );
+
+
+
+    /*
+    ================================
+    UPDATE
+    ================================
+    */
+
+
+    if(rows.length){
+
+
+        const id =
+            rows[0].id;
+
+
+
+        await db.query(
+
+            `
+            UPDATE airdrop_project_team
+
+            SET
+
+                position=?,
+
+                linkedin=?,
+
+                twitter=?,
+
+                previous_company=?,
+
+                experience_years=?,
+
+                github=?,
+
+                avatar=?,
+
+                source_url=?,
+
+                updated_at=?
+
+            WHERE id=?
+
+            `,
+
+            [
+
+                data.position || "",
+
+                data.linkedin || "",
+
+                data.twitter || "",
+
+                data.previous_company || "",
+
+                Number(
+                    data.experience_years || 0
+                ),
+
+                data.github || "",
+
+                data.avatar || "",
+
+                data.source_url || "",
+
+                Date.now(),
+
+                id
+
+            ]
+
+        );
+
+
+        return id;
+
+
+    }
+
+
+
+    /*
+    ================================
+    INSERT
+    ================================
+    */
+
+
+    const [result] =
+
+        await db.query(
+
+            `
+            INSERT INTO airdrop_project_team
+
+            (
+
+                project_id,
+
+                member_name,
+
+                position,
+
+                linkedin,
+
+                previous_company,
+
+                experience_years,
+
+                twitter,
+
+                github,
+
+                avatar,
+
+                source_url,
+
+                created_at,
+
+                updated_at
+
+            )
+
+            VALUES
+
+            (?,?,?,?,?,?,?,?,?,?,?,?)
+
+            `,
+
+            [
+
+                projectId,
+
+                name,
+
+                data.position || "",
+
+                data.linkedin || "",
+
+                data.previous_company || "",
+
+                Number(
+                    data.experience_years || 0
+                ),
+
+                data.twitter || "",
+
+                data.github || "",
+
+                data.avatar || "",
+
+                data.source_url || "",
+
+                Date.now(),
+
+                Date.now()
+
+            ]
+
+        );
+
+
+
+    return result.insertId;
+
+}
 
 /* =========================================
    EXPORTS
@@ -220,6 +432,8 @@ module.exports = {
 
     deleteMember,
 
-    deleteAll
+    deleteAll,
+
+    upsertMember
 
 };

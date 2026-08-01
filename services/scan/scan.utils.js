@@ -5,39 +5,25 @@
 "use strict";
 
 
-
 /* =========================================
    NUMBER
 ========================================= */
-
 
 function number(value){
 
     value =
         Number(value);
 
-
-    if(
-        !Number.isFinite(value)
-    ){
-
-        return 0;
-
-    }
-
-
-    return value;
+    return Number.isFinite(value)
+        ? value
+        : 0;
 
 }
-
-
-
 
 
 /* =========================================
    CLAMP
 ========================================= */
-
 
 function clamp(
     value,
@@ -45,15 +31,11 @@ function clamp(
     max = 100
 ){
 
-    value =
-        number(value);
-
-
     return Math.min(
 
         Math.max(
 
-            value,
+            number(value),
 
             min
 
@@ -66,13 +48,9 @@ function clamp(
 }
 
 
-
-
-
 /* =========================================
    PERCENT
 ========================================= */
-
 
 function percent(
     value,
@@ -82,32 +60,21 @@ function percent(
     value =
         number(value);
 
-
     total =
         number(total);
 
-
-
-    if(
-        total <= 0
-    ){
+    if(total <= 0){
 
         return 0;
 
     }
 
-
-
     return Number(
 
         (
-
             value /
-
             total *
-
             100
-
         )
         .toFixed(2)
 
@@ -116,22 +83,14 @@ function percent(
 }
 
 
-
-
-
 /* =========================================
-   NORMALIZE STRING
+   NORMALIZE
 ========================================= */
 
-
-function normalize(
-    value
-){
+function normalize(value){
 
     return String(
-
         value || ""
-
     )
     .trim()
     .toLowerCase();
@@ -139,47 +98,32 @@ function normalize(
 }
 
 
-
-
-
 /* =========================================
-   SAFE JSON PARSE
+   SAFE JSON
 ========================================= */
-
 
 function safeJson(
     value,
     fallback = {}
 ){
 
-    if(
-        !value
-    ){
+    if(!value){
 
         return fallback;
 
     }
 
-
-
-    if(
-        typeof value === "object"
-    ){
+    if(typeof value === "object"){
 
         return value;
 
     }
 
-
-
     try{
 
-        return JSON.parse(
-            value
-        );
+        return JSON.parse(value);
 
     }
-
     catch(_){
 
         return fallback;
@@ -189,69 +133,38 @@ function safeJson(
 }
 
 
-
-
-
 /* =========================================
-   DATE HELPERS
+   DATE
 ========================================= */
 
+function daysSince(date){
 
-function daysSince(
-    date
-){
-
-    if(
-        !date
-    ){
+    if(!date){
 
         return null;
 
     }
-
-
 
     const d =
-        new Date(
-            date
-        );
+        new Date(date);
 
-
-
-    if(
-        Number.isNaN(
-            d.getTime()
-        )
-    ){
+    if(Number.isNaN(d.getTime())){
 
         return null;
 
     }
-
-
 
     return Math.floor(
 
         (
-
-            Date.now()
-
-            -
-
+            Date.now() -
             d.getTime()
-
         )
-
-        /
-
-        86400000
+        / 86400000
 
     );
 
 }
-
-
-
 
 
 function isRecent(
@@ -260,241 +173,142 @@ function isRecent(
 ){
 
     const diff =
-        daysSince(
-            date
-        );
+        daysSince(date);
 
-
-    if(
-        diff === null
-    ){
-
-        return false;
-
-    }
-
-
-    return diff <= days;
+    return diff !== null &&
+        diff <= days;
 
 }
-
-
-
 
 
 /* =========================================
    SCORE GRADE
 ========================================= */
 
-
-function scoreGrade(
-    score
-){
+function scoreGrade(score){
 
     score =
         clamp(score);
 
-
-
-    if(
-        score >=90
-    ){
+    if(score >= 90){
 
         return "S";
 
     }
 
-
-
-    if(
-        score >=80
-    ){
+    if(score >= 80){
 
         return "A";
 
     }
 
-
-
-    if(
-        score >=70
-    ){
+    if(score >= 70){
 
         return "B";
 
     }
 
-
-
-    if(
-        score >=60
-    ){
+    if(score >= 60){
 
         return "C";
 
     }
 
-
-
-    if(
-        score >=40
-    ){
+    if(score >= 40){
 
         return "D";
 
     }
-
-
 
     return "F";
 
 }
 
 
-
-
-
 /* =========================================
    RISK LEVEL
 ========================================= */
 
-
-function riskLevel(
-    score
-){
+function riskLevel(score){
 
     score =
         clamp(score);
 
-
-
-    /*
-        score cao = an toàn
-    */
-
-
-    if(
-        score >=80
-    ){
+    if(score >= 80){
 
         return "low";
 
     }
 
-
-    if(
-        score >=60
-    ){
+    if(score >= 60){
 
         return "medium";
 
     }
 
-
-    if(
-        score >=40
-    ){
+    if(score >= 40){
 
         return "high";
 
     }
-
 
     return "very-high";
 
 }
 
 
-
-
-
 /* =========================================
    RISK SCORE
 ========================================= */
 
-
-function calculateRiskScore(
-    data={}
-){
+function calculateRiskScore(data={}){
 
     let risk = 0;
 
+    if(data.anonymous_team){
 
-
-    if(
-        data.anonymous_team
-    ){
-
-        risk +=20;
+        risk += 20;
 
     }
 
+    if(data.no_audit){
 
-
-    if(
-        data.no_audit
-    ){
-
-        risk +=20;
+        risk += 20;
 
     }
 
+    if(data.high_fdv){
 
-
-    if(
-        data.high_fdv
-    ){
-
-        risk +=15;
+        risk += 15;
 
     }
 
+    if(data.low_liquidity){
 
-
-    if(
-        data.low_liquidity
-    ){
-
-        risk +=15;
+        risk += 15;
 
     }
 
+    if(data.inactive_github){
 
-
-    if(
-        data.inactive_github
-    ){
-
-        risk +=10;
+        risk += 10;
 
     }
 
+    if(data.bad_notes){
 
-
-    if(
-        data.bad_notes
-    ){
-
-        risk +=20;
+        risk += 20;
 
     }
 
-
-
-    return clamp(
-        risk
-    );
+    return clamp(risk);
 
 }
-
-
-
 
 
 /* =========================================
    WEIGHTED SCORE
 ========================================= */
-
 
 function weightedScore(
     scores = {},
@@ -502,202 +316,199 @@ function weightedScore(
 ){
 
     let total = 0;
-
     let weightTotal = 0;
-
-
 
     Object.keys(scores)
     .forEach(key=>{
 
-
         const value =
-
-            number(
-                scores[key]
-            );
-
+            number(scores[key]);
 
         const weight =
-
-            number(
-                weights[key]
-            );
-
-
+            number(weights[key]);
 
         total +=
-
-            value *
-
-            weight;
-
-
+            value * weight;
 
         weightTotal +=
-
             weight;
-
-
 
     });
 
-
-
-
-
-    if(
-        weightTotal <=0
-    ){
+    if(weightTotal <= 0){
 
         return 0;
 
     }
 
-
-
     return Math.round(
-
         total /
-
         weightTotal
-
     );
 
 }
 
 
-
-
-
 /* =========================================
-   MERGE SCAN RESULT
+   MERGE RESULT
 ========================================= */
 
-
-function mergeResults(
-    results=[]
-){
+function mergeResults(results=[]){
 
     const output = {};
 
-
-
     results.forEach(item=>{
-
 
         if(
             item &&
-
             typeof item === "object"
-
         ){
 
             Object.assign(
-
                 output,
-
                 item
-
             );
 
         }
 
-
     });
-
-
 
     return output;
 
 }
 
 
-
-
-
 /* =========================================
    SCORE SUMMARY
 ========================================= */
 
+function createScoreSummary(scores = {}) {
 
-function createScoreSummary(
-    scores={}
-){
+    const normalized = {
 
-    const total =
+        team:
+            clamp(
+                scores.team_score ??
+                scores.team ??
+                0
+            ),
 
-        weightedScore(
+        investor:
+            clamp(
+                scores.investor_score ??
+                scores.investor ??
+                0
+            ),
 
-            scores,
+        partner:
+            clamp(
+                scores.partner_score ??
+                scores.partner ??
+                0
+            ),
 
-            {
+        tokenomics:
+            clamp(
+                scores.tokenomics_score ??
+                scores.tokenomics ??
+                0
+            ),
 
-                team:0.15,
+        financial:
+            clamp(
+                scores.financial_score ??
+                scores.financial ??
+                0
+            ),
 
-                investor:0.15,
+        community:
+            clamp(
+                scores.community_score ??
+                scores.community ??
+                0
+            ),
 
-                partner:0.10,
+        development:
+            clamp(
+                scores.development_score ??
+                scores.development ??
+                0
+            ),
 
-                tokenomics:0.15,
+        onchain:
+            clamp(
+                scores.onchain_score ??
+                scores.onchain ??
+                0
+            )
 
-                financial:0.15,
+    };
 
-                community:0.10,
+    const overall = Math.round(
 
-                development:0.10,
+        normalized.team * 0.15 +
 
-                onchain:0.10
+        normalized.investor * 0.15 +
 
-            }
+        normalized.partner * 0.10 +
 
-        );
+        normalized.tokenomics * 0.15 +
 
+        normalized.financial * 0.15 +
 
+        normalized.community * 0.10 +
+
+        normalized.development * 0.10 +
+
+        normalized.onchain * 0.10
+
+    );
 
     return {
 
+        team_score:
+            normalized.team,
 
-        scores,
+        investor_score:
+            normalized.investor,
 
+        partner_score:
+            normalized.partner,
 
+        tokenomics_score:
+            normalized.tokenomics,
+
+        financial_score:
+            normalized.financial,
+
+        community_score:
+            normalized.community,
+
+        development_score:
+            normalized.development,
+
+        onchain_score:
+            normalized.onchain,
 
         overall_score:
-
-            total,
-
-
+            overall,
 
         grade:
-
-            scoreGrade(
-                total
-            ),
-
-
+            scoreGrade(overall),
 
         risk_level:
-
-            riskLevel(
-                total
-            )
-
+            riskLevel(overall)
 
     };
 
 }
 
 
-
-
-
 /* =========================================
    EXPORT
 ========================================= */
 
-
 module.exports = {
-
 
     number,
 
@@ -709,11 +520,9 @@ module.exports = {
 
     safeJson,
 
-
     daysSince,
 
     isRecent,
-
 
     scoreGrade,
 
@@ -721,11 +530,9 @@ module.exports = {
 
     calculateRiskScore,
 
-
     weightedScore,
 
     mergeResults,
-
 
     createScoreSummary
 

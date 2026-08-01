@@ -4,37 +4,25 @@
 
 "use strict";
 
-
 const fetch =
     global.fetch ||
     require("node-fetch");
-
 
 
 /* =========================================
    HELPERS
 ========================================= */
 
-
 function number(value){
 
     value =
         Number(value);
 
-
-    if(
-        !Number.isFinite(value)
-    ){
-
-        return 0;
-
-    }
-
-
-    return value;
+    return Number.isFinite(value)
+        ? value
+        : 0;
 
 }
-
 
 
 function normalizeUrl(url){
@@ -45,12 +33,9 @@ function normalizeUrl(url){
 
     }
 
-
     try{
 
-        return new URL(
-            url
-        );
+        return new URL(url);
 
     }
     catch(_){
@@ -62,20 +47,17 @@ function normalizeUrl(url){
 }
 
 
-
 async function request(url){
-
 
     try{
 
         const res =
             await fetch(
-
                 url,
-
                 {
 
-                    method:"GET",
+                    method:
+                        "GET",
 
                     headers:{
 
@@ -84,12 +66,11 @@ async function request(url){
 
                     },
 
-                    timeout:10000
+                    timeout:
+                        10000
 
                 }
-
             );
-
 
         return {
 
@@ -104,438 +85,216 @@ async function request(url){
 
         };
 
-
     }
     catch(_){
 
         return {
 
-            ok:false,
+            ok:
+                false,
 
-            status:0,
+            status:
+                0,
 
-            text:""
+            text:
+                ""
 
         };
 
     }
 
-
 }
 
 
-
-
-
 /* =========================================
-   SSL CHECK
+   SSL
 ========================================= */
-
 
 function checkSSL(url){
 
     const parsed =
-        normalizeUrl(
-            url
-        );
+        normalizeUrl(url);
 
-
-    if(!parsed){
-
-        return false;
-
-    }
-
-
-    return (
-
-        parsed.protocol ===
-        "https:"
-
-    );
+    return !!parsed &&
+        parsed.protocol === "https:";
 
 }
 
 
-
-
-
 /* =========================================
-   SOCIAL DETECTION
+   SOCIAL
 ========================================= */
 
-
-function detectSocial(
-    html=""
-){
+function detectSocial(html=""){
 
     const text =
         html.toLowerCase();
-
-
-
-    const socials = {
-
-
-        twitter:
-
-            text.includes(
-                "twitter.com"
-            )
-
-            ||
-
-            text.includes(
-                "x.com"
-            ),
-
-
-
-        discord:
-
-            text.includes(
-                "discord.gg"
-            ),
-
-
-
-        telegram:
-
-            text.includes(
-                "t.me"
-            ),
-
-
-
-        github:
-
-            text.includes(
-                "github.com"
-            ),
-
-
-
-        medium:
-
-            text.includes(
-                "medium.com"
-            )
-
-    };
-
-
-    return socials;
-
-}
-
-
-
-
-
-/* =========================================
-   DOCUMENT CHECK
-========================================= */
-
-
-function detectDocuments(
-    html=""
-){
-
-    const text =
-        html.toLowerCase();
-
-
 
     return {
 
+        twitter:
+            text.includes("twitter.com") ||
+            text.includes("x.com"),
 
-        whitepaper:
+        discord:
+            text.includes("discord.gg"),
 
-            text.includes(
-                "whitepaper"
-            )
+        telegram:
+            text.includes("t.me"),
 
-            ||
+        github:
+            text.includes("github.com"),
 
-            text.includes(
-                "litepaper"
-            ),
-
-
-
-        docs:
-
-            text.includes(
-                "docs."
-            )
-
-            ||
-
-            text.includes(
-                "/docs"
-            ),
-
-
-
-        roadmap:
-
-            text.includes(
-                "roadmap"
-            )
+        medium:
+            text.includes("medium.com")
 
     };
-
 
 }
 
 
+/* =========================================
+   DOCUMENTS
+========================================= */
 
+function detectDocuments(html=""){
+
+    const text =
+        html.toLowerCase();
+
+    return {
+
+        whitepaper:
+            text.includes("whitepaper") ||
+            text.includes("litepaper"),
+
+        docs:
+            text.includes("docs.") ||
+            text.includes("/docs"),
+
+        roadmap:
+            text.includes("roadmap")
+
+    };
+
+}
 
 
 /* =========================================
    SCORE
 ========================================= */
 
-
-function calculateWebsiteScore(
-    data={}
-){
+function calculateWebsiteScore(data={}){
 
     let score = 0;
 
+    if(data.ssl){
 
-
-    /*
-    ===============================
-       SSL
-    ===============================
-    */
-
-
-    if(
-        data.ssl
-    ){
-
-        score +=15;
+        score += 15;
 
     }
 
-
-
-
-    /*
-    ===============================
-       SOCIAL
-    ===============================
-    */
-
-
     const socialCount =
-
         Object.values(
-
             data.social || {}
-
         )
         .filter(Boolean)
         .length;
 
+    if(socialCount >= 5){
 
+        score += 25;
 
-    if(
-        socialCount >=5
-    ){
+    }
+    else if(socialCount >= 3){
 
-        score +=25;
+        score += 15;
+
+    }
+    else if(socialCount >= 1){
+
+        score += 5;
 
     }
 
-    else if(
-        socialCount >=3
-    ){
+    if(data.documents?.whitepaper){
 
-        score +=15;
+        score += 20;
 
     }
 
-    else if(
-        socialCount >=1
-    ){
+    if(data.documents?.docs){
 
-        score +=5;
+        score += 15;
 
     }
 
+    if(data.documents?.roadmap){
 
-
-
-
-    /*
-    ===============================
-       DOCUMENTATION
-    ===============================
-    */
-
-
-    if(
-        data.documents?.whitepaper
-    ){
-
-        score +=20;
+        score += 10;
 
     }
 
+    if(data.online){
 
-    if(
-        data.documents?.docs
-    ){
-
-        score +=15;
+        score += 15;
 
     }
-
-
-    if(
-        data.documents?.roadmap
-    ){
-
-        score +=10;
-
-    }
-
-
-
-
-
-    /*
-    ===============================
-       WEBSITE ACTIVE
-    ===============================
-    */
-
-
-    if(
-        data.online
-    ){
-
-        score +=15;
-
-    }
-
-
 
     return Math.min(
-
         score,
-
         100
-
     );
 
-
 }
-
-
-
 
 
 /* =========================================
    SCAN WEBSITE
 ========================================= */
 
-
-async function scanWebsite(
-    context={}
-){
+async function scanWebsite(context={}){
 
     const project =
         context.project || {};
 
-
-
     const url =
-
         project.website ||
-
         project.url ||
-
-        project.site || "";
-
-
-
-
+        project.site ||
+        "";
 
     if(!url){
 
-
         return {
 
+            website_score:
+                0,
 
-            website_score:0,
-
-
-            community_score:0
-
+            community_score:
+                0
 
         };
 
-
     }
 
-
-
-
-
     const response =
-
-        await request(
-
-            url
-
-        );
-
-
-
-
+        await request(url);
 
     const social =
-
         detectSocial(
-
             response.text
-
         );
-
-
-
-
 
     const documents =
-
         detectDocuments(
-
             response.text
-
         );
-
-
-
-
 
     const ssl =
-
-        checkSSL(
-
-            url
-
-        );
-
-
-
-
+        checkSSL(url);
 
     const score =
-
         calculateWebsiteScore({
 
             ssl,
@@ -549,79 +308,55 @@ async function scanWebsite(
 
         });
 
-
-console.log("========== WEBSITE RESULT ==========");
-console.log(result);
-
-
-    return {
-
+    const result = {
 
         website_url:
-
             url,
 
-
-
         online:
-
             response.ok,
-
-
 
         ssl,
 
-
-
         status:
-
             response.status,
-
-
 
         social,
 
-
-
         documents,
 
-
-
         website_score:
-
             score,
 
-
-
         community_score:
-
             score
-
 
     };
 
+    console.log(
+        "========== WEBSITE RESULT =========="
+    );
+
+    console.log(
+        result
+    );
+
+    return result;
+
 }
-
-
-
 
 
 /* =========================================
    EXPORT
 ========================================= */
 
-
 module.exports = {
-
 
     scanWebsite,
 
-
     calculateWebsiteScore,
 
-
     detectSocial,
-
 
     detectDocuments
 
