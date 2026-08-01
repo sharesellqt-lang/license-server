@@ -439,7 +439,8 @@ async function scanInvestor(
 
 
 
-
+console.log("========== INVESTOR RESULT ==========");
+console.log(result);
 
     return {
 

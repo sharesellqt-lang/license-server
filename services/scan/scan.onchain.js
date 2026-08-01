@@ -560,7 +560,8 @@ async function scanOnchain(
 
 
 
-
+console.log("========== ONCHAIN RESULT ==========");
+console.log(result);
 
 
     return {

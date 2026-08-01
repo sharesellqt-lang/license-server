@@ -100,7 +100,8 @@ async function scanGithub(
 
     }
 
-
+console.log("========== GITHUB RESULT ==========");
+console.log(result);
 
     return {
 

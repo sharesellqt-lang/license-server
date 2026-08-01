@@ -550,7 +550,8 @@ async function scanWebsite(
         });
 
 
-
+console.log("========== WEBSITE RESULT ==========");
+console.log(result);
 
 
     return {

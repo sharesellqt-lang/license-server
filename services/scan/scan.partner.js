@@ -480,6 +480,8 @@ if (!projectId) {
 
         );
 
+        console.log("========== PARTNER RESULT ==========");
+console.log(result);
     return {
 
 

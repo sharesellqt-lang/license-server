@@ -418,7 +418,8 @@ async function scanTeam(
 
 
 
-
+console.log("========== TEAM RESULT ==========");
+console.log(result);
 
     return {
 

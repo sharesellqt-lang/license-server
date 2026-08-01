@@ -525,7 +525,19 @@ console.dir(results.geckoterminal, { depth: null });
 
             );
 
+console.log("========== SCAN RESULTS ==========");
 
+Object.entries(results).forEach(([name, result]) => {
+
+    console.log(
+        name,
+        "success:",
+        result.success,
+        "data:",
+        result.data
+    );
+
+});
 
     /*
     =====================================

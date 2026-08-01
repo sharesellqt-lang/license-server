@@ -491,7 +491,8 @@ async function scanFinancial(
         );
 
 
-
+console.log("========== FINANCIAL RESULT ==========");
+console.log(result);
 
 
     return {

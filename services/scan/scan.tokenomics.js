@@ -507,7 +507,8 @@ public_roi
         );
 
 
-
+console.log("========== TOKENOMICS RESULT ==========");
+console.log(result);
 
 
     return {
