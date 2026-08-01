@@ -627,7 +627,8 @@ Object.assign(
        SAVE METRICS
     =====================================
     */
-
+console.log("===== METRICS SAVE =====");
+console.dir(metrics, { depth: null });
 
     await metricsService.saveMetrics(
 
@@ -766,8 +767,6 @@ async function scanUserProjects(
 
 
 }
-
-
 
 
 /*

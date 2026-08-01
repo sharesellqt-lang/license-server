@@ -1338,6 +1338,13 @@ WHERE
 
     ];
 
+    console.log("====== SAVE METRICS DATA ======");
+console.dir(data, { depth: null });
+
+const normalized = normalizeMetrics(data);
+
+console.log("====== NORMALIZED ======");
+console.dir(normalized, { depth: null });
     const [result] =
         await db.query(
             sql,
