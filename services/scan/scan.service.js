@@ -425,6 +425,17 @@ await safeRun(
 
 );
 
+console.log(
+    "========== TEAM AI RESULT =========="
+);
+
+console.dir(
+    results.team_ai,
+    {
+        depth:null
+    }
+);
+
     results.partner =
 
         await safeRun(
