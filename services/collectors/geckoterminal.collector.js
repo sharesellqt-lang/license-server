@@ -84,119 +84,194 @@ async function fetchToken(
 
     }
 
-
     const apiNetwork =
         mapNetwork(network);
 
-
     const url =
-        `${BASE_URL}/networks/${apiNetwork}/tokens/${tokenAddress}/pools`;
-
+`${BASE_URL}/networks/${apiNetwork}/tokens/${tokenAddress}/pools`;
 
     console.log("========== GECKOTERMINAL ==========");
     console.log("NETWORK :", network);
     console.log("API     :", apiNetwork);
     console.log("TOKEN   :", tokenAddress);
 
-
     try{
-
 
         const response =
             await axios.get(
                 url,
                 {
-                    timeout:10000,
-
-                    headers:{
-                        accept:
-                        "application/json"
-                    }
-
+                    timeout:10000
                 }
             );
 
-
-        const pools =
-            response.data?.data || [];
-
+      const pools =
+    response.data?.data || [];
 
 
-        if(
-            pools.length === 0
-        ){
+if(
+    !Array.isArray(pools) ||
+    pools.length === 0
+){
 
-            console.log(
-                "NO POOL FOUND"
+    return {};
+
+}
+
+
+/*
+ lấy pool có liquidity lớn nhất
+*/
+
+const pool =
+
+    pools.sort(
+
+        (a,b)=>
+
+        number(
+            b.attributes?.reserve_in_usd
+        )
+
+        -
+
+        number(
+            a.attributes?.reserve_in_usd
+        )
+
+    )[0];
+
+
+
+const attr =
+    pool.attributes || {};
+
+        /* =====================================
+           SUPPLY
+        ===================================== */
+
+        const totalSupply =
+            number(
+
+                attr.normalized_total_supply ||
+
+                attr.total_supply
+
             );
 
-            return {};
+        let circulatingSupply =
+
+            number(
+                attr.circulating_supply
+            );
+
+        if(
+
+            circulatingSupply <= 0 &&
+
+            number(attr.market_cap_usd) > 0 &&
+
+            number(attr.price_usd) > 0
+
+        ){
+
+            circulatingSupply =
+
+                number(attr.market_cap_usd)
+
+                /
+
+                number(attr.price_usd);
 
         }
 
+        let maxSupply =
+            number(attr.max_supply);
 
+        if(
 
-        /*
-        chọn pool có liquidity lớn nhất
-        */
+            maxSupply <= 0 &&
 
-        const pool =
+            totalSupply > 0
 
-            pools.sort(
+        ){
 
-                (a,b)=>{
+            maxSupply =
+                totalSupply;
 
-                    const la =
-                        Number(
-                            a.attributes?.reserve_in_usd || 0
-                        );
+        }
 
-                    const lb =
-                        Number(
-                            b.attributes?.reserve_in_usd || 0
-                        );
+        if(
 
+            totalSupply > 0 &&
 
-                    return lb-la;
+            circulatingSupply > totalSupply
 
-                }
+        ){
 
-            )[0];
+            circulatingSupply =
+                totalSupply;
 
+        }
 
+        if(
 
+            circulatingSupply <= 0 &&
 
-        const attr =
-            pool.attributes || {};
+            totalSupply > 0
 
+        ){
 
+            circulatingSupply =
+                totalSupply;
 
+        }
+
+        /* =====================================
+           NORMALIZED DATA
+        ===================================== */
 
         const result = {
 
-
             token_symbol:
 
-                attr.base_token_symbol ||
-                "",
-
-
+                attr.symbol || "",
 
             current_price:
 
                 number(
-                    attr.base_token_price_usd
+
+                    attr.price_usd ||
+
+                    attr.base_token_price_usd ||
+
+                    attr.price
+
                 ),
 
+            total_supply:
 
+                totalSupply,
+
+            circulating_supply:
+
+                circulatingSupply,
+
+            max_supply:
+
+                maxSupply,
 
             market_cap:
 
                 number(
-                    attr.market_cap_usd
+
+                    attr.market_cap_usd ||
+
+                    attr.market_cap ||
+
+                    attr.fdv_usd
+
                 ),
-
-
 
             fdv:
 
@@ -204,74 +279,122 @@ async function fetchToken(
                     attr.fdv_usd
                 ),
 
+            volume_24h:
 
+                number(
+
+                    attr.volume_usd?.h24 ||
+
+                    attr.volume_usd?.["24h"] ||
+
+                    attr.volume_24h
+
+                ),
 
             liquidity:
 
                 number(
-                    attr.reserve_in_usd
+
+                    attr.total_reserve_in_usd ||
+
+                    attr.reserve_in_usd ||
+
+                    attr.liquidity_usd
+
                 ),
-
-
-
-            volume_24h:
-
-                number(
-                    attr.volume_usd?.h24
-                ),
-
-
 
             price_change_24h:
 
                 number(
-                    attr.price_change_percentage?.h24
+
+                    attr.price_change_percentage?.h24 ||
+
+                    attr.price_change_percentage?.["24h"]
+
                 )
 
-
         };
-
-
 
         console.table({
 
             price:
+
                 result.current_price,
 
             market_cap:
+
                 result.market_cap,
 
             fdv:
+
                 result.fdv,
 
-            liquidity:
-                result.liquidity,
-
             volume:
-                result.volume_24h
+
+                result.volume_24h,
+
+            liquidity:
+
+                result.liquidity
 
         });
 
-
-
         return result;
 
-
-
     }
-    catch(err){
 
+    catch(err){
 
         console.log(
             "========== GECKOTERMINAL ERROR =========="
         );
 
+        if(err.response){
 
-        console.log(
-            err.response?.status ||
-            err.message
-        );
+            console.log(
+                "Status :",
+                err.response.status
+            );
 
+            if(err.response.status === 404){
+
+                console.log(
+                    "Token not found."
+                );
+
+            }
+
+            else if(err.response.status === 429){
+
+                console.log(
+                    "Rate limit reached."
+                );
+
+            }
+
+            else{
+
+                console.log(
+                    err.response.data
+                );
+
+            }
+
+        }
+
+        else{
+
+            console.log(
+                err.message
+            );
+
+        }
+
+        /*
+        Không throw để tránh
+        làm hỏng toàn bộ
+        metrics pipeline.
+        */
 
         return {};
 

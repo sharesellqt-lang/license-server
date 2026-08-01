@@ -323,25 +323,30 @@ async function scanGeckoTerminal(
 
 
 
-    if(!result){
+ if(
+    !result ||
+    Object.keys(result).length === 0
+){
 
+    return {
 
-        return {
+        listed:false,
 
+        onchain_score:0,
 
-            listed:false,
+        geckoterminal_score:0,
 
+        liquidity:0,
 
-            onchain_score:0,
+        volume_24h:0,
 
+        market_cap:0,
 
-            geckoterminal_score:0
+        fdv:0
 
+    };
 
-        };
-
-
-    }
+}
 
 
 
