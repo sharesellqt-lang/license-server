@@ -580,12 +580,38 @@ const metrics = {
     ...results.audit.data,
 
 
-    // DATABASE TEAM
+    /*
+    =====================================
+       DATABASE TEAM SCORE
+       lấy từ scan.team.js
+    =====================================
+    */
+
     ...results.team.data,
 
 
-    // AI TEAM
-    ...results.team_ai.data,
+    /*
+    =====================================
+       AI TEAM EXTRACTION
+       chỉ lưu dữ liệu AI
+       không ghi đè score
+    =====================================
+    */
+
+    team_ai_count:
+
+        results.team_ai.data?.team_count || 0,
+
+
+    team_ai_members:
+
+        results.team_ai.data?.members || [],
+
+
+    team_ai_extracted:
+
+        results.team_ai.data?.extracted || [],
+
 
 
     ...results.partner.data,
