@@ -317,15 +317,7 @@ console.log(project);
 
         );
 
-if(results.website.success){
 
-    context.html =
-        results.website.data.html;
-
-    context.text =
-        results.website.data.text;
-
-}
 
     results.github =
 
@@ -406,6 +398,32 @@ console.dir(results.geckoterminal, { depth: null });
 
         );
 
+
+const {
+    scanTeamAI
+}
+=
+require("./scan/scan.team.ai");
+
+results.team_ai =
+
+await safeRun(
+
+    "team_ai",
+
+    ()=>
+
+
+        scanTeamAI({
+
+            ...context,
+
+            html:
+                results.website.data?.html || ""
+
+        })
+
+);
 
 console.log(
     "========== TEAM AI RESULT =========="
