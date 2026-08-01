@@ -301,11 +301,8 @@ async function scanProject(
     =====================================
     */
 
-
     const results = {};
-
-
-
+console.log(project);
     results.website =
 
         await safeRun(
