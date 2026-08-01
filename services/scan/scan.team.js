@@ -411,18 +411,15 @@ if(
     try{
 
 
-     const aiMembers =
-    await scanTeamAI({
+        const aiMembers =
+            await scanTeamAI({
 
-        html:
-            context.html,
+                html:
+                    context.html,
 
-        project,
+                project
 
-        projectId
-
-    });
-
+            });
 
 
         console.log(
@@ -438,10 +435,9 @@ if(
         );
 
 
-
-       for(
-    const member of aiMembers.members
-){
+        for(
+            const member of aiMembers
+        ){
 
 
             await teamService.upsertMember(
@@ -469,8 +465,6 @@ if(
     }
 
 }
-
-
 
 
 const members =
