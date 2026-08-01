@@ -368,7 +368,8 @@ async function scanProject(
 
         );
 
-
+console.log("===== GECKOTERMINAL RESULT =====");
+console.dir(results.geckoterminal, { depth: null });
 
     results.defillama =
 
