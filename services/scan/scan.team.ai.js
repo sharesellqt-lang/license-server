@@ -8,11 +8,7 @@
 const teamService =
     require("../airdrop.team.service");
 
-const {
-    calculateTeamScore
-}
-=
-require("./scan.team");
+
 
 /* =========================================
    HELPERS
@@ -495,11 +491,11 @@ return {
         saved,
 
 
-    team_score:
+   team_score:
 
-        calculateTeamScore(
-            total
-        )
+calculateAITeamScore(
+    total
+)
 
 };
 
@@ -507,7 +503,106 @@ return {
 }
 
 
+function calculateAITeamScore(
+    members=[]
+){
 
+    if(
+        !Array.isArray(members) ||
+        members.length === 0
+    ){
+
+        return 0;
+
+    }
+
+
+    let score = 0;
+
+
+    /*
+    TEAM SIZE
+    */
+
+    if(members.length >= 10){
+
+        score += 20;
+
+    }
+    else if(members.length >= 5){
+
+        score += 15;
+
+    }
+    else if(members.length >= 2){
+
+        score += 10;
+
+    }
+
+
+    /*
+    VERIFIED
+    */
+
+    const verified =
+
+        members.filter(
+            m =>
+                m.linkedin ||
+                m.twitter ||
+                m.github
+        )
+        .length;
+
+
+    if(verified >= 5){
+
+        score += 30;
+
+    }
+    else if(verified >= 2){
+
+        score += 20;
+
+    }
+
+
+    /*
+    EXPERIENCE
+    */
+
+    const exp =
+
+        members.filter(
+
+            m =>
+            Number(
+                m.experience_years || 0
+            ) >= 5
+
+        )
+        .length;
+
+
+    if(exp >= 3){
+
+        score += 30;
+
+    }
+    else if(exp >= 1){
+
+        score += 15;
+
+    }
+
+
+    return Math.min(
+        score,
+        100
+    );
+
+}
 
 
 /* =========================================
