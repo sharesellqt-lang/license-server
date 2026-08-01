@@ -84,288 +84,194 @@ async function fetchToken(
 
     }
 
+
     const apiNetwork =
         mapNetwork(network);
 
+
     const url =
-        `${BASE_URL}/networks/${apiNetwork}/tokens/${tokenAddress}`;
+        `${BASE_URL}/networks/${apiNetwork}/tokens/${tokenAddress}/pools`;
+
 
     console.log("========== GECKOTERMINAL ==========");
     console.log("NETWORK :", network);
     console.log("API     :", apiNetwork);
     console.log("TOKEN   :", tokenAddress);
 
+
     try{
+
 
         const response =
             await axios.get(
                 url,
                 {
-                    timeout:10000
+                    timeout:10000,
+
+                    headers:{
+                        accept:
+                        "application/json"
+                    }
+
                 }
             );
 
-        const token =
-            response.data?.data;
 
-        if(!token){
+        const pools =
+            response.data?.data || [];
+
+
+
+        if(
+            pools.length === 0
+        ){
+
+            console.log(
+                "NO POOL FOUND"
+            );
 
             return {};
 
         }
 
+
+
+        /*
+        chọn pool có liquidity lớn nhất
+        */
+
+        const pool =
+
+            pools.sort(
+
+                (a,b)=>{
+
+                    const la =
+                        Number(
+                            a.attributes?.reserve_in_usd || 0
+                        );
+
+                    const lb =
+                        Number(
+                            b.attributes?.reserve_in_usd || 0
+                        );
+
+
+                    return lb-la;
+
+                }
+
+            )[0];
+
+
+
+
         const attr =
-            token.attributes || {};
+            pool.attributes || {};
 
-        /* =====================================
-           SUPPLY
-        ===================================== */
 
-        const totalSupply =
-            number(
 
-                attr.normalized_total_supply ||
-
-                attr.total_supply
-
-            );
-
-        let circulatingSupply =
-
-            number(
-                attr.circulating_supply
-            );
-
-        if(
-
-            circulatingSupply <= 0 &&
-
-            number(attr.market_cap_usd) > 0 &&
-
-            number(attr.price_usd) > 0
-
-        ){
-
-            circulatingSupply =
-
-                number(attr.market_cap_usd)
-
-                /
-
-                number(attr.price_usd);
-
-        }
-
-        let maxSupply =
-            number(attr.max_supply);
-
-        if(
-
-            maxSupply <= 0 &&
-
-            totalSupply > 0
-
-        ){
-
-            maxSupply =
-                totalSupply;
-
-        }
-
-        if(
-
-            totalSupply > 0 &&
-
-            circulatingSupply > totalSupply
-
-        ){
-
-            circulatingSupply =
-                totalSupply;
-
-        }
-
-        if(
-
-            circulatingSupply <= 0 &&
-
-            totalSupply > 0
-
-        ){
-
-            circulatingSupply =
-                totalSupply;
-
-        }
-
-        /* =====================================
-           NORMALIZED DATA
-        ===================================== */
 
         const result = {
 
+
             token_symbol:
 
-                attr.symbol || "",
+                attr.base_token_symbol ||
+                "",
+
+
 
             current_price:
 
                 number(
-
-                    attr.price_usd ||
-
-                    attr.base_token_price_usd ||
-
-                    attr.price
-
+                    attr.base_token_price_usd
                 ),
 
-            total_supply:
 
-                totalSupply,
-
-            circulating_supply:
-
-                circulatingSupply,
-
-            max_supply:
-
-                maxSupply,
 
             market_cap:
 
                 number(
-
-                    attr.market_cap_usd ||
-
-                    attr.market_cap ||
-
-                    attr.fdv_usd
-
+                    attr.market_cap_usd
                 ),
+
+
 
             fdv:
 
                 number(
                     attr.fdv_usd
                 ),
+
+
+
+            liquidity:
+
+                number(
+                    attr.reserve_in_usd
+                ),
+
+
 
             volume_24h:
 
                 number(
-
-                    attr.volume_usd?.h24 ||
-
-                    attr.volume_usd?.["24h"] ||
-
-                    attr.volume_24h
-
+                    attr.volume_usd?.h24
                 ),
 
-            liquidity:
 
-                number(
-
-                    attr.total_reserve_in_usd ||
-
-                    attr.reserve_in_usd ||
-
-                    attr.liquidity_usd
-
-                ),
 
             price_change_24h:
 
                 number(
-
-                    attr.price_change_percentage?.h24 ||
-
-                    attr.price_change_percentage?.["24h"]
-
+                    attr.price_change_percentage?.h24
                 )
 
+
         };
+
+
 
         console.table({
 
             price:
-
                 result.current_price,
 
             market_cap:
-
                 result.market_cap,
 
             fdv:
-
                 result.fdv,
 
-            volume:
-
-                result.volume_24h,
-
             liquidity:
+                result.liquidity,
 
-                result.liquidity
+            volume:
+                result.volume_24h
 
         });
 
+
+
         return result;
 
-    }
 
+
+    }
     catch(err){
+
 
         console.log(
             "========== GECKOTERMINAL ERROR =========="
         );
 
-        if(err.response){
 
-            console.log(
-                "Status :",
-                err.response.status
-            );
+        console.log(
+            err.response?.status ||
+            err.message
+        );
 
-            if(err.response.status === 404){
-
-                console.log(
-                    "Token not found."
-                );
-
-            }
-
-            else if(err.response.status === 429){
-
-                console.log(
-                    "Rate limit reached."
-                );
-
-            }
-
-            else{
-
-                console.log(
-                    err.response.data
-                );
-
-            }
-
-        }
-
-        else{
-
-            console.log(
-                err.message
-            );
-
-        }
-
-        /*
-        Không throw để tránh
-        làm hỏng toàn bộ
-        metrics pipeline.
-        */
 
         return {};
 
