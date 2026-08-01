@@ -317,7 +317,15 @@ console.log(project);
 
         );
 
+if(results.website.success){
 
+    context.html =
+        results.website.data.html;
+
+    context.text =
+        results.website.data.text;
+
+}
 
     results.github =
 
