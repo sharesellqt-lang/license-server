@@ -537,82 +537,31 @@ async function scanProject(
 
 const metrics = {
 
+    ...results.website.data,
 
-    website:
+    ...results.github.data,
 
-        results.website.data || {},
+    ...results.coingecko.data,
 
+    ...results.geckoterminal.data,
 
+    ...results.defillama.data,
 
-    github:
+    ...results.audit.data,
 
-        results.github.data || {},
+    ...results.team.data,
 
+    ...results.partner.data,
 
+    ...results.investor.data,
 
-    coingecko:
+    ...results.tokenomics.data,
 
-        results.coingecko.data || {},
+    ...results.financial.data,
 
+    ...results.community.data,
 
-
-    geckoterminal:
-
-        results.geckoterminal.data || {},
-
-
-
-    defillama:
-
-        results.defillama.data || {},
-
-
-
-    audit:
-
-        results.audit.data || {},
-
-
-
-    team:
-
-        results.team.data || {},
-
-
-
-    partner:
-
-        results.partner.data || {},
-
-
-
-    investor:
-
-        results.investor.data || {},
-
-
-
-    tokenomics:
-
-        results.tokenomics.data || {},
-
-
-
-    financial:
-
-        results.financial.data || {},
-
-
-
-    community:
-
-        results.community.data || {},
-
-
-
-    onchain:
-
-        results.onchain.data || {}
+    ...results.onchain.data
 
 };
 
