@@ -399,32 +399,6 @@ console.dir(results.geckoterminal, { depth: null });
         );
 
 
-const {
-    scanTeamAI
-}
-=
-require("./scan/scan.team.ai");
-
-results.team_ai =
-
-await safeRun(
-
-    "team_ai",
-
-    ()=>
-
-
-        scanTeamAI({
-
-            ...context,
-
-            html:
-                results.website.data?.html || ""
-
-        })
-
-);
-
 console.log(
     "========== TEAM AI RESULT =========="
 );
