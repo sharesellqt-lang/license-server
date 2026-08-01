@@ -579,7 +579,14 @@ const metrics = {
 
     ...results.audit.data,
 
+
+    // DATABASE TEAM
     ...results.team.data,
+
+
+    // AI TEAM
+    ...results.team_ai.data,
+
 
     ...results.partner.data,
 
