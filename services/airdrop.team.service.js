@@ -71,6 +71,8 @@ note,
 
 created_at,
 
+updated_at,
+
 experience_years,
 
 is_founder,
@@ -162,45 +164,101 @@ return result.insertId;
    UPDATE
 ========================================= */
 
-async function updateMember(id, data = {}) {
+async function updateMember(
+    id,
+    data={}
+){
 
-    const sql = `
-        UPDATE airdrop_project_team
-        SET
+const sql = `
 
-            member_name=?,
+UPDATE airdrop_project_team
 
-            position=?,
+SET
 
-            linkedin=?,
+member_name=?,
 
-            previous_company=?,
+position=?,
 
-            note=?
+linkedin=?,
 
-        WHERE id=?
-    `;
+previous_company=?,
 
-    const values = [
+note=?,
 
-        data.member_name || "",
+experience_years=?,
 
-        data.position || "",
+is_founder=?,
 
-        data.linkedin || "",
+github=?,
 
-        data.previous_company || "",
+twitter=?,
 
-        data.note || "",
+avatar=?,
 
-        id
+verification_level=?,
 
-    ];
+source_url=?,
 
-    const [result] =
-        await db.query(sql, values);
+influence_score=?,
 
-    return result.affectedRows > 0;
+updated_at=?
+
+WHERE id=?
+
+`;
+
+
+const values=[
+
+
+data.member_name || "",
+
+data.position || "",
+
+data.linkedin || "",
+
+data.previous_company || "",
+
+data.note || "",
+
+Number(
+    data.experience_years || 0
+),
+
+data.is_founder || 0,
+
+data.github || "",
+
+data.twitter || "",
+
+data.avatar || "",
+
+data.verification_level || "low",
+
+data.source_url || "",
+
+Number(
+    data.influence_score || 0
+),
+
+Date.now(),
+
+id
+
+
+];
+
+
+const [result]=
+
+await db.query(
+    sql,
+    values
+);
+
+
+return result.affectedRows > 0;
+
 
 }
 

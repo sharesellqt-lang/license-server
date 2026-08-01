@@ -8,7 +8,11 @@
 const teamService =
     require("../airdrop.team.service");
 
-
+const {
+    calculateTeamScore
+}
+=
+require("./scan.team");
 
 /* =========================================
    HELPERS
@@ -368,60 +372,13 @@ function uniqueMembers(
 
 }
 
-
-
-
-
-/* =========================================
-   UPSERT
-========================================= */
-
-
-async function upsertMember(
-    projectId,
-    member
+for(
+    const member of members
 ){
-
-
-    const existing =
-
-        await teamService.findMember(
-            projectId,
-            member.member_name
-        );
-
-
-
-    if(existing){
-
-
-        await teamService.updateMember(
-
-            existing.id,
-
-            member
-
-        );
-
-
-        return {
-
-            action:
-                "updated",
-
-            id:
-                existing.id
-
-        };
-
-
-    }
-
-
 
     const id =
 
-        await teamService.createMember(
+        await teamService.upsertMember(
 
             projectId,
 
@@ -430,22 +387,15 @@ async function upsertMember(
         );
 
 
+    saved.push({
 
-    return {
-
-        action:
-            "inserted",
+        ...member,
 
         id
 
-    };
-
+    });
 
 }
-
-
-
-
 
 /* =========================================
    SCAN TEAM AI
@@ -531,37 +481,27 @@ async function scanTeamAI(
         );
 
 
+return {
 
-    return {
-
-
-        team_count:
-
-            total.length,
+    team_count:
+        total.length,
 
 
-        members:
-
-            total,
-
-
-        extracted:
-
-            saved,
+    members:
+        total,
 
 
-        team_score:
-
-            Math.min(
-
-                100,
-
-                total.length * 10
-
-            )
+    extracted:
+        saved,
 
 
-    };
+    team_score:
+
+        calculateTeamScore(
+            total
+        )
+
+};
 
 
 }
