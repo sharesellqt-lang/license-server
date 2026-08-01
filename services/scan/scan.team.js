@@ -535,7 +535,7 @@ members.map(member=>({
     verification:
         member.verification_level || "unverified"
 
-}))
+})),
 
 
 
