@@ -368,30 +368,7 @@ function uniqueMembers(
 
 }
 
-for(
-    const member of members
-){
 
-    const id =
-
-        await teamService.upsertMember(
-
-            projectId,
-
-            member
-
-        );
-
-
-    saved.push({
-
-        ...member,
-
-        id
-
-    });
-
-}
 
 /* =========================================
    SCAN TEAM AI
@@ -446,16 +423,24 @@ async function scanTeamAI(
     ){
 
 
-        const result =
+   const id =
 
-            await upsertMember(
+    await teamService.upsertMember(
 
-                projectId,
+        projectId,
 
-                member
+        member
 
-            );
+    );
 
+
+const result = {
+
+    action:"saved",
+
+    id
+
+};
 
         saved.push({
 
