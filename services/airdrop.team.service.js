@@ -48,48 +48,113 @@ async function getMember(id) {
    CREATE
 ========================================= */
 
-async function createMember(projectId, data = {}) {
+async function createMember(
+    projectId,
+    data={}
+){
 
-    const now = Date.now();
+const sql = `
 
-    const sql = `
-        INSERT INTO airdrop_project_team(
+INSERT INTO airdrop_project_team(
 
-            project_id,
-            member_name,
-            position,
-            linkedin,
-            previous_company,
-            note,
-            created_at
+project_id,
 
-        )
+member_name,
 
-        VALUES(?,?,?,?,?,?,?)
-    `;
+position,
 
-    const values = [
+linkedin,
 
-        projectId,
+previous_company,
 
-        data.member_name || "",
+note,
 
-        data.position || "",
+created_at,
 
-        data.linkedin || "",
+experience_years,
 
-        data.previous_company || "",
+is_founder,
 
-        data.note || "",
+github,
 
-        now
+twitter,
 
-    ];
+avatar,
 
-    const [result] =
-        await db.query(sql, values);
+verification_level,
 
-    return result.insertId;
+source_url,
+
+influence_score
+
+)
+
+VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+
+`;
+
+
+const values=[
+
+
+projectId,
+
+
+data.member_name || "",
+
+
+data.position || "",
+
+
+data.linkedin || "",
+
+
+data.previous_company || "",
+
+
+data.note || "",
+
+
+Date.now(),
+
+
+data.experience_years || 0,
+
+
+data.is_founder || 0,
+
+
+data.github || "",
+
+
+data.twitter || "",
+
+
+data.avatar || "",
+
+
+data.verification_level || "low",
+
+
+data.source_url || "",
+
+
+data.influence_score || 0
+
+
+];
+
+
+const [result]=
+
+await db.query(
+    sql,
+    values
+);
+
+
+return result.insertId;
+
 
 }
 
@@ -414,21 +479,32 @@ async function upsertMember(
 
 }
 
+/* =========================================
+   FIND MEMBER BY NAME
+========================================= */
+
 async function findMember(
     projectId,
     memberName
 ){
 
     const sql = `
+
         SELECT *
+
         FROM airdrop_project_team
+
         WHERE project_id=?
-        AND member_name=?
+
+        AND LOWER(member_name)=LOWER(?)
+
         LIMIT 1
+
     `;
 
 
     const [rows] =
+
         await db.query(
             sql,
             [
@@ -454,6 +530,8 @@ module.exports = {
 
     getMember,
 
+    findMember,
+
     createMember,
 
     updateMember,
@@ -462,8 +540,7 @@ module.exports = {
 
     deleteAll,
 
-    upsertMember,
+    upsertMember
 
-    findMember
 
 };
