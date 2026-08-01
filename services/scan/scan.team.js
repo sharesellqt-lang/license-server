@@ -377,24 +377,21 @@ async function scanTeam(
         context.projectId;
 
 
+if (!projectId) {
 
-    if(!projectId){
+    return {
 
+        team_score: 0,
 
-       return {
+        founder_score: 0,
 
-    team_score,
+        team_count: 0,
 
-    members,
+        team_members: []
 
-    founders,
-
-    linkedin_score
+    };
 
 }
-
-
-    }
 
 
 
@@ -408,7 +405,10 @@ async function scanTeam(
         );
 
 
+console.log("TEAM MEMBERS");
+console.dir(members, { depth: null });
 
+console.log("COUNT =", members.length);
 
 
     const score =
@@ -417,9 +417,10 @@ async function scanTeam(
         );
 
 
-
 console.log("========== TEAM RESULT ==========");
-console.log(result);
+console.dir(members, { depth: null });
+
+console.log("TEAM SCORE =", score);
 
     return {
 
