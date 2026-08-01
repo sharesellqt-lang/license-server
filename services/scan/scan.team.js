@@ -394,17 +394,10 @@ if (!projectId) {
 }
 
 
-
-
-
-    const members =
-        await teamService.getTeamByProject(
-
-            projectId
-
-        );
-
-
+const members =
+    await teamService.getMembers(
+        projectId
+    );
 console.log("TEAM MEMBERS");
 console.dir(members, { depth: null });
 
