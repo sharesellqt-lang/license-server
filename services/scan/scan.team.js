@@ -404,41 +404,26 @@ if (!projectId) {
 =====================================
 */
 
-if(
-    context.html
-){
+if(context.html){
 
     try{
 
-
-        const aiMembers =
+        const aiResult =
             await scanTeamAI({
 
                 html:
                     context.html,
 
-                project
+                project,
+
+                projectId
 
             });
 
 
-        console.log(
-            "===== AI MEMBERS ====="
-        );
-
-
-        console.dir(
-            aiMembers,
-            {
-                depth:null
-            }
-        );
-
-
         for(
-            const member of aiMembers
+            const member of aiResult.members || []
         ){
-
 
             await teamService.upsertMember(
 
@@ -448,19 +433,16 @@ if(
 
             );
 
-
         }
 
 
     }
     catch(error){
 
-
         console.log(
             "TEAM AI ERROR:",
             error.message
         );
-
 
     }
 

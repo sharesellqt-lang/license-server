@@ -91,58 +91,72 @@ influence_score
 
 )
 
-VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+VALUES(
+?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
+)
 
 `;
 
 
-const values=[
+const now = Date.now();
 
+const values = [
 
-projectId,
+    projectId,
 
+    String(
+        data.member_name || ""
+    ).trim(),
 
-data.member_name || "",
+    String(
+        data.position || ""
+    ).trim(),
 
+    String(
+        data.linkedin || ""
+    ).trim(),
 
-data.position || "",
+    String(
+        data.previous_company || ""
+    ).trim(),
 
+    String(
+        data.note || ""
+    ).trim(),
 
-data.linkedin || "",
+    now,
 
+    now,
 
-data.previous_company || "",
+    Number(
+        data.experience_years ?? 0
+    ),
 
+    Number(
+        data.is_founder ?? 0
+    ),
 
-data.note || "",
+    String(
+        data.github || ""
+    ).trim(),
 
+    String(
+        data.twitter || ""
+    ).trim(),
 
-Date.now(),
+    String(
+        data.avatar || ""
+    ).trim(),
 
+    data.verification_level || "unverified",
 
-data.experience_years || 0,
+    String(
+        data.source_url || ""
+    ).trim(),
 
-
-data.is_founder || 0,
-
-
-data.github || "",
-
-
-data.twitter || "",
-
-
-data.avatar || "",
-
-
-data.verification_level || "low",
-
-
-data.source_url || "",
-
-
-data.influence_score || 0
-
+    Number(
+        data.influence_score ?? 0
+    )
 
 ];
 
