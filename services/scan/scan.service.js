@@ -553,63 +553,32 @@ const metrics = {
 
     ...results.github.data,
 
-    ...results.coingecko.data,
+
+    /*
+    =====================================
+       DEX DATA
+       GeckoTerminal
+    =====================================
+    */
 
     ...results.geckoterminal.data,
+
+
+    /*
+    =====================================
+       MARKET DATA
+       CoinGecko ưu tiên
+    =====================================
+    */
+
+    ...results.coingecko.data,
+
 
     ...results.defillama.data,
 
     ...results.audit.data,
 
-
-    /*
-    =====================================
-       DATABASE TEAM SCORE
-       lấy từ scan.team.js
-    =====================================
-    */
-
-    ...results.team.data,
-
-
-    /*
-    =====================================
-       AI TEAM EXTRACTION
-       chỉ lưu dữ liệu AI
-       không ghi đè score
-    =====================================
-    */
-
-    team_ai_count:
-
-        results.team_ai.data?.team_count || 0,
-
-
-    team_ai_members:
-
-        results.team_ai.data?.members || [],
-
-
-    team_ai_extracted:
-
-        results.team_ai.data?.extracted || [],
-
-
-
-    ...results.partner.data,
-
-    ...results.investor.data,
-
-    ...results.tokenomics.data,
-
-    ...results.financial.data,
-
-    ...results.community.data,
-
-    ...results.onchain.data
-
 };
-
 
 const scoreSummary = createScoreSummary({
 
@@ -655,6 +624,39 @@ Object.assign(
     */
 console.log("===== METRICS SAVE =====");
 console.dir(metrics, { depth: null });
+console.log(
+    "========== PRICE DEBUG =========="
+);
+
+console.table({
+
+    coinGecko_price:
+        results.coingecko.data?.current_price,
+
+    geckoTerminal_price:
+        results.geckoterminal.data?.current_price,
+
+
+    final_price:
+        metrics.current_price,
+
+
+    coinGecko_market:
+        results.coingecko.data?.market_cap,
+
+
+    geckoTerminal_market:
+        results.geckoterminal.data?.market_cap,
+
+
+    final_market:
+        metrics.market_cap
+
+});
+
+console.log(
+    "================================="
+);
 
     await metricsService.saveMetrics(
 

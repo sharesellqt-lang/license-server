@@ -320,10 +320,7 @@ async function scanGeckoTerminal(
         );
 
 
-
-
-
- if(
+if(
     !result ||
     Object.keys(result).length === 0
 ){
@@ -334,23 +331,11 @@ async function scanGeckoTerminal(
 
         onchain_score:0,
 
-        geckoterminal_score:0,
-
-        liquidity:0,
-
-        volume_24h:0,
-
-        market_cap:0,
-
-        fdv:0
+        geckoterminal_score:0
 
     };
 
 }
-
-
-
-
 
     const score =
         calculateLiquidityScore(

@@ -263,15 +263,13 @@ const attr =
 
             market_cap:
 
-                number(
+            number(
 
-                    attr.market_cap_usd ||
+                attr.market_cap_usd ||
 
-                    attr.market_cap ||
+                attr.market_cap
 
-                    attr.fdv_usd
-
-                ),
+            ),
 
             fdv:
 
