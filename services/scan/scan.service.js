@@ -418,6 +418,27 @@ console.dir(
     }
 );
 
+/*
+=====================================
+   TEAM
+=====================================
+*/
+
+results.team =
+
+await safeRun(
+
+    "team",
+
+    ()=>
+
+
+        scanTeam(
+            context
+        )
+
+);
+
     results.partner =
 
         await safeRun(
@@ -549,34 +570,31 @@ Object.entries(results).forEach(([name, result]) => {
 
 const metrics = {
 
-    ...results.website.data,
+    ...(results.website.data || {}),
 
-    ...results.github.data,
+    ...(results.github.data || {}),
 
+    ...(results.coingecko.data || {}),
 
-    /*
-    =====================================
-       DEX DATA
-       GeckoTerminal
-    =====================================
-    */
+    ...(results.geckoterminal.data || {}),
 
-    ...results.geckoterminal.data,
+    ...(results.defillama.data || {}),
 
+    ...(results.audit.data || {}),
 
-    /*
-    =====================================
-       MARKET DATA
-       CoinGecko ưu tiên
-    =====================================
-    */
+    ...(results.team.data || {}),
 
-    ...results.coingecko.data,
+    ...(results.partner.data || {}),
 
+    ...(results.investor.data || {}),
 
-    ...results.defillama.data,
+    ...(results.tokenomics.data || {}),
 
-    ...results.audit.data,
+    ...(results.financial.data || {}),
+
+    ...(results.community.data || {}),
+
+    ...(results.onchain.data || {})
 
 };
 

@@ -107,7 +107,17 @@ async function fetchToken(
 
       const pools =
     response.data?.data || [];
+console.log(
+    "POOL COUNT:",
+    pools.length
+);
 
+console.dir(
+    pools[0],
+    {
+        depth:5
+    }
+);
 
 if(
     !Array.isArray(pools) ||
@@ -123,23 +133,29 @@ if(
  lấy pool có liquidity lớn nhất
 */
 
-const pool =
+const pool = pools.sort(
 
-    pools.sort(
+(a,b)=>{
 
-        (a,b)=>
+const aLiquidity =
+number(
+a.attributes?.reserve_in_usd ||
+a.attributes?.total_reserve_in_usd
+);
 
-        number(
-            b.attributes?.reserve_in_usd
-        )
 
-        -
+const bLiquidity =
+number(
+b.attributes?.reserve_in_usd ||
+b.attributes?.total_reserve_in_usd
+);
 
-        number(
-            a.attributes?.reserve_in_usd
-        )
 
-    )[0];
+return bLiquidity-aLiquidity;
+
+}
+
+)[0];
 
 
 
@@ -237,17 +253,19 @@ const attr =
 
                 attr.symbol || "",
 
-            current_price:
+           current_price:
 
-                number(
+number(
 
-                    attr.price_usd ||
+attr.price_usd ||
 
-                    attr.base_token_price_usd ||
+attr.base_token_price_usd ||
 
-                    attr.price
+attr.token_price_usd ||
 
-                ),
+0
+
+),
 
             total_supply:
 
@@ -261,15 +279,13 @@ const attr =
 
                 maxSupply,
 
-            market_cap:
+         market_cap:
 
-            number(
-
-                attr.market_cap_usd ||
-
-                attr.market_cap
-
-            ),
+number(
+ attr.market_cap_usd ||
+ attr.market_cap ||
+ 0
+),
 
             fdv:
 
