@@ -101,7 +101,7 @@ async function scanGithub(
     }
 
 console.log("========== GITHUB RESULT ==========");
-console.log(result);
+console.dir(data, {depth:null});
 
     return {
 

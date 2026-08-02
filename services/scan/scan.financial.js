@@ -483,16 +483,16 @@ async function scanFinancial(
     =====================================
     */
 
+const financial_score =
 
-    const financial_score =
-
-        calculateFinancialScore(
-            financial
-        );
+    calculateFinancialScore(
+        financial
+    );
 
 
 console.log("========== FINANCIAL RESULT ==========");
-console.log(result);
+console.log(financial);
+console.log("FINANCIAL SCORE =", financial_score);
 
 
     return {

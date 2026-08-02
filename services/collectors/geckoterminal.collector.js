@@ -33,7 +33,7 @@ function mapNetwork(network = ""){
 
         case "eth":
         case "ethereum":
-            return "ethereum";
+            return "eth";
 
         case "bsc":
         case "bnb":

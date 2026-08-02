@@ -341,7 +341,12 @@ if(results.website.success){
 
         );
 
+if(results.github.success){
 
+    context.github =
+        results.github.data;
+
+}
 
     results.coingecko =
 
@@ -356,6 +361,13 @@ if(results.website.success){
                 )
 
         );
+
+        if(results.coingecko.success){
+
+    context.coingecko =
+        results.coingecko.data;
+
+}
 
 context.coingecko =
 results.coingecko.data || {};
@@ -378,6 +390,13 @@ results.coingecko.data || {};
 console.log("===== GECKOTERMINAL RESULT =====");
 console.dir(results.geckoterminal, { depth: null });
 
+if(results.geckoterminal.success){
+
+    context.geckoterminal =
+        results.geckoterminal.data;
+
+}
+
 context.geckoterminal =
 
     results.geckoterminal.data || {};
@@ -396,7 +415,9 @@ context.geckoterminal =
 
         );
 
+context.defillama =
 
+    results.defillama.data || {};
 
     results.audit =
 
@@ -629,7 +650,13 @@ const metrics = {
     ================================
     */
 
-    ...(results.geckoterminal.data || {})
+   ...(results.geckoterminal.success &&
+    results.geckoterminal.data
+        ?
+        results.geckoterminal.data
+        :
+        {}
+),
 
 };
 

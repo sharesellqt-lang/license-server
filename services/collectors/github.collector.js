@@ -134,7 +134,19 @@ function parseRepository(repo){
     repo =
         String(repo).trim();
 
-    if(repo.startsWith("http")){
+    if(
+    repo.startsWith("http") ||
+    repo.includes("github.com")
+){
+
+    if(
+    !repo.startsWith("http")
+){
+
+    repo =
+        "https://" + repo;
+
+}
 
         try{
 
@@ -372,9 +384,17 @@ async function fetchProfile(username){
 ========================================= */
 
 async function fetchRepository(repoInput){
+    console.log(
+    "FETCH GITHUB REPO:",
+    repoInput
+);
 
     const parsed =
         parseRepository(repoInput);
+        console.log(
+    "PARSED:",
+    parsed
+);
 
     if(!parsed){
 
