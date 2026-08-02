@@ -25,7 +25,7 @@ const linkedin =
 const teamService =
     require("./airdrop.team.service");
 
-function normalizeMetrics(data = {}) {
+    function normalizeMetrics(data = {}) {
 
     return {
 
@@ -62,6 +62,8 @@ function normalizeMetrics(data = {}) {
             Number(
                 data.max_supply || 0
             ),
+
+
 
         // =====================================
         // MARKET
@@ -378,18 +380,13 @@ function normalizeMetrics(data = {}) {
         financial_score:
 
             Number(
-
+                data.defillama?.defillama_score
+                ??
                 data.financial_score
-
                 ??
-
-                data.defillama?.financial_score
-
-                ??
-
                 0
-
             ),
+
 
 
         onchain_score:
@@ -422,38 +419,7 @@ function normalizeMetrics(data = {}) {
                 data.risk_score || 0
             ),
 
-        investment_score:
 
-            Number(
-
-                data.investment_score
-                ??
-
-                0
-
-            ),
-
-        investment_rating:
-
-            String(
-
-                data.investment_rating
-                ||
-
-                "UNKNOWN"
-
-            ),
-
-        investment_action:
-
-            String(
-
-                data.investment_action
-                ||
-
-                ""
-
-            ),
 
         risk_level:
 
@@ -468,6 +434,7 @@ function normalizeMetrics(data = {}) {
             data.recommendation
             ||
             null,
+
 
 
         // =====================================
@@ -491,6 +458,8 @@ function normalizeMetrics(data = {}) {
             Number(
                 data.public_roi || 0
             ),
+
+
 
         // =====================================
         // GITHUB
@@ -561,19 +530,7 @@ function normalizeMetrics(data = {}) {
                 0
             ),
 
-        audit_score:
 
-            Number(
-
-                data.audit_score
-                ??
-
-                data.audit?.audit_score
-                ??
-
-                0
-
-            ),
 
         // =====================================
         // LINKEDIN TEAM
@@ -1229,6 +1186,10 @@ ${placeholders}
 
 )
 
+
+ON DUPLICATE KEY UPDATE
+
+
 ${updates}
 
 
@@ -1369,17 +1330,13 @@ WHERE
 
 `;
 
-const values = [
+    const values = [
 
-    ...columns.map(
+        ...columns.map(c => metric[c]),
 
-        c => metric[c] ?? null
+        projectId
 
-    ),
-
-    projectId
-
-];
+    ];
 
     const [result] =
         await db.query(
@@ -1507,6 +1464,39 @@ async function syncCoinGecko(
         "CoinGecko metrics saved."
     );
 
+
+    return data;
+
+}
+
+async function syncGeckoTerminal(
+    projectId,
+    coinId
+){
+    console.log("========== SYNC COINGECKO ==========");
+console.log("projectId =", projectId);
+console.log("coinId =", coinId);
+
+    if(!coinId){
+
+        throw new Error(
+            "Missing CoinGecko ID"
+        );
+
+    }
+
+
+    const data =
+        await coingecko.fetchById(
+            coinId
+        );
+console.log("CoinGecko DATA:", data);
+
+    await saveMetrics(
+        projectId,
+        data
+    );
+console.log("Metrics saved.");
 
     return data;
 
@@ -1918,11 +1908,18 @@ console.log(
     "========== FINAL METRICS =========="
 );
 
+console.log(data);
+console.log("========== FINAL METRICS ==========");
+
 console.table({
 
 market_cap:data.market_cap,
 
 fdv:data.fdv,
+
+volume_24h:data.volume_24h,
+
+circulating_supply:data.circulating_supply,
 
 holders:data.holders,
 
@@ -1930,7 +1927,7 @@ tvl:data.tvl,
 
 github_score:data.github_score,
 
-team_score:data.team_score
+github_stars:data.github_stars
 
 });
 
