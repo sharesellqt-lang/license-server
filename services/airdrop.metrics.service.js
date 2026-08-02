@@ -377,15 +377,21 @@ const teamService =
 
 
 
-        financial_score:
+   financial_score:
 
-            Number(
-                data.defillama?.defillama_score
-                ??
-                data.financial_score
-                ??
-                0
-            ),
+Number(
+
+    data.financial_score
+
+    ??
+
+    data.defillama?.financial_score
+
+    ??
+
+    0
+
+),
 
 
 
@@ -419,7 +425,38 @@ const teamService =
                 data.risk_score || 0
             ),
 
+investment_score:
 
+    Number(
+
+        data.investment_score
+        ??
+
+        0
+
+    ),
+
+    investment_rating:
+
+    String(
+
+        data.investment_rating
+        ||
+
+        "UNKNOWN"
+
+    ),
+
+    investment_action:
+
+    String(
+
+        data.investment_action
+        ||
+
+        ""
+
+    ),
 
         risk_level:
 
@@ -530,7 +567,23 @@ const teamService =
                 0
             ),
 
+// =====================================
+// AUDIT
+// =====================================
 
+audit_score:
+
+    Number(
+
+        data.audit_score
+        ??
+
+        data.audit?.audit_score
+        ??
+
+        0
+
+    ),
 
         // =====================================
         // LINKEDIN TEAM
@@ -1330,13 +1383,17 @@ WHERE
 
 `;
 
-    const values = [
+   const values = [
 
-        ...columns.map(c => metric[c]),
+    ...columns.map(
 
-        projectId
+        c => metric[c] ?? null
 
-    ];
+    ),
+
+    projectId
+
+];
 
     const [result] =
         await db.query(
@@ -1471,32 +1528,59 @@ async function syncCoinGecko(
 
 async function syncGeckoTerminal(
     projectId,
-    coinId
+    network,
+    tokenAddress
 ){
-    console.log("========== SYNC COINGECKO ==========");
-console.log("projectId =", projectId);
-console.log("coinId =", coinId);
 
-    if(!coinId){
+    console.log(
+        "========== SYNC GECKOTERMINAL =========="
+    );
+
+    console.log(
+        "projectId =",
+        projectId
+    );
+
+    console.log(
+        "network =",
+        network
+    );
+
+    console.log(
+        "tokenAddress =",
+        tokenAddress
+    );
+
+    if(
+        !network ||
+        !tokenAddress
+    ){
 
         throw new Error(
-            "Missing CoinGecko ID"
+            "Missing network or contract address"
         );
 
     }
 
-
     const data =
-        await coingecko.fetchById(
-            coinId
+        await gecko.fetchToken(
+            network,
+            tokenAddress
         );
-console.log("CoinGecko DATA:", data);
+
+    console.log(
+        "GeckoTerminal DATA:",
+        data
+    );
 
     await saveMetrics(
         projectId,
         data
     );
-console.log("Metrics saved.");
+
+    console.log(
+        "Metrics saved."
+    );
 
     return data;
 
