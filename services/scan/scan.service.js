@@ -589,6 +589,18 @@ Object.entries(results).forEach(([name, result]) => {
 
 });
 
+console.log("========== SCAN RESULTS ==========");
+
+Object.entries(results).forEach(([name, result]) => {
+
+    console.log(
+        name,
+        "success:",
+        result.success
+    );
+
+});
+
     /*
     =====================================
        BUILD METRICS
