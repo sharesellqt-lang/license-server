@@ -162,6 +162,13 @@ return bLiquidity-aLiquidity;
 const attr =
     pool.attributes || {};
 
+const baseToken =
+    pool.relationships?.base_token?.data?.id || "";
+
+
+const quoteToken =
+    pool.relationships?.quote_token?.data?.id || "";
+
         /* =====================================
            SUPPLY
         ===================================== */
@@ -253,17 +260,17 @@ const attr =
 
                 attr.symbol || "",
 
-           current_price:
+current_price:
 
 number(
 
-attr.price_usd ||
+    attr.base_token_price_usd ||
 
-attr.base_token_price_usd ||
+    attr.quote_token_price_usd ||
 
-attr.token_price_usd ||
+    attr.price_usd ||
 
-0
+    attr.price
 
 ),
 

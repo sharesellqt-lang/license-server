@@ -357,7 +357,8 @@ if(results.website.success){
 
         );
 
-
+context.coingecko =
+results.coingecko.data || {};
 
     results.geckoterminal =
 
@@ -373,8 +374,13 @@ if(results.website.success){
 
         );
 
+
 console.log("===== GECKOTERMINAL RESULT =====");
 console.dir(results.geckoterminal, { depth: null });
+
+context.geckoterminal =
+
+    results.geckoterminal.data || {};
 
     results.defillama =
 
@@ -570,19 +576,30 @@ Object.entries(results).forEach(([name, result]) => {
 
 const metrics = {
 
+
     ...(results.website.data || {}),
 
     ...(results.github.data || {}),
 
     ...(results.coingecko.data || {}),
 
-    ...(results.geckoterminal.data || {}),
-
     ...(results.defillama.data || {}),
 
     ...(results.audit.data || {}),
 
+
     ...(results.team.data || {}),
+
+
+    team_ai_count:
+        results.team.data?.team_count || 0,
+
+    team_ai_members:
+        results.team.data?.team_members || [],
+
+    team_ai_extracted:
+        results.team.data?.team_members || [],
+
 
     ...(results.partner.data || {}),
 
@@ -590,11 +607,29 @@ const metrics = {
 
     ...(results.tokenomics.data || {}),
 
+
     ...(results.financial.data || {}),
 
     ...(results.community.data || {}),
 
-    ...(results.onchain.data || {})
+
+    /*
+    ================================
+       ONCHAIN SCORE ONLY
+       không cho overwrite market
+    ================================
+    */
+
+    ...(results.onchain.data || {}),
+
+
+    /*
+    ================================
+       MARKET DATA CUỐI CÙNG
+    ================================
+    */
+
+    ...(results.geckoterminal.data || {})
 
 };
 

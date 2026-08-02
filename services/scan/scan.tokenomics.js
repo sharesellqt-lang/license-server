@@ -442,30 +442,29 @@ async function scanTokenomics(
 
 
 
-    if(!projectId){
+if(!projectId){
 
-       return {
+    return {
 
-tokenomics_score,
+        tokenomics_score:0,
 
-circulating_percent,
+        circulating_percent:0,
 
-locked_percent,
+        locked_percent:0,
 
-inflation,
+        inflation:0,
 
-risk_score,
+        risk_score:0,
 
-seed_roi,
+        seed_roi:0,
 
-private_roi,
+        private_roi:0,
 
-public_roi
+        public_roi:0
+
+    };
 
 }
-
-    }
-
 
 
 
@@ -508,7 +507,25 @@ public_roi
 
 
 console.log("========== TOKENOMICS RESULT ==========");
-console.log(result);
+
+console.log({
+
+    total_supply:
+        metrics.total_supply,
+
+    circulating_supply:
+        metrics.circulating_supply,
+
+    market_cap:
+        metrics.market_cap,
+
+    fdv:
+        metrics.fdv,
+
+    tokenomics_score:
+        score
+
+});
 
 
     return {
