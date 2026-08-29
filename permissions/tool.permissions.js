@@ -12,6 +12,11 @@ module.exports = {
       trialDays: 1
     },
 
+    exportCSV: {
+    requiredPlan: "vip",
+    trialDays: 0
+    },
+
     // Airdrop Hunter PRO
 
     galxeScanner: {
