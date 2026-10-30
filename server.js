@@ -80,6 +80,11 @@ app.use(
     "/api/english-learning",
     require("./routes/english-learning")
 );
+app.use(
+    "/api/english-learning/progress",
+    require("./routes/english-progress")
+);
+
 
 // =========================
 // BOOTSTRAP
