@@ -76,6 +76,10 @@ app.use((req, res, next) => {
 // =========================
 app.use("/api/airdrop", airdropRoutes);
 app.use("/api/airdrop",dashboardRoutes);
+app.use(
+    "/api/english-learning",
+    require("./routes/english-learning")
+);
 
 // =========================
 // BOOTSTRAP

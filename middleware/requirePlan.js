@@ -1,27 +1,45 @@
-module.exports = (requiredPlan) => {
 
-  return (req, res, next) => {
+"use strict";
 
-    const levels = {
-      free: 0,
-      pro: 1,
-      vip: 2
-    };
+const PLAN_LEVELS = Object.freeze({
+    free: 0,
+    pro: 1,
+    vip: 2
+});
 
-    const current =
-      levels[req.user.plan] || 0;
+module.exports = (requiredPlan = "free") => {
+    const required = PLAN_LEVELS[String(requiredPlan).toLowerCase()];
 
-    const needed =
-      levels[requiredPlan] || 0;
-
-    if (current < needed) {
-      return res.status(403).json({
-        error: "Upgrade required"
-      });
+    if (required === undefined) {
+        throw new Error(`Invalid required plan: ${requiredPlan}`);
     }
 
-    next();
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                error: "Authentication required"
+            });
+        }
 
-  };
+        const plan = String(req.user.plan || "free").toLowerCase();
+        const current = PLAN_LEVELS[plan];
 
+        if (current === undefined) {
+            return res.status(403).json({
+                success: false,
+                error: "Invalid account plan"
+            });
+        }
+
+        if (current < required) {
+            return res.status(403).json({
+                success: false,
+                error: "Upgrade required",
+                requiredPlan
+            });
+        }
+
+        next();
+    };
 };

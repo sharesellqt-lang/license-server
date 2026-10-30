@@ -23,8 +23,10 @@ module.exports = async (req, res, next) => {
     // =========================
     // TOKEN
     // =========================
-    const token =
-      authHeader.split(" ")[1];
+    const [scheme, token] = authHeader.split(" ");
+      if (scheme !== "Bearer" || !token) {
+          return res.status(401).json({ error: "Invalid authorization header" });
+      }
 
     if (!token) {
 
@@ -116,32 +118,32 @@ try {
     // =========================
     // DEFAULT PLAN
     // =========================
-    let plan =
-      user.plan || "free";
+    let plan = String(user.plan || "free").toLowerCase();
+    if (!["free", "pro", "vip"].includes(plan)) plan = "free";
 
     // =========================
     // AUTO EXPIRE
     // =========================
     if (
-      user.expire_at &&
-      new Date(user.expire_at) < new Date()
+        user.expire_at &&
+        new Date(user.expire_at) < new Date()
     ) {
+        try {
+            await db.query(
+                `UPDATE users SET plan = 'free', expire_at = NULL WHERE id = ?`,
+                [user.id]
+            );
 
-      await db.query(
-        `
-        UPDATE users
-        SET
-          plan = 'free',
-          expire_at = NULL
-        WHERE id = ?
-        `,
-        [user.id]
-      );
+            plan = "free";
+            user.expire_at = null;
 
-      plan = "free";
+        } catch (err) {
+            console.error("PLAN EXPIRY UPDATE ERROR:", err.message);
 
-      user.expire_at = null;
-
+            return res.status(500).json({
+                error: "Unable to update expired plan"
+            });
+        }
     }
 
     // =========================
