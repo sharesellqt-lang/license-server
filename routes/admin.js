@@ -6,12 +6,10 @@ const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const requireAdmin = require("../middleware/requireAdmin");
 
+// ==============================
 // JWT TOKEN GENERATOR
-const SECRET = process.env.JWT_SECRET;
-
-if (!SECRET) {
-    throw new Error("JWT_SECRET is not configured");
-}
+// ==============================
+const SECRET = process.env.JWT_SECRET || "supersecret";
 
 // =====================================
 // Các route admin khác: users, payments, set-plan, stats...
@@ -21,54 +19,20 @@ if (!SECRET) {
 // ADMIN AUTH
 // =====================================
 
-async function adminAuth(req, res, next) {
-    try {
-        const authHeader = req.headers.authorization;
+function adminAuth(req, res, next) {
+  const authHeader = req.headers.authorization; // Bearer <token>
+  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
 
-        if (!authHeader?.startsWith("Bearer ")) {
-            return res.status(401).json({ error: "Unauthorized" });
-        }
+  const token = authHeader.split(" ")[1];
 
-        const token = authHeader.slice(7).trim();
-        const decoded = jwt.verify(token, SECRET);
-
-        if (!decoded.adminId) {
-            return res.status(403).json({ error: "Admin token required" });
-        }
-
-        const [rows] = await db.query(
-            "SELECT id FROM admin WHERE id = ? LIMIT 1",
-            [decoded.adminId]
-        );
-
-        if (!rows.length) {
-            return res.status(401).json({ error: "Admin account not found" });
-        }
-
-        req.adminId = rows[0].id;
-        next();
-
-    } catch (err) {
-        if (err.name === "JsonWebTokenError" || err.name === "TokenExpiredError") {
-            return res.status(401).json({ error: "Invalid or expired token" });
-        }
-
-        console.error("ADMIN AUTH ERROR:", err.message);
-        return res.status(500).json({ error: "Admin authentication failed" });
-    }
+  try {
+    const decoded = jwt.verify(token, SECRET);
+    req.adminId = decoded.adminId; // gán adminId nếu cần dùng
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 }
-
-// =====================================
-// ENGLISH LEARNING CMS
-// =====================================
-
-const createEnglishLearningAdminRouter =
-    require("./admin.english-learning");
-
-router.use(
-    "/english-learning",
-    createEnglishLearningAdminRouter(adminAuth)
-);
 
 // Hàm tạo token login
 function generateToken(adminId) {
@@ -83,27 +47,16 @@ function generateToken(adminId) {
 
 router.post("/login", async (req, res) => {
   try {
-    const { username, password } = req.body || {};
-
-    if (
-      typeof username !== "string" ||
-      typeof password !== "string" ||
-      !username.trim() ||
-      !password
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Username and password are required"
-      });
-    }
+    const { username, password } = req.body;
 
     // Lấy admin từ database
+    console.log("BODY:", req.body);
 
     const [rows] = await db.query(
       "SELECT * FROM admin WHERE username = ?", 
       [username]
     );
-
+console.log("ROWS:", rows);
 
    if (!rows.length) {
     return res.status(401).json({
@@ -114,9 +67,11 @@ router.post("/login", async (req, res) => {
 
 const admin = rows[0];
 
+console.log("HASH:", admin.password_hash);
 
     // So sánh password hash
     const match = await bcrypt.compare(password, admin.password_hash);
+        console.log("MATCH:", match);
 
     if (!match){
       return res.status(401).json({ success: false, message: "Invalid credentials" });
