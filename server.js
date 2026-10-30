@@ -77,13 +77,14 @@ app.use((req, res, next) => {
 app.use("/api/airdrop", airdropRoutes);
 app.use("/api/airdrop",dashboardRoutes);
 app.use(
-    "/api/english-learning",
-    require("./routes/english-learning")
-);
-app.use(
     "/api/english-learning/progress",
     require("./routes/english-progress")
 );
+app.use(
+    "/api/english-learning",
+    require("./routes/english-learning")
+);
+
 
 
 // =========================
