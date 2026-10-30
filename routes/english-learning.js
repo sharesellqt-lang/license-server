@@ -5,6 +5,7 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 const auth = require("../middleware/auth");
+console.log("[ENGLISH LEARNING] Router loaded");
 
 const PLAN_LEVELS = Object.freeze({
     free: 0,
@@ -397,5 +398,14 @@ router.get("/categories", async (req, res) => {
         return sendError(res, err, "ENGLISH CATEGORIES ERROR");
     }
 });
-
+console.log("[ENGLISH LEARNING] Routes registered:", [
+    "/",
+    "/data",
+    "/lessons",
+    "/lessons/:id",
+    "/grammar",
+    "/quizzes",
+    "/conversations",
+    "/categories"
+]);
 module.exports = router;
