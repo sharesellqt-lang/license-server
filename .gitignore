@@ -1,3 +1,23 @@
 node_modules/
 .env
 client_secret_*.json
+
+# Python virtual environments
+.venv/
+venv/
+whisper-local/.venv/
+
+# Node.js
+node_modules/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Temporary files
+__pycache__/
+*.pyc

@@ -42,9 +42,7 @@ function adminAuth(req, res, next) {
 // LOGIN
 // =========================
 router.post("/login", async (req, res) => {
-       console.log("BODY:", req.body);
-  console.log("ADMIN_USER:", ADMIN_USER);
-  console.log("ADMIN_PASS:", ADMIN_PASS);
+
 
   try {
     const { user, pass } = req.body;
