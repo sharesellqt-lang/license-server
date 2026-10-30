@@ -11,6 +11,7 @@ const router = express.Router();
 
 const db = require("../db");
 const auth = require("../middleware/auth");
+console.log("[ENGLISH PROGRESS] Router loaded");
 
 router.use(auth);
 
@@ -416,5 +417,12 @@ router.post("/settings", async (req, res) => {
         return sendError(res, error);
     }
 });
-
+console.log("[ENGLISH PROGRESS] Routes registered:", [
+    "/",
+    "/lesson",
+    "/vocabulary",
+    "/quiz",
+    "/study",
+    "/settings"
+]);
 module.exports = router;
