@@ -3,15 +3,16 @@
 
 const mysql = require("mysql2/promise");
 
-console.log("========== DB CONFIG ==========");
-console.log("DB_HOST:", process.env.DB_HOST || "MISSING");
+const dbHost = process.env.DB_HOST?.trim();
+
+console.log("========== DATABASE CONFIG ==========");
+console.log("DB_HOST:", dbHost || "MISSING");
 console.log("DB_USER:", process.env.DB_USER ? "SET" : "MISSING");
 console.log("DB_NAME:", process.env.DB_NAME ? "SET" : "MISSING");
 console.log("DB_PORT:", process.env.DB_PORT || "3306");
-console.log("===============================");
-
+console.log("=====================================");
 const db = mysql.createPool({
-    host: process.env.DB_HOST,
+    host: dbHost,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
