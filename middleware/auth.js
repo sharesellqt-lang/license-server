@@ -42,7 +42,13 @@ module.exports = async (req, res, next) => {
         token,
         process.env.JWT_SECRET
       );
+      const userId = decoded.id || decoded.userId;
 
+      if (!userId) {
+          return res.status(401).json({
+              error: "Invalid token"
+          });
+      }
     // =========================
     // GET USER REALTIME
     // =========================
@@ -59,7 +65,7 @@ module.exports = async (req, res, next) => {
         FROM users
         WHERE id = ?
         `,
-        [decoded.id]
+        [userId]
       );
     } catch (err) {
       console.error("❌ DB ERROR in auth:", err.message);
