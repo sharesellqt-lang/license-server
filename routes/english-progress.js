@@ -156,47 +156,26 @@ router.get("/", async (req, res) => {
         }
 
         const dates = studyRows.map(row => row.study_date);
-        console.log("[PROGRESS GET CHECK]", {
-    userId,
-    vocabularyRows: vocabularyRows.length,
-    vocabulary: vocabularyRows
+
+
+       const progressData = {
+    completedLessons: lessonRows.map(row => row.lesson_id),
+    savedWords: vocabularyRows.filter(row => row.is_saved).map(row => row.word_id),
+    knownWords: vocabularyRows.filter(row => row.is_known).map(row => row.word_id),
+    quizAttempts: Number(quizRows[0]?.quizAttempts || 0),
+    quizCorrect: Number(quizRows[0]?.quizCorrect || 0),
+    studyDates: dates,
+    lastStudyDate: dates.length ? dates[dates.length - 1] : "",
+    reviewDue,
+    wordCountGoal: Number(settingRows[0]?.word_count_goal || 100)
+};
+
+console.log("[PROGRESS GET RESPONSE]", progressData);
+
+return res.json({
+    success: true,
+    progress: progressData
 });
-
-        return res.json({
-            success: true,
-            progress: {
-                completedLessons: lessonRows.map(row => row.lesson_id),
-
-                savedWords: vocabularyRows
-                    .filter(row => row.is_saved)
-                    .map(row => row.word_id),
-
-                knownWords: vocabularyRows
-                    .filter(row => row.is_known)
-                    .map(row => row.word_id),
-
-                quizAttempts: Number(
-                    quizRows[0]?.quizAttempts || 0
-                ),
-
-                quizCorrect: Number(
-                    quizRows[0]?.quizCorrect || 0
-                ),
-
-                studyDates: dates,
-
-                lastStudyDate: dates.length
-                    ? dates[dates.length - 1]
-                    : "",
-
-                reviewDue,
-
-                wordCountGoal: Number(
-                    settingRows[0]?.word_count_goal || 100
-                )
-            }
-        });
-
     } catch (error) {
         return sendError(res, error, "ENGLISH PROGRESS LOAD ERROR");
     }
