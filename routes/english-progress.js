@@ -8,10 +8,14 @@
 
 const express = require("express");
 const router = express.Router();
-
 const db = require("../db");
 const auth = require("../middleware/auth");
+
 console.log("[ENGLISH PROGRESS] Router loaded");
+
+// =========================================
+// AUTHENTICATION
+// =========================================
 
 router.use(auth);
 
@@ -20,7 +24,21 @@ router.use(auth);
 // =========================================
 
 function getUserId(req) {
-    return req.user?.id;
+    return req.user?.id || null;
+}
+
+function requireUserId(req, res) {
+    const userId = getUserId(req);
+
+    if (!userId) {
+        res.status(401).json({
+            success: false,
+            message: "Unauthorized"
+        });
+        return null;
+    }
+
+    return userId;
 }
 
 function validId(value) {
@@ -30,8 +48,10 @@ function validId(value) {
 }
 
 function validDate(value) {
-    if (typeof value !== "string" ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    if (
+        typeof value !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(value)
+    ) return false;
 
     const date = new Date(`${value}T00:00:00Z`);
 
@@ -41,14 +61,16 @@ function validDate(value) {
 
 function isBoolean(value) {
     return typeof value === "boolean" ||
-        value === 0 || value === 1;
+        value === 0 ||
+        value === 1;
 }
 
-function sendError(res, error, message = "Server error") {
-    console.error("[English Progress]", error);
+function sendError(res, error, label = "ENGLISH PROGRESS ERROR") {
+    console.error(`[${label}]`, error);
+
     return res.status(500).json({
         success: false,
-        message
+        message: "Unable to save or load learning progress"
     });
 }
 
@@ -59,31 +81,26 @@ function sendError(res, error, message = "Server error") {
 
 router.get("/", async (req, res) => {
     try {
-        const userId = getUserId(req);
-
-        if (!userId) {
-            return res.status(401).json({
-                success: false,
-                message: "Unauthorized"
-            });
-        }
+        const userId = requireUserId(req, res);
+        if (!userId) return;
 
         const [
-            lessons,
-            vocabulary,
-            quizzes,
-            studyDates,
-            settings
+            lessonsResult,
+            vocabularyResult,
+            quizzesResult,
+            studyDatesResult,
+            settingsResult
         ] = await Promise.all([
 
-            db.execute(
+            db.query(
                 `SELECT lesson_id
                  FROM english_user_lesson_progress
-                 WHERE user_id = ? AND is_completed = 1`,
+                 WHERE user_id = ?
+                   AND is_completed = 1`,
                 [userId]
             ),
 
-            db.execute(
+            db.query(
                 `SELECT
                     word_id,
                     is_known,
@@ -94,7 +111,7 @@ router.get("/", async (req, res) => {
                 [userId]
             ),
 
-            db.execute(
+            db.query(
                 `SELECT
                     COALESCE(SUM(correct_count), 0) AS quizCorrect,
                     COALESCE(SUM(total_count), 0) AS quizAttempts
@@ -103,7 +120,7 @@ router.get("/", async (req, res) => {
                 [userId]
             ),
 
-            db.execute(
+            db.query(
                 `SELECT DATE_FORMAT(study_date, '%Y-%m-%d') AS study_date
                  FROM english_user_study_dates
                  WHERE user_id = ?
@@ -111,7 +128,7 @@ router.get("/", async (req, res) => {
                 [userId]
             ),
 
-            db.execute(
+            db.query(
                 `SELECT word_count_goal
                  FROM english_user_settings
                  WHERE user_id = ?
@@ -120,11 +137,11 @@ router.get("/", async (req, res) => {
             )
         ]);
 
-        const lessonRows = lessons[0];
-        const vocabularyRows = vocabulary[0];
-        const quizRows = quizzes[0];
-        const studyRows = studyDates[0];
-        const settingRows = settings[0];
+        const lessonRows = lessonsResult[0];
+        const vocabularyRows = vocabularyResult[0];
+        const quizRows = quizzesResult[0];
+        const studyRows = studyDatesResult[0];
+        const settingRows = settingsResult[0];
 
         const reviewDue = {};
 
@@ -149,10 +166,16 @@ router.get("/", async (req, res) => {
                     .filter(row => row.is_known)
                     .map(row => row.word_id),
 
-                quizAttempts: Number(quizRows[0]?.quizAttempts || 0),
-                quizCorrect: Number(quizRows[0]?.quizCorrect || 0),
+                quizAttempts: Number(
+                    quizRows[0]?.quizAttempts || 0
+                ),
+
+                quizCorrect: Number(
+                    quizRows[0]?.quizCorrect || 0
+                ),
 
                 studyDates: dates,
+
                 lastStudyDate: dates.length
                     ? dates[dates.length - 1]
                     : "",
@@ -166,7 +189,7 @@ router.get("/", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH PROGRESS LOAD ERROR");
     }
 });
 
@@ -177,18 +200,26 @@ router.get("/", async (req, res) => {
 
 router.post("/lesson", async (req, res) => {
     try {
-        const userId = getUserId(req);
-        const { lessonId, completed = true } = req.body || {};
+        const userId = requireUserId(req, res);
+        if (!userId) return;
 
-        if (!validId(lessonId) || !isBoolean(completed)) {
+        const {
+            lessonId,
+            completed = true
+        } = req.body || {};
+
+        if (
+            !validId(lessonId) ||
+            !isBoolean(completed)
+        ) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid lesson data"
             });
         }
 
-        if (completed) {
-            await db.execute(
+        if (Boolean(completed)) {
+            await db.query(
                 `INSERT INTO english_user_lesson_progress
                     (user_id, lesson_id, is_completed, completed_at)
                  VALUES (?, ?, 1, CURRENT_TIMESTAMP)
@@ -198,9 +229,10 @@ router.post("/lesson", async (req, res) => {
                 [userId, lessonId.trim()]
             );
         } else {
-            await db.execute(
+            await db.query(
                 `DELETE FROM english_user_lesson_progress
-                 WHERE user_id = ? AND lesson_id = ?`,
+                 WHERE user_id = ?
+                   AND lesson_id = ?`,
                 [userId, lessonId.trim()]
             );
         }
@@ -211,7 +243,7 @@ router.post("/lesson", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH LESSON PROGRESS ERROR");
     }
 });
 
@@ -222,7 +254,8 @@ router.post("/lesson", async (req, res) => {
 
 router.post("/vocabulary", async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const userId = requireUserId(req, res);
+        if (!userId) return;
 
         const {
             wordId,
@@ -246,7 +279,7 @@ router.post("/vocabulary", async (req, res) => {
         const known = Boolean(isKnown);
         const saved = Boolean(isSaved);
 
-        await db.execute(
+        await db.query(
             `INSERT INTO english_user_vocabulary_progress
                 (user_id, word_id, is_known, is_saved, review_due, known_at)
              VALUES (?, ?, ?, ?, ?, ?)
@@ -271,7 +304,7 @@ router.post("/vocabulary", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH VOCABULARY PROGRESS ERROR");
     }
 });
 
@@ -282,7 +315,8 @@ router.post("/vocabulary", async (req, res) => {
 
 router.post("/quiz", async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const userId = requireUserId(req, res);
+        if (!userId) return;
 
         const {
             quizId,
@@ -308,7 +342,7 @@ router.post("/quiz", async (req, res) => {
             ((correctCount / totalCount) * 100).toFixed(2)
         );
 
-        await db.execute(
+        await db.query(
             `INSERT INTO english_user_quiz_attempts
                 (user_id, quiz_id, correct_count, total_count, score)
              VALUES (?, ?, ?, ?, ?)`,
@@ -328,7 +362,7 @@ router.post("/quiz", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH QUIZ PROGRESS ERROR");
     }
 });
 
@@ -339,7 +373,9 @@ router.post("/quiz", async (req, res) => {
 
 router.post("/study", async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const userId = requireUserId(req, res);
+        if (!userId) return;
+
         const { studyDate } = req.body || {};
 
         if (
@@ -353,14 +389,14 @@ router.post("/study", async (req, res) => {
         }
 
         if (studyDate) {
-            await db.execute(
+            await db.query(
                 `INSERT IGNORE INTO english_user_study_dates
                     (user_id, study_date)
                  VALUES (?, ?)`,
                 [userId, studyDate]
             );
         } else {
-            await db.execute(
+            await db.query(
                 `INSERT IGNORE INTO english_user_study_dates
                     (user_id, study_date)
                  VALUES (?, CURDATE())`,
@@ -374,7 +410,7 @@ router.post("/study", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH STUDY DATE ERROR");
     }
 });
 
@@ -385,7 +421,9 @@ router.post("/study", async (req, res) => {
 
 router.post("/settings", async (req, res) => {
     try {
-        const userId = getUserId(req);
+        const userId = requireUserId(req, res);
+        if (!userId) return;
+
         const { wordCountGoal } = req.body || {};
 
         if (
@@ -399,7 +437,7 @@ router.post("/settings", async (req, res) => {
             });
         }
 
-        await db.execute(
+        await db.query(
             `INSERT INTO english_user_settings
                 (user_id, word_count_goal)
              VALUES (?, ?)
@@ -414,9 +452,14 @@ router.post("/settings", async (req, res) => {
         });
 
     } catch (error) {
-        return sendError(res, error);
+        return sendError(res, error, "ENGLISH SETTINGS ERROR");
     }
 });
+
+// =========================================
+// ROUTES REGISTERED
+// =========================================
+
 console.log("[ENGLISH PROGRESS] Routes registered:", [
     "/",
     "/lesson",
@@ -425,4 +468,5 @@ console.log("[ENGLISH PROGRESS] Routes registered:", [
     "/study",
     "/settings"
 ]);
+
 module.exports = router;
