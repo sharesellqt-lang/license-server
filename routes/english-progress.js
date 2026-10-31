@@ -156,6 +156,11 @@ router.get("/", async (req, res) => {
         }
 
         const dates = studyRows.map(row => row.study_date);
+        console.log("[PROGRESS GET CHECK]", {
+    userId,
+    vocabularyRows: vocabularyRows.length,
+    vocabulary: vocabularyRows
+});
 
         return res.json({
             success: true,
