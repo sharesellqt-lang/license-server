@@ -90,11 +90,11 @@ async function loadEnglishData(user) {
             ),
 
             db.query(
-                `SELECT id, level, topic, question, explanation, access, sort_order
-                 FROM english_quizzes
-                 WHERE status = 'published'
-                   AND access IN (${accessSlots})
-                 ORDER BY sort_order ASC, created_at ASC`,
+                `SELECT id, lesson_id, level, topic, question, explanation, access, sort_order
+                FROM english_quizzes
+                WHERE status = 'published'
+                AND access IN (${accessSlots})
+                ORDER BY sort_order ASC, created_at ASC`,
                 allowed
             ),
 
@@ -214,6 +214,7 @@ async function loadEnglishData(user) {
 
         return {
             ...normalizeAccess(item),
+            lessonId: item.lesson_id || null,
             answers: answers.map(answer => answer.answer_text),
             correct: correctIndex,
             explanation: item.explanation || ""

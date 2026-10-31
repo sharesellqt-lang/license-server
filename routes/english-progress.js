@@ -170,7 +170,7 @@ router.get("/", async (req, res) => {
     wordCountGoal: Number(settingRows[0]?.word_count_goal || 100)
 };
 
-console.log("[PROGRESS GET RESPONSE]", progressData);
+
 
 return res.json({
     success: true,
