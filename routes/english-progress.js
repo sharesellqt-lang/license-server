@@ -82,6 +82,10 @@ function sendError(res, error, label = "ENGLISH PROGRESS ERROR") {
 router.get("/", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
+        console.log("[PROGRESS GET]", {
+    userId,
+    db: db.config?.database
+});
         if (!userId) return;
 
         const [
@@ -255,6 +259,10 @@ router.post("/lesson", async (req, res) => {
 router.post("/vocabulary", async (req, res) => {
     try {
         const userId = requireUserId(req, res);
+        console.log("[PROGRESS GET]", {
+    userId,
+    db: db.config?.database
+});
         if (!userId) return;
 
         const {
