@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const requireAdmin = require("../middleware/requireAdmin");
+const requirePermission = require("../middleware/requirePermission");
 
 // JWT TOKEN GENERATOR
 const SECRET = process.env.JWT_SECRET;
@@ -67,7 +68,9 @@ const createEnglishLearningAdminRouter =
 
 router.use(
     "/english-learning",
-    createEnglishLearningAdminRouter(adminAuth)
+    adminAuth,
+    requirePermission("lessons:manage"),
+    createEnglishLearningAdminRouter((req, res, next) => next())
 );
 
 // Hàm tạo token login
