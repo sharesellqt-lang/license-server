@@ -81,11 +81,11 @@ async function loadEnglishData(user) {
             ),
 
             db.query(
-                `SELECT id, title, level, topic, rule, formula, examples, access, sort_order
-                 FROM english_grammar
-                 WHERE status = 'published'
-                   AND access IN (${accessSlots})
-                 ORDER BY sort_order ASC, created_at ASC`,
+                `SELECT id, lesson_id, title, level, topic, rule, formula, examples, access, sort_order
+                FROM english_grammar
+                WHERE status = 'published'
+                AND access IN (${accessSlots})
+                ORDER BY sort_order ASC, created_at ASC`,
                 allowed
             ),
 
@@ -99,11 +99,11 @@ async function loadEnglishData(user) {
             ),
 
             db.query(
-                `SELECT id, topic, prompt, model, translation, tips, access, sort_order
-                 FROM english_conversations
-                 WHERE status = 'published'
-                   AND access IN (${accessSlots})
-                 ORDER BY sort_order ASC, created_at ASC`,
+                `SELECT id, lesson_id, topic, prompt, model, translation, tips, access, sort_order
+                FROM english_conversations
+                WHERE status = 'published'
+                AND access IN (${accessSlots})
+                ORDER BY sort_order ASC, created_at ASC`,
                 allowed
             ),
 
@@ -174,6 +174,7 @@ async function loadEnglishData(user) {
 
     const grammar = grammarRows.map(item => ({
         ...normalizeAccess(item),
+        lessonId: item.lesson_id || null,
         examples: parseJson(item.examples, [])
     }));
 
@@ -237,6 +238,7 @@ async function loadEnglishData(user) {
 
         conversations[topic].push({
             id: item.id,
+            lessonId: item.lesson_id || null,
             prompt: item.prompt,
             model: item.model,
             translation: item.translation || "",
