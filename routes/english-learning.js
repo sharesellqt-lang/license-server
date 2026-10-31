@@ -244,7 +244,8 @@ async function loadEnglishData(user) {
             translation: item.translation || "",
             tips: item.tips || "",
             access: item.access,
-            pro: item.access !== "free"
+            pro: item.access !== "free",
+            sortOrder: item.sort_order
         });
     }
 
