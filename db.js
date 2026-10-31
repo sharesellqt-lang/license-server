@@ -37,6 +37,14 @@ async function testDB() {
 
     try {
         conn = await db.getConnection();
+        const [rows] = await conn.query(`
+    SELECT
+        DATABASE() AS database_name,
+        USER() AS db_user,
+        CONNECTION_ID() AS connection_id
+`);
+
+console.log("MYSQL ACTIVE CONNECTION:", rows[0]);
 
         console.log(
             "✅ MYSQL CONNECTED:",
