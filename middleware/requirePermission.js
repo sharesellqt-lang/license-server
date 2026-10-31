@@ -12,7 +12,7 @@ function requirePermission(permission) {
             }
 
             const [rows] = await db.execute(
-                `SELECT permission
+                `SELECT 1
                  FROM admin_permissions
                  WHERE admin_id = ?
                    AND permission IN (?, 'super_admin')
@@ -27,7 +27,6 @@ function requirePermission(permission) {
             }
 
             next();
-
         } catch (err) {
             console.error("[ADMIN PERMISSION]", err);
 
