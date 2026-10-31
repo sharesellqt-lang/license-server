@@ -7,6 +7,7 @@ const db = require("../db");
 
 const ACCESS_VALUES = ["free", "pro", "vip"];
 
+
 const CONFIGS = {
     lessons: {
         table: "english_lessons",
@@ -15,6 +16,7 @@ const CONFIGS = {
         statuses: ["draft", "published", "hidden", "archived"],
         filters: ["status", "level", "topic"]
     },
+
     vocabulary: {
         table: "english_vocabulary",
         columns: ["lesson_id", "word", "pronunciation", "meaning", "example", "example_vi", "progress_key", "sort_order", "status"],
@@ -22,29 +24,33 @@ const CONFIGS = {
         statuses: ["published", "hidden", "archived"],
         filters: ["status", "lesson_id"]
     },
+
     grammar: {
         table: "english_grammar",
-        columns: ["title", "level", "topic", "rule", "formula", "examples", "access", "status", "sort_order"],
-        required: ["title", "level"],
+        columns: ["lesson_id", "title", "level", "topic", "rule", "formula", "examples", "access", "status", "sort_order"],
+        required: ["lesson_id", "title", "level"],
         statuses: ["draft", "published", "hidden", "archived"],
-        filters: ["status", "level", "topic"],
+        filters: ["status", "lesson_id", "level", "topic"],
         jsonFields: ["examples"]
     },
+
     quizzes: {
         table: "english_quizzes",
-        columns: ["level", "topic", "question", "explanation", "access", "status", "sort_order"],
-        required: ["level", "question"],
+        columns: ["lesson_id", "level", "topic", "question", "explanation", "access", "status", "sort_order"],
+        required: ["lesson_id", "level", "question"],
         statuses: ["draft", "published", "hidden", "archived"],
-        filters: ["status", "level", "topic"]
+        filters: ["status", "lesson_id", "level", "topic"]
     },
+
     conversations: {
         table: "english_conversations",
-        columns: ["topic", "prompt", "model", "translation", "tips", "access", "status", "sort_order"],
-        required: ["topic", "prompt", "model"],
+        columns: ["lesson_id", "topic", "prompt", "model", "translation", "tips", "access", "status", "sort_order"],
+        required: ["lesson_id", "topic", "prompt", "model"],
         statuses: ["draft", "published", "hidden", "archived"],
-        filters: ["status", "topic"]
+        filters: ["status", "lesson_id", "topic"]
     }
 };
+
 
 /* =========================================
    COMMON HELPERS
@@ -182,11 +188,32 @@ async function checkLesson(lessonId, executor = db) {
     if (!validId(lessonId)) return false;
 
     const [rows] = await executor.execute(
-        "SELECT id FROM english_lessons WHERE id = ? LIMIT 1",
+        `SELECT id
+         FROM english_lessons
+         WHERE id = ?
+           AND status != 'archived'
+         LIMIT 1`,
         [lessonId]
     );
 
     return rows.length > 0;
+}
+
+const LESSON_CHILD_RESOURCES = [
+    "vocabulary",
+    "grammar",
+    "quizzes",
+    "conversations"
+];
+
+async function validateLessonResource(resource, data) {
+    if (!LESSON_CHILD_RESOURCES.includes(resource)) return null;
+
+    if (!data.lesson_id || !(await checkLesson(data.lesson_id))) {
+        return "Lesson not found";
+    }
+
+    return null;
 }
 
 async function recordExists(table, id, executor = db) {
@@ -222,9 +249,9 @@ function buildUpdate(table, data, id) {
 ========================================= */
 
 function validateQuizAnswers(answers) {
-    if (!Array.isArray(answers) || answers.length < 2) {
-        return "A quiz must have at least 2 answers";
-    }
+    if (!Array.isArray(answers) || answers.length !== 4) {
+            return "A quiz must have exactly 4 answers";
+        }
 
     let correctCount = 0;
     const ids = new Set();
@@ -441,9 +468,10 @@ module.exports = function createEnglishLearningAdminRouter(adminAuth) {
 
             const data = normalized.data;
 
-            if (req.params.resource === "vocabulary" && !(await checkLesson(data.lesson_id))) {
-                return res.status(400).json({ error: "Lesson not found" });
-            }
+            const lessonError = await validateLessonResource(req.params.resource, data);
+                if (lessonError) {
+                    return res.status(400).json({ error: lessonError });
+                }
 
             if (req.params.resource === "quizzes") {
                 const validationError = validateQuizAnswers(body.answers);
@@ -520,10 +548,15 @@ module.exports = function createEnglishLearningAdminRouter(adminAuth) {
                 return res.status(400).json({ error: "No fields to update" });
             }
 
-            if (req.params.resource === "vocabulary" &&
-                data.lesson_id &&
-                !(await checkLesson(data.lesson_id))) {
-                return res.status(400).json({ error: "Lesson not found" });
+            if (Object.prototype.hasOwnProperty.call(data, "lesson_id")) {
+                const lessonError = await validateLessonResource(
+                    req.params.resource,
+                    data
+                );
+
+                if (lessonError) {
+                    return res.status(400).json({ error: lessonError });
+                }
             }
 
             if (isQuiz && hasAnswers) {
@@ -625,6 +658,53 @@ module.exports = function createEnglishLearningAdminRouter(adminAuth) {
             return sendError(res, err);
         }
     });
+
+    /* =====================================
+   DELETE / ARCHIVE
+   DELETE /:resource/:id
+
+   Soft delete: chuyển status sang archived.
+   Không xóa vật lý dữ liệu.
+===================================== */
+
+router.delete("/:resource/:id", async (req, res) => {
+    try {
+        const config = CONFIGS[req.params.resource];
+        const { id } = req.params;
+
+        if (!config) {
+            return res.status(404).json({ error: "Resource not found" });
+        }
+
+        if (!validId(id)) {
+            return res.status(400).json({ error: "Invalid ID" });
+        }
+
+        if (!config.statuses.includes("archived")) {
+            return res.status(400).json({
+                error: "This resource does not support archiving"
+            });
+        }
+
+        if (!(await recordExists(config.table, id))) {
+            return res.status(404).json({ error: "Record not found" });
+        }
+
+        await db.execute(
+            `UPDATE ${config.table} SET status = 'archived' WHERE id = ?`,
+            [id]
+        );
+
+        return res.json({
+            success: true,
+            id,
+            status: "archived"
+        });
+
+    } catch (err) {
+        return sendError(res, err);
+    }
+});
 
     return router;
 };
