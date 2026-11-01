@@ -238,6 +238,7 @@ async function createProject(userId, data = {}) {
     return getOwnedProject(uid, insertId(result));
 }
 
+
 async function updateProject(userId, projectId, data = {}) {
     const uid = requireId(userId, "User ID");
     const id = requireId(projectId, "Project ID");
@@ -260,8 +261,14 @@ async function updateProject(userId, projectId, data = {}) {
             return name;
         }
 
+        if (field === "category") {
+            return cleanString(value, 100) || null;
+        }
+
         if (field === "status") {
-            if (!["on", "off"].includes(value)) throw new Error("Invalid project status");
+            if (!["on", "off"].includes(value)) {
+                throw new Error("Invalid project status");
+            }
             return value;
         }
 
@@ -278,20 +285,21 @@ async function updateProject(userId, projectId, data = {}) {
             }
             return value || null;
         }
+
         if (field === "start_date" || field === "end_date") {
             return normalizeProjectDate(value);
         }
+
         if (field === "watchlist") return value ? 1 : 0;
         if (field === "fees") return Math.max(toNumber(value), 0);
 
         return value;
     });
 
-    const next = { ...current, ...Object.fromEntries(fields.map((field, i) => [field, values[i]])) };
-
-    if (field === "category") {
-        return cleanString(value, 100);
-    }
+    const next = {
+        ...current,
+        ...Object.fromEntries(fields.map((field, i) => [field, values[i]]))
+    };
 
     if (next.start_date && next.end_date &&
         next.end_date < next.start_date) {
@@ -308,6 +316,7 @@ async function updateProject(userId, projectId, data = {}) {
 
     return getOwnedProject(uid, id);
 }
+
 
 async function deleteProject(userId, projectId) {
     const uid = requireId(userId, "User ID");
