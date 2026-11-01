@@ -46,6 +46,108 @@ async function fetchJSON(url, headers = {}) {
     }
 }
 
+// =============================================
+// DEXSCREENER - NETWORK
+// =============================================
+
+function getDexChainId(network) {
+    const value = String(network || "")
+        .toLowerCase()
+        .replace(/[\s_-]/g, "");
+
+    const networks = {
+        ethereum: "ethereum",
+        eth: "ethereum",
+        "ethereum mainnet": "ethereum",
+        bsc: "bsc",
+        bnb: "bsc",
+        bnbchain: "bsc",
+        binancesmartchain: "bsc",
+        polygon: "polygon",
+        matic: "polygon",
+        arbitrum: "arbitrum",
+        arbitrumone: "arbitrum",
+        base: "base",
+        optimism: "optimism",
+        avalanche: "avalanche",
+        avax: "avalanche",
+        fantom: "fantom",
+        sonic: "sonic",
+        cronos: "cronos",
+        linea: "linea",
+        blast: "blast",
+        zksync: "zksync",
+        scroll: "scroll",
+        mantle: "mantle",
+        celo: "celo",
+        opbnb: "opbnb",
+        gnosis: "gnosis",
+        solana: "solana"
+    };
+
+    return networks[value] || null;
+}
+// =============================================
+// DEXSCREENER
+// =============================================
+
+async function fetchDexScreener(project) {
+    const contract = String(project.contract_address || "").trim();
+    const chain = getDexChainId(project.network);
+
+    if (!contract || !chain) return {};
+
+    const data = await fetchJSON(
+        `https://api.dexscreener.com/token-pairs/v1/${encodeURIComponent(chain)}/${encodeURIComponent(contract)}`
+    );
+
+    if (!Array.isArray(data) || !data.length) return {};
+
+    // Chỉ chọn pool có đúng token contract.
+    const pairs = data.filter(pair =>
+        String(pair.chainId || "").toLowerCase() === chain &&
+        String(pair.baseToken?.address || "").toLowerCase() === contract.toLowerCase()
+    );
+
+    if (!pairs.length) return {};
+
+    // Ưu tiên pool có thanh khoản cao nhất.
+    pairs.sort((a, b) =>
+        Number(b.liquidity?.usd || 0) -
+        Number(a.liquidity?.usd || 0)
+    );
+
+    const pair = pairs[0];
+
+    const map = {
+        token_symbol: pair.baseToken?.symbol,
+        current_price: pair.priceUsd,
+        market_cap: pair.marketCap,
+        fdv: pair.fdv,
+        liquidity: pair.liquidity?.usd,
+        volume_24h: pair.volume?.h24,
+        price_change_24h: pair.priceChange?.h24
+    };
+
+    const result = {};
+
+    for (const [field, value] of Object.entries(map)) {
+        if (
+            value !== null &&
+            value !== undefined &&
+            value !== "" &&
+            Number.isFinite(
+                field === "token_symbol" ? 1 : Number(value)
+            )
+        ) {
+            result[field] = field === "token_symbol"
+                ? String(value).slice(0, 30)
+                : Number(value);
+        }
+    }
+
+    return result;
+}
 async function getActiveProjects() {
     return query(
         `SELECT id, user_id, name, url, network,
@@ -292,27 +394,47 @@ async function fetchProjectMetrics(project) {
     const collected = {};
 
     const sources = [
-        ["CoinGecko", () => fetchCoinGecko(project)],
-        ["GitHub", () => fetchGitHub(project)],
-        ["DefiLlama", () => fetchDefiLlama(project)]
-    ];
+    ["DexScreener", () => fetchDexScreener(project)],
+    ["CoinGecko", () => fetchCoinGecko(project)],
+    ["GitHub", () => fetchGitHub(project)],
+    ["DefiLlama", () => fetchDefiLlama(project)]
+];
 
-    for (const [name, fetcher] of sources) {
-        try {
-            const data = await fetcher();
-            Object.assign(collected, data);
-        } catch (error) {
-            console.warn(
-                `[Airdrop Auto] ${name} project #${project.id}:`,
-                error.message
-            );
-        }
+    const sourceResults = {};
+
+for (const [name, fetcher] of sources) {
+    try {
+        const data = await fetcher();
+        const fields = Object.keys(data || {});
+
+        Object.assign(collected, data);
+
+        sourceResults[name] = {
+            success: fields.length > 0,
+            fields
+        };
+
+    } catch (error) {
+        sourceResults[name] = {
+            success: false,
+            error: error.message
+        };
+
+        console.warn(
+            `[Airdrop Auto] ${name} project #${project.id}:`,
+            error.message
+        );
     }
+}
 
-    const fields = Object.keys(collected);
+   const fields = Object.keys(collected);
 
     if (!fields.length) {
-        return { updated: false, fields: [] };
+        return {
+            updated: false,
+            fields: [],
+            sources: sourceResults
+        };
     }
 
     await metricsService.updateMetrics(
@@ -321,7 +443,11 @@ async function fetchProjectMetrics(project) {
         collected
     );
 
-    return { updated: true, fields };
+    return {
+        updated: true,
+        fields,
+        sources: sourceResults
+    };
 }
 
 // =============================================
