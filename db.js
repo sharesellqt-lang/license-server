@@ -23,7 +23,8 @@ const db = mysql.createPool({
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     connectTimeout: 10000,
-    timezone: "+07:00"
+    timezone: "+07:00",
+    dateStrings: true
 });
 
 /*
