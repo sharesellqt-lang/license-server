@@ -70,6 +70,7 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
+
 app.get("/api/airdrop-test", (req, res) => {
     res.json({
         success: true,
@@ -92,14 +93,6 @@ app.use(
 // =========================
 // BOOTSTRAP
 // =========================
-(async () => {
-    try {
-        await projectService.initTable();
-        console.log("✅ Airdrop table ready");
-    } catch (err) {
-        console.error("❌ Init table failed:", err);
-    }
-})();
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "https://sharesell.net");
