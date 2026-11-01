@@ -13,6 +13,11 @@ const REQUEST_TIMEOUT = 15000;
 let isRunning = false;
 let defiProtocolsCache = null;
 let defiProtocolsCacheAt = 0;
+const COINGECKO_CACHE_TTL = 6 * 60 * 60 * 1000;
+const COINGECKO_RATE_LIMIT_WAIT = 60 * 60 * 1000;
+
+const coingeckoCache = new Map();
+const coingeckoBlockedUntil = new Map();
 
 async function query(sql, params = []) {
     const result = await connection.query(sql, params);
@@ -37,7 +42,10 @@ async function fetchJSON(url, headers = {}) {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${url}`);
+            const error = new Error(`HTTP ${response.status}: ${url}`);
+            error.status = response.status;
+            error.retryAfter = response.headers.get("retry-after");
+            throw error;
         }
 
         return await response.json();
@@ -45,7 +53,6 @@ async function fetchJSON(url, headers = {}) {
         clearTimeout(timer);
     }
 }
-
 // =============================================
 // DEXSCREENER - NETWORK
 // =============================================
@@ -163,50 +170,103 @@ async function getActiveProjects() {
 // =============================================
 
 async function fetchCoinGecko(project) {
-    const coinId = String(project.coingecko_id || "").trim();
-
-    console.log("[CoinGecko] Project:", project.id, project.name);
-    console.log("[CoinGecko] Coin ID:", coinId);
-
+    const coinId = String(project.coingecko_id || "").trim().toLowerCase();
     if (!coinId) return {};
+
+    const now = Date.now();
+
+    // Kiểm tra thời gian bị giới hạn.
+    const blockedUntil = coingeckoBlockedUntil.get(coinId) || 0;
+
+    if (now < blockedUntil) {
+        throw new Error(
+            `CoinGecko rate limited. Retry after ${new Date(blockedUntil).toISOString()}`
+        );
+    }
+
+    // Sử dụng cache nếu còn hạn.
+    const cached = coingeckoCache.get(coinId);
+
+    if (cached && now - cached.timestamp < COINGECKO_CACHE_TTL) {
+        return { ...cached.data };
+    }
 
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`;
 
-    const data = await fetchJSON(url);
-    const market = data.market_data || {};
+    try {
+        const data = await fetchJSON(url);
+        const market = data.market_data || {};
 
-    console.log("[CoinGecko] Response:", {
-        id: data.id,
-        hasMarketData: !!data.market_data,
-        total_supply: market.total_supply,
-        circulating_supply: market.circulating_supply,
-        max_supply: market.max_supply
-    });
+        const map = {
+            token_symbol: data.symbol,
+            current_price: market.current_price?.usd,
+            total_supply: market.total_supply,
+            circulating_supply: market.circulating_supply,
+            max_supply: market.max_supply,
+            market_cap: market.market_cap?.usd,
+            fdv: market.fully_diluted_valuation?.usd,
+            volume_24h: market.total_volume?.usd,
+            price_change_24h: market.price_change_percentage_24h,
+            ath_price: market.ath?.usd,
+            atl_price: market.atl?.usd
+        };
 
-    // Giữ nguyên phần code map và return result bên dưới.
-    const result = {};
+        const result = {};
 
-    const map = {
-        token_symbol: data.symbol,
-        current_price: market.current_price?.usd,
-        total_supply: market.total_supply,
-        circulating_supply: market.circulating_supply,
-        max_supply: market.max_supply,
-        market_cap: market.market_cap?.usd,
-        fdv: market.fully_diluted_valuation?.usd,
-        volume_24h: market.total_volume?.usd,
-        price_change_24h: market.price_change_percentage_24h,
-        ath_price: market.ath?.usd,
-        atl_price: market.atl?.usd
-    };
-
-    for (const [field, value] of Object.entries(map)) {
-        if (value !== null && value !== undefined && value !== "") {
-            result[field] = value;
+        for (const [field, value] of Object.entries(map)) {
+            if (
+                value !== null &&
+                value !== undefined &&
+                value !== "" &&
+                Number.isFinite(
+                    field === "token_symbol" ? 1 : Number(value)
+                )
+            ) {
+                result[field] = field === "token_symbol"
+                    ? String(value).slice(0, 30)
+                    : Number(value);
+            }
         }
-    }
 
-    return result;
+        // Chỉ cache khi thực sự có dữ liệu.
+        if (Object.keys(result).length) {
+            coingeckoCache.set(coinId, {
+                timestamp: Date.now(),
+                data: result
+            });
+        }
+
+        coingeckoBlockedUntil.delete(coinId);
+
+        return result;
+
+    } catch (error) {
+        if (error.status === 429) {
+            let waitTime = COINGECKO_RATE_LIMIT_WAIT;
+            const retryAfter = error.retryAfter;
+
+            if (retryAfter) {
+                const seconds = Number(retryAfter);
+
+                if (Number.isFinite(seconds) && seconds > 0) {
+                    waitTime = seconds * 1000;
+                } else {
+                    const retryDate = Date.parse(retryAfter);
+
+                    if (Number.isFinite(retryDate)) {
+                        waitTime = Math.max(1000, retryDate - Date.now());
+                    }
+                }
+            }
+
+            coingeckoBlockedUntil.set(
+                coinId,
+                Date.now() + waitTime
+            );
+        }
+
+        throw error;
+    }
 }
 
 // =============================================
