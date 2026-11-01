@@ -70,7 +70,6 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
-app.use("/api/airdrop",dashboardRoutes);
 app.use(
     "/api/english-learning/progress",
     require("./routes/english-progress")
