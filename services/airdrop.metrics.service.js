@@ -39,31 +39,38 @@ const RAW_COLUMNS = [
     "volume_24h",
     "liquidity",
     "price_change_24h",
+
     "tvl",
     "tvl_growth_7d",
     "tvl_growth_30d",
     "protocol_fee",
     "protocol_revenue",
     "revenue_growth_30d",
+
     "treasury",
     "cash_runway_months",
     "stablecoin_reserve",
     "token_buyback",
     "token_burn",
+
     "holders",
     "transactions_24h",
+
     "seed_price",
     "private_price",
     "public_price",
     "ath_price",
     "atl_price",
+
     "funding_amount",
+
     "github_stars",
-    "forks",
-    "watchers",
-    "contributors",
-    "recent_commits",
-    "releases",
+    "github_forks",
+    "github_watchers",
+    "github_contributors",
+    "github_recent_commits",
+    "github_releases",
+
     "followers",
     "total_experience",
     "big_companies",
@@ -87,7 +94,7 @@ function normalizeMetrics(data = {}) {
         if (field === "token_symbol") {
             result[field] = value === null
                 ? null
-                : String(value).trim().slice(0, 40);
+                : String(value).trim().slice(0, 30);
             continue;
         }
 
