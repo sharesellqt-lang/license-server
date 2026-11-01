@@ -483,6 +483,8 @@ async function fetchProjectMetrics(project) {
             const fields = Object.keys(data || {});
 
             for (const [field, value] of Object.entries(data || {})) {
+                if (value === undefined || value === null || value === "") continue;
+
                 collected[field] = value;
                 fieldSources[field] = name;
             }
