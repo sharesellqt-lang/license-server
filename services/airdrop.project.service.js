@@ -39,7 +39,7 @@ function requireId(value, label = "ID") {
 
 async function getOwnedProject(userId, projectId) {
     const rows = await query(
-        `SELECT id, user_id, name, url, wallet, network,
+        `SELECT id, user_id, name, url, wallet, network, category,
                 contract_address, start_date, end_date,
                 tasks, interactions, status, result, fees,
                 source, difficulty, expected_reward, notes,
@@ -83,7 +83,7 @@ async function getOwnedParticipation(userId, participationId) {
 // =============================================
 
 const PROJECT_FIELDS = [
-    "name", "url", "wallet", "network", "contract_address",
+    "name", "url", "wallet", "network", "category", "contract_address",
     "start_date", "end_date", "tasks", "interactions",
     "status", "result", "fees", "source", "difficulty",
     "expected_reward", "notes", "tags", "watchlist",
@@ -106,9 +106,15 @@ async function getProjects(userId, filters = {}) {
     }
 
     if (filters.search) {
-        where += " AND (p.name LIKE ? OR p.network LIKE ? OR p.contract_address LIKE ?)";
+        where += ` AND (
+            p.name LIKE ?
+            OR p.network LIKE ?
+            OR p.category LIKE ?
+            OR p.contract_address LIKE ?
+        )`;
+
         const keyword = `%${String(filters.search).trim()}%`;
-        params.push(keyword, keyword, keyword);
+        params.push(keyword, keyword, keyword, keyword);
     }
 
     const limit = Math.min(Math.max(toNumber(filters.limit, 100), 1), 500);
@@ -121,6 +127,9 @@ async function getProjects(userId, filters = {}) {
             p.url,
             p.wallet,
             p.network,
+            p.wallet,
+            p.network,
+            p.category,
             p.contract_address,
             p.start_date,
             p.end_date,
@@ -193,6 +202,7 @@ async function createProject(userId, data = {}) {
         url: cleanString(data.url, 1000),
         wallet: cleanString(data.wallet, 128),
         network: cleanString(data.network, 80),
+        category: cleanString(data.category, 100),
         contract_address: cleanString(data.contract_address, 255),
         start_date: normalizeProjectDate(data.start_date),
         end_date: normalizeProjectDate(data.end_date),
@@ -278,6 +288,10 @@ async function updateProject(userId, projectId, data = {}) {
     });
 
     const next = { ...current, ...Object.fromEntries(fields.map((field, i) => [field, values[i]])) };
+
+    if (field === "category") {
+        return cleanString(value, 100);
+    }
 
     if (next.start_date && next.end_date &&
         next.end_date < next.start_date) {
