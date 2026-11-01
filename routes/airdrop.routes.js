@@ -8,7 +8,7 @@
 const express = require("express");
 const router = express.Router();
 
-const authMiddleware = require("../middleware/auth.middleware");
+const authMiddleware = require("../middleware/auth");
 const projectService = require("../services/airdrop.project.service");
 const metricsService = require("../services/airdrop.metrics.service");
 
