@@ -466,42 +466,46 @@ async function fetchDefiLlama(project) {
 
 async function fetchProjectMetrics(project) {
     const collected = {};
+    const fieldSources = {};
 
     const sources = [
-    ["DexScreener", () => fetchDexScreener(project)],
-    ["CoinGecko", () => fetchCoinGecko(project)],
-    ["GitHub", () => fetchGitHub(project)],
-    ["DefiLlama", () => fetchDefiLlama(project)]
-];
+        ["DexScreener", () => fetchDexScreener(project)],
+        ["CoinGecko", () => fetchCoinGecko(project)],
+        ["GitHub", () => fetchGitHub(project)],
+        ["DefiLlama", () => fetchDefiLlama(project)]
+    ];
 
     const sourceResults = {};
 
-for (const [name, fetcher] of sources) {
-    try {
-        const data = await fetcher();
-        const fields = Object.keys(data || {});
+    for (const [name, fetcher] of sources) {
+        try {
+            const data = await fetcher();
+            const fields = Object.keys(data || {});
 
-        Object.assign(collected, data);
+            for (const [field, value] of Object.entries(data || {})) {
+                collected[field] = value;
+                fieldSources[field] = name;
+            }
 
-        sourceResults[name] = {
-            success: fields.length > 0,
-            fields
-        };
+            sourceResults[name] = {
+                success: fields.length > 0,
+                fields
+            };
 
-    } catch (error) {
-        sourceResults[name] = {
-            success: false,
-            error: error.message
-        };
+        } catch (error) {
+            sourceResults[name] = {
+                success: false,
+                error: error.message
+            };
 
-        console.warn(
-            `[Airdrop Auto] ${name} project #${project.id}:`,
-            error.message
-        );
+            console.warn(
+                `[Airdrop Auto] ${name} project #${project.id}:`,
+                error.message
+            );
+        }
     }
-}
 
-   const fields = Object.keys(collected);
+    const fields = Object.keys(collected);
 
     if (!fields.length) {
         return {
@@ -514,7 +518,10 @@ for (const [name, fetcher] of sources) {
     await metricsService.updateMetrics(
         project.user_id,
         project.id,
-        collected
+        collected,
+        {
+            sourceByField: fieldSources
+        }
     );
 
     return {
