@@ -160,6 +160,28 @@ async function getProject(userId, projectId) {
     return getOwnedProject(userId, projectId);
 }
 
+function normalizeProjectDate(value) {
+    if (!value) return null;
+
+    const date = String(value).trim();
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw new Error("Invalid project date format. Expected YYYY-MM-DD");
+    }
+
+    const [year, month, day] = date.split("-").map(Number);
+    const check = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+        check.getUTCFullYear() !== year ||
+        check.getUTCMonth() !== month - 1 ||
+        check.getUTCDate() !== day
+    ) {
+        throw new Error("Invalid project date");
+    }
+
+    return date;
+}
 async function createProject(userId, data = {}) {
     const uid = requireId(userId, "User ID");
     const name = cleanString(data.name, 255);
@@ -172,8 +194,8 @@ async function createProject(userId, data = {}) {
         wallet: cleanString(data.wallet, 128),
         network: cleanString(data.network, 80),
         contract_address: cleanString(data.contract_address, 255),
-        start_date: data.start_date || null,
-        end_date: data.end_date || null,
+        start_date: normalizeProjectDate(data.start_date),
+        end_date: normalizeProjectDate(data.end_date),
         tasks: data.tasks ?? null,
         interactions: data.interactions ?? null,
         status: ["on", "off"].includes(data.status) ? data.status : "on",
@@ -189,7 +211,7 @@ async function createProject(userId, data = {}) {
     };
 
     if (values.start_date && values.end_date &&
-        new Date(values.end_date) < new Date(values.start_date)) {
+    values.end_date < values.start_date) {
         throw new Error("End date must not be earlier than start date");
     }
 
@@ -246,7 +268,9 @@ async function updateProject(userId, projectId, data = {}) {
             }
             return value || null;
         }
-
+        if (field === "start_date" || field === "end_date") {
+            return normalizeProjectDate(value);
+        }
         if (field === "watchlist") return value ? 1 : 0;
         if (field === "fees") return Math.max(toNumber(value), 0);
 
@@ -256,7 +280,7 @@ async function updateProject(userId, projectId, data = {}) {
     const next = { ...current, ...Object.fromEntries(fields.map((field, i) => [field, values[i]])) };
 
     if (next.start_date && next.end_date &&
-        new Date(next.end_date) < new Date(next.start_date)) {
+        next.end_date < next.start_date) {
         throw new Error("End date must not be earlier than start date");
     }
 
