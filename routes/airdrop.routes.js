@@ -11,6 +11,7 @@ const router = express.Router();
 const authMiddleware = require("../middleware/auth");
 const projectService = require("../services/airdrop.project.service");
 const metricsService = require("../services/airdrop.metrics.service");
+const metricsAutoService = require("../services/airdrop.metrics.auto");
 
 // =============================================
 // RESPONSE HELPERS
@@ -625,6 +626,35 @@ router.delete("/projects/:id/metrics", authMiddleware, async (req, res) => {
         return sendSuccess(res, { deleted }, "Metrics deleted");
     } catch (error) {
         return sendError(res, error, "DELETE METRICS", handleStatus(error));
+    }
+});
+
+// =============================================
+// FETCH METRICS NOW
+// =============================================
+
+router.post("/projects/:id/metrics/fetch", authMiddleware, async (req, res) => {
+    try {
+        const userId = requireUser(req, res);
+        if (!userId) return;
+
+        const projectId = req.params.id;
+        const project = await projectService.getProject(userId, projectId);
+
+        if (!project) {
+            return sendError(res, 404, "Project not found");
+        }
+
+        const result = await metricsAutoService.fetchProjectMetrics(project);
+        const metrics = await metricsService.getMetrics(userId, projectId);
+
+        return sendSuccess(res, {
+            ...result,
+            metrics
+        }, "Metrics fetch completed");
+
+    } catch (error) {
+        return handleStatus(res, error);
     }
 });
 

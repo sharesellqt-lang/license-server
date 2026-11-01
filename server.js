@@ -382,7 +382,8 @@ function authMiddleware(req, res, next) {
 
 // chạy cron bank
 require("./jobs/bankScan");
-
+// AUTO SYNC AIRDROP METRICS - EVERY 6 HOURS
+require("./services/airdrop.metrics.auto");
 
 // =========================
 // REDEEM KEY (FIX SAFE - PLAN INTEGRATION)
