@@ -1,772 +1,128 @@
-// =========================================
-// services/airdrop.project.service.js (FIXED)
-// =========================================
+
+// =============================================
+// services/airdrop.project.service.js
+// =============================================
 
 "use strict";
 
-const db = require("../db");
-const metricsService =
-require("./airdrop.metrics.service");
-const coinSearch =
-require("./collectors/coingecko.search.collector");
-const analysisService =
-    require("./airdrop.analysis.service");
+const db = require("../config/db");
 
-/* =========================================
-   INIT TABLE (SAFE AUTO MIGRATION)
-========================================= */
+// Hỗ trợ mysql2 pool và mysql2 promise pool.
+const connection = typeof db.promise === "function" ? db.promise() : db;
 
-async function initTable() {
-
-    const sql = `
-        CREATE TABLE IF NOT EXISTS airdrop_projects (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-
-            user_id BIGINT UNSIGNED NOT NULL,
-
-            name VARCHAR(255) NOT NULL,
-            url TEXT,
-            wallet VARCHAR(255) DEFAULT NULL,
-
-            network VARCHAR(50) DEFAULT NULL,
-
-            contract_address VARCHAR(255) DEFAULT NULL,
-
-            coingecko_id VARCHAR(100) DEFAULT NULL,
-
-            start_date DATE NULL,
-            end_date DATE NULL,
-
-            tasks TEXT,
-
-            interactions INT DEFAULT 0,
-
-            status ENUM('on','off') DEFAULT 'on',
-
-            result ENUM('pending','eligible','not-eligible') DEFAULT 'pending',
-
-            fees VARCHAR(50) DEFAULT NULL,
-
-            score INT DEFAULT 0,
-
-            source VARCHAR(100) DEFAULT NULL,
-
-            created_at BIGINT NOT NULL,
-            updated_at BIGINT NULL,
-
-            INDEX idx_user_id (user_id),
-            INDEX idx_status (status),
-            INDEX idx_result (result),
-            INDEX idx_score (score),
-            INDEX idx_created_at (created_at)
-        );
-    `;
-
-    await db.query(sql);
+async function query(sql, params = []) {
+    const result = await connection.query(sql, params);
+    return Array.isArray(result) && result.length === 2 ? result[0] : result;
 }
 
-/* =========================================
-   VALIDATION
-========================================= */
+function insertId(result) {
+    return Number(result?.insertId || 0);
+}
 
-function validateProject(data) {
+function toNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+}
 
-    if (!data) {
-        throw new Error("Invalid project data");
+function cleanString(value, max = 500) {
+    if (value === null || value === undefined) return null;
+    const text = String(value).trim();
+    return text ? text.slice(0, max) : null;
+}
+
+function requireId(value, label = "ID") {
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        throw new Error(`${label} không hợp lệ`);
     }
-
-    if (!data.name || !String(data.name).trim()) {
-        throw new Error("Project name is required");
-    }
-
-    return true;
+    return id;
 }
 
-/* =========================================
-   NORMALIZE INPUT
-========================================= */
-
-function normalizeProjectInput(data = {}) {
-
-    return {
-
-        name:
-            String(data.name || "").trim(),
-
-        url:
-            String(data.url || "").trim(),
-
-        wallet:
-            String(data.wallet || "").trim(),
-
-        network:
-            String(data.network || "").trim(),
-
-        contract_address:
-            String(
-                data.contract_address || ""
-            ).trim(),
-
-        coingecko_id:
-            String(
-                data.coingecko_id || ""
-            ).trim(),
-
-        start_date:
-            data.start_date ??
-            data.startDate ??
-            null,
-
-        end_date:
-            data.end_date ??
-            data.endDate ??
-            null,
-
-        tasks:
-            String(data.tasks || "").trim(),
-
-        interactions:
-            Number(data.interactions || 0),
-
-        status:
-            data.status || "on",
-
-        result:
-            data.result || "pending",
-
-        fees:
-            data.fees || null,
-
-        source:
-            data.source || "manual",
-
-        watchlist:
-            Number(data.watchlist || 0),
-
-        difficulty:
-            data.difficulty || "medium",
-
-        expected_reward:
-            Number(data.expected_reward || 0),
-
-        risk:
-            Number(data.risk || 0),
-
-        ai_confidence:
-            Number(data.ai_confidence || 0),
-
-        notes:
-            data.notes || null,
-
-        tags:
-            data.tags || null
-
-    };
-
-}
-
-/* =========================================
-   CREATE PROJECT
-========================================= */
-
-async function createProject(userId, data) {
-
-validateProject(data);
-
-const p = normalizeProjectInput(data);
-
-
-/*
-=====================================
-AUTO FIND COINGECKO ID
-=====================================
-*/
-
-if (
-
-    !p.coingecko_id &&
-
-    p.name
-
-){
-
-    try{
-
-
-        const coins =
-            await coinSearch.searchCoin(
-
-                p.name
-
-            );
-
-
-        if (
-
-            coins &&
-
-            coins.length
-
-        ){
-
-            /*
-            ưu tiên coin đầu tiên
-            */
-
-            p.coingecko_id =
-                coins[0].id;
-
-
-            console.log(
-                "AUTO COINGECKO ID:",
-                p.coingecko_id
-            );
-
-
-        }
-
-
-    }
-
-    catch(err){
-
-
-        console.log(
-
-            "Search CoinGecko:",
-
-            err.message
-
-        );
-
-
-    }
-
-}
-
-    const sql = `
-        INSERT INTO airdrop_projects (
-            user_id,
-            name,
-            url,
-            wallet,
-            network,
-            contract_address,
-            start_date,
-            end_date,
-            tasks,
-            interactions,
-            status,
-            result,
-            fees,
-            source,
-            coingecko_id,
-            created_at,
-            updated_at
-        )
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    `;
-
-    const now = Date.now();
-
-    const values = [
-        userId,
-        p.name,
-        p.url,
-        p.wallet,
-        p.network,
-        p.contract_address,
-        p.start_date,
-        p.end_date,
-        p.tasks,
-        p.interactions,
-        p.status,
-        p.result,
-        p.fees,
-        p.source,
-        p.coingecko_id,
-        now,
-        now
-    ];
-console.log(values.length);
-    const [result] =
-    await db.query(
-        sql,
-        values
+async function getOwnedProject(userId, projectId) {
+    const rows = await query(
+        `SELECT id, user_id, name, url, wallet, network,
+                contract_address, start_date, end_date,
+                tasks, interactions, status, result, fees,
+                source, difficulty, expected_reward, notes,
+                tags, watchlist, coingecko_id,
+                created_at, updated_at
+         FROM airdrop_projects
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [requireId(projectId, "Project ID"), requireId(userId, "User ID")]
     );
 
-if (!result.insertId) {
-
-    return {
-
-        success: false,
-
-        message: "Insert failed"
-
-    };
-
+    return rows[0] || null;
 }
 
-   const projectId = result.insertId;
-
-
-/*
--------------------------------------
-CREATE DEFAULT METRICS
--------------------------------------
-*/
-
-try {
-
-    await metricsService.createMetrics(
-        projectId,
-        {
-            token_symbol: "",
-            current_price: 0,
-            market_cap: 0,
-            fdv: 0,
-            volume_24h: 0,
-            liquidity: 0
-        }
+async function getOwnedWallet(userId, walletId) {
+    const rows = await query(
+        `SELECT *
+         FROM airdrop_wallets
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [requireId(walletId, "Wallet ID"), requireId(userId, "User ID")]
     );
 
+    return rows[0] || null;
+}
 
-    console.log(
-        "CREATE METRICS SUCCESS:",
-        projectId
+async function getOwnedParticipation(userId, participationId) {
+    const rows = await query(
+        `SELECT *
+         FROM airdrop_project_participations
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [requireId(participationId, "Participation ID"), requireId(userId, "User ID")]
     );
 
-
-}
-catch(err){
-
-    console.error(
-        "CREATE METRICS ERROR:",
-        err.message
-    );
-
-}
-/*
--------------------------------------
-SYNC MARKET
--------------------------------------
-*/
-
-console.log("========== BEFORE SYNC ==========");
-console.log("network =", p.network);
-console.log("contract =", p.contract_address);
-console.log("coingecko =", p.coingecko_id);
-
-try {
-
-    const hasGeckoTerminal =
-        Boolean(
-            p.network &&
-            p.contract_address
-        );
-
-
-    const hasCoinGecko =
-        typeof p.coingecko_id === "string" &&
-        p.coingecko_id.trim().length > 0;
-
-
-
-    if(
-        hasGeckoTerminal ||
-        hasCoinGecko
-    ){
-
-        console.log(
-            "CALL syncMarketData"
-        );
-
-
-        const marketData =
-            await metricsService.syncMarketData({
-
-                id: projectId,
-
-                name:p.name,
-
-                network:p.network,
-
-                contract_address:p.contract_address,
-
-                coingecko_id:p.coingecko_id
-
-            });
-
-
-        console.log(
-            "MARKET DATA:",
-            marketData
-        );
-
-
-    }
-    else {
-
-        console.log(
-            "Skip market sync"
-        );
-
-    }
-
-
-}
-catch(err){
-
-    console.log(
-        "========== SYNC MARKET ERROR =========="
-    );
-
-    console.log(
-        err.message
-    );
-
+    return rows[0] || null;
 }
 
-/*
--------------------------------------
-ANALYSIS
--------------------------------------
-*/
+// =============================================
+// PROJECT
+// =============================================
 
-try{
-console.log("CALL analyzeProject");
-await new Promise(
-    resolve => setTimeout(resolve,1000)
-);
-
-    await analysisService.analyzeProject(
-
-        userId,
-
-        projectId
-
-    );
-console.log("AFTER analyzeProject");
-}
-catch(err){
-
-    console.error("Analysis ERROR:");
-    console.error(err);
-
-}
-  
-
-    return {
-        success: true,
-        data: {
-            id: projectId,
-            user_id: userId,
-            ...p,
-            created_at: now,
-            updated_at: now
-        }
-    };
-}
-
-/* =========================================
-   UPDATE PROJECT
-========================================= */
-
-async function updateProject(userId, id, data) {
-
-    validateProject(data);
-
-    const p = normalizeProjectInput(data);
-
-   const sql = `
-UPDATE airdrop_projects
-SET
-    name=?,
-    url=?,
-    wallet=?,
-
-    network=?,
-    contract_address=?,
-
-    start_date=?,
-    end_date=?,
-
-    tasks=?,
-    interactions=?,
-
-    status=?,
-    result=?,
-
-    fees=?,
-
-    watchlist=?,
-
-    source=?,
-
-    difficulty=?,
-    expected_reward=?,
-    risk=?,
-    ai_confidence=?,
-
-    notes=?,
-    tags=?,
-
-    updated_at=?
-
-WHERE id=? AND user_id=?
-`;
-
-    const now = Date.now();
-
-const values = [
-
-    p.name,
-    p.url,
-    p.wallet,
-
-    p.network,
-    p.contract_address,
-
-    p.start_date,
-    p.end_date,
-
-    p.tasks,
-    p.interactions,
-
-    p.status,
-    p.result,
-
-    p.fees,
-
-    p.watchlist,
-
-    p.source,
-
-    p.difficulty,
-    p.expected_reward,
-    p.risk,
-    p.ai_confidence,
-
-    p.notes,
-    p.tags,
-
-    now,
-
-    id,
-    userId
-
+const PROJECT_FIELDS = [
+    "name", "url", "wallet", "network", "contract_address",
+    "start_date", "end_date", "tasks", "interactions",
+    "status", "result", "fees", "source", "difficulty",
+    "expected_reward", "notes", "tags", "watchlist",
+    "coingecko_id"
 ];
 
-    const [result] = await db.query(sql, values);
 
-    // ✅ FIX QUAN TRỌNG
-    return result.affectedRows > 0;
-}
+async function getProjects(userId, filters = {}) {
+    const params = [requireId(userId, "User ID")];
+    let where = "WHERE p.user_id = ?";
 
-/* =========================================
-   DELETE PROJECT
-========================================= */
-
-async function deleteProject(userId, id) {
-
-    const sql = `
-        DELETE FROM airdrop_projects
-        WHERE id=? AND user_id=?
-    `;
-
-    const [result] = await db.query(sql, [id, userId]);
-
-    if (!result.affectedRows) {
-        return {
-            success: false,
-            deleted: false
-        };
+    if (filters.status && ["on", "off"].includes(filters.status)) {
+        where += " AND p.status = ?";
+        params.push(filters.status);
     }
 
-    return {
-        success: true,
-        deleted: true
-    };
-}
+    if (filters.result && ["pending", "eligible", "not-eligible"].includes(filters.result)) {
+        where += " AND p.result = ?";
+        params.push(filters.result);
+    }
 
-async function updateWatchlist(
-    projectId,
-    watchlist
-){
+    if (filters.search) {
+        where += " AND (p.name LIKE ? OR p.network LIKE ? OR p.contract_address LIKE ?)";
+        const keyword = `%${String(filters.search).trim()}%`;
+        params.push(keyword, keyword, keyword);
+    }
 
-    const value =
-        Number(watchlist) === 1
-            ? 1
-            : 0;
-
-
-    const [result] =
-        await db.query(
-            `
-            UPDATE airdrop_projects
-            SET watchlist=?
-            WHERE id=?
-            `,
-            [
-                value,
-                projectId
-            ]
-        );
-
-
-    return {
-        success:true,
-        watchlist:value,
-        affectedRows:
-            result.affectedRows
-    };
-
-}
-/* =========================================
-   GET PROJECTS BY USER (LIST)
-========================================= */
-
-async function getProjectsByUser(userId) {
+    const limit = Math.min(Math.max(toNumber(filters.limit, 100), 1), 500);
+    const offset = Math.max(toNumber(filters.offset, 0), 0);
 
     const sql = `
         SELECT
-
-            p.*,
-
-            m.current_price,
-            m.market_cap,
-            m.fdv,
-            m.volume_24h,
-            m.liquidity,
-
-            m.total_score,
-            m.risk_level,
-
-            m.investment_score,
-            m.investment_rating,
-            m.investment_action
-
-        FROM airdrop_projects p
-
-        LEFT JOIN airdrop_project_metrics m
-
-            ON p.id = m.project_id
-
-        WHERE p.user_id = ?
-
-        ORDER BY p.created_at DESC
-    `;
-
-    const [rows] =
-        await db.query(sql, [userId]);
-
-    return {
-
-        success: true,
-
-        data: rows || [],
-
-        count: rows?.length || 0
-
-    };
-
-}
-
-/* =========================================
-   SEARCH PROJECTS
-========================================= */
-
-async function searchProjects(userId, keyword = "") {
-
-    keyword = `%${String(keyword).trim()}%`;
-
-    const sql = `
-        SELECT *
-        FROM airdrop_projects
-        WHERE user_id=?
-        AND (
-            name LIKE ?
-            OR url LIKE ?
-            OR tasks LIKE ?
-        )
-        ORDER BY created_at DESC
-    `;
-
-    const [rows] = await db.query(sql, [
-        userId,
-        keyword,
-        keyword,
-        keyword
-    ]);
-
-    return {
-        success: true,
-        data: rows || []
-    };
-}
-
-/* =========================================
-   UPSERT PROJECT
-========================================= */
-
-async function upsertProject(userId, id, data) {
-
-    if (!id) {
-        return createProject(userId, data);
-    }
-
-    const existing = await getProjectById(userId, id);
-
-    if (!existing) {
-        return createProject(userId, data);
-    }
-
-    return updateProject(userId, id, data);
-}
-
-/* =========================================
-   EXPORT JSON
-========================================= */
-
-async function exportJson(userId) {
-
-    const projects = await getProjectsByUser(userId);
-
-    return JSON.stringify(projects.data || [], null, 2);
-}
-
-/* =========================================
-   EXPORT CSV
-========================================= */
-
-async function exportCsv(userId) {
-
-    const projects = await getProjectsByUser(userId);
-
-    const headers = [
-        "id",
-        "name",
-        "url",
-        "start_date",
-        "end_date",
-        "tasks",
-        "interactions",
-        "status",
-        "result",
-        "fees",
-        "score",
-        "source",
-        "created_at"
-    ];
-
-    const rows = [headers];
-
-    for (const p of projects.data || []) {
-
-        rows.push([
             p.id,
             p.name,
             p.url,
+            p.wallet,
+            p.network,
+            p.contract_address,
             p.start_date,
             p.end_date,
             p.tasks,
@@ -774,146 +130,668 @@ async function exportCsv(userId) {
             p.status,
             p.result,
             p.fees,
-            p.score,
             p.source,
-            p.created_at
-        ]);
+            p.created_at,
+            p.updated_at,
+            p.risk,
+            p.difficulty,
+            p.expected_reward,
+            p.notes,
+            p.tags,
+            p.watchlist,
+            p.coingecko_id,
+            (
+                SELECT COUNT(*)
+                FROM airdrop_project_participations pp
+                WHERE pp.project_id = p.id
+                  AND pp.user_id = p.user_id
+            ) AS wallet_count
+        FROM airdrop_projects p
+        ${where}
+        ORDER BY p.created_at DESC
+        LIMIT ? OFFSET ?
+    `;
+
+    params.push(limit, offset);
+
+    return query(sql, params);
+}
+
+async function getProject(userId, projectId) {
+    return getOwnedProject(userId, projectId);
+}
+
+async function createProject(userId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const name = cleanString(data.name, 255);
+
+    if (!name) throw new Error("Project name is required");
+
+    const values = {
+        name,
+        url: cleanString(data.url, 1000),
+        wallet: cleanString(data.wallet, 128),
+        network: cleanString(data.network, 80),
+        contract_address: cleanString(data.contract_address, 255),
+        start_date: data.start_date || null,
+        end_date: data.end_date || null,
+        tasks: data.tasks ?? null,
+        interactions: data.interactions ?? null,
+        status: ["on", "off"].includes(data.status) ? data.status : "on",
+        result: ["pending", "eligible", "not-eligible"].includes(data.result) ? data.result : "pending",
+        fees: Math.max(toNumber(data.fees), 0),
+        source: cleanString(data.source, 255),
+        difficulty: ["easy", "medium", "hard"].includes(data.difficulty) ? data.difficulty : null,
+        expected_reward: cleanString(data.expected_reward, 255),
+        notes: data.notes ?? null,
+        tags: data.tags ?? null,
+        watchlist: data.watchlist ? 1 : 0,
+        coingecko_id: cleanString(data.coingecko_id, 120)
+    };
+
+    if (values.start_date && values.end_date &&
+        new Date(values.end_date) < new Date(values.start_date)) {
+        throw new Error("End date must not be earlier than start date");
     }
 
-    return rows
-        .map(row =>
-            row
-                .map(v =>
-                    `"${String(v ?? "").replace(/"/g, '""')}"`
-                )
-                .join(",")
-        )
-        .join("\n");
+    const fields = ["user_id", ...PROJECT_FIELDS];
+    const params = [uid, ...PROJECT_FIELDS.map(field => values[field])];
+
+    const result = await query(
+        `INSERT INTO airdrop_projects
+         (${fields.join(", ")})
+         VALUES (${fields.map(() => "?").join(", ")})`,
+        params
+    );
+
+    return getOwnedProject(uid, insertId(result));
 }
 
-/* =========================================
-   STATISTICS
-========================================= */
+async function updateProject(userId, projectId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(projectId, "Project ID");
+    const current = await getOwnedProject(uid, id);
 
-async function getStatistics(userId) {
+    if (!current) return null;
 
-    const sql = `
-        SELECT
-            COUNT(*) as total,
-            SUM(CASE WHEN result='eligible' THEN 1 ELSE 0 END) as eligible,
-            SUM(CASE WHEN result='not-eligible' THEN 1 ELSE 0 END) as not_eligible,
-            SUM(CASE WHEN result='pending' THEN 1 ELSE 0 END) as pending,
-            AVG(score) as avg_score
-        FROM airdrop_projects
-        WHERE user_id=?
-    `;
+    const fields = PROJECT_FIELDS.filter(field =>
+        Object.prototype.hasOwnProperty.call(data, field)
+    );
 
-    const [rows] = await db.query(sql, [userId]);
+    if (!fields.length) return current;
 
-    return rows[0] || {
-        total: 0,
-        eligible: 0,
-        not_eligible: 0,
-        pending: 0,
-        avg_score: 0
-    };
+    const values = fields.map(field => {
+        const value = data[field];
+
+        if (field === "name") {
+            const name = cleanString(value, 255);
+            if (!name) throw new Error("Project name is required");
+            return name;
+        }
+
+        if (field === "status") {
+            if (!["on", "off"].includes(value)) throw new Error("Invalid project status");
+            return value;
+        }
+
+        if (field === "result") {
+            if (!["pending", "eligible", "not-eligible"].includes(value)) {
+                throw new Error("Invalid project result");
+            }
+            return value;
+        }
+
+        if (field === "difficulty") {
+            if (value && !["easy", "medium", "hard"].includes(value)) {
+                throw new Error("Invalid project difficulty");
+            }
+            return value || null;
+        }
+
+        if (field === "watchlist") return value ? 1 : 0;
+        if (field === "fees") return Math.max(toNumber(value), 0);
+
+        return value;
+    });
+
+    const next = { ...current, ...Object.fromEntries(fields.map((field, i) => [field, values[i]])) };
+
+    if (next.start_date && next.end_date &&
+        new Date(next.end_date) < new Date(next.start_date)) {
+        throw new Error("End date must not be earlier than start date");
+    }
+
+    await query(
+        `UPDATE airdrop_projects
+         SET ${fields.map(field => `${field} = ?`).join(", ")},
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [...values, id, uid]
+    );
+
+    return getOwnedProject(uid, id);
 }
 
-/* =========================================
-   GET PROJECT BY ID
-========================================= */
+async function deleteProject(userId, projectId) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(projectId, "Project ID");
 
-async function getProjectById(
-    userId,
-    projectId
-) {
+    // Không xóa dữ liệu theo dõi. Tắt project để tránh mất lịch sử.
+    const result = await query(
+        `UPDATE airdrop_projects
+         SET status = 'off', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [id, uid]
+    );
 
-    const sql = `
-        SELECT *
-        FROM airdrop_projects
-        WHERE
-            id = ?
-        AND
-            user_id = ?
-        LIMIT 1
-    `;
-
-    const [rows] =
-        await db.query(sql, [
-
-            Number(projectId),
-
-            Number(userId)
-
-        ]);
-
-    return rows[0] || null;
-
+    return result.affectedRows > 0;
 }
 
-async function getProjects(userId){
+// =============================================
+// WALLET
+// =============================================
 
-    const [rows] =
-        await db.query(
-            `
-            SELECT *
-            FROM airdrop_projects
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            `,
-            [
-                userId
-            ]
-        );
+async function getWallets(userId, filters = {}) {
+    const params = [requireId(userId, "User ID")];
+    let where = "WHERE user_id = ?";
 
-    return rows;
+    if (filters.network) {
+        where += " AND network = ?";
+        params.push(cleanString(filters.network, 80));
+    }
 
+    if (filters.active !== undefined) {
+        where += " AND is_active = ?";
+        params.push(filters.active ? 1 : 0);
+    }
+
+    return query(
+        `SELECT *
+         FROM airdrop_wallets
+         ${where}
+         ORDER BY updated_at DESC`,
+        params
+    );
 }
 
-async function updateAnalysisScore(
-    id,
-    score,
-    risk
-){
+async function createWallet(userId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const walletName = cleanString(data.wallet_name, 120);
+    const address = cleanString(data.wallet_address, 128);
+    const network = cleanString(data.network, 80);
 
-    await db.query(
-        `
-        UPDATE airdrop_projects
-        SET
-            score=?,
-            risk=?,
-            updated_at=?
-        WHERE id=?
-        `,
+    if (!walletName) throw new Error("Wallet name is required");
+    if (!address) throw new Error("Wallet address is required");
+    if (!network) throw new Error("Wallet network is required");
+
+    const result = await query(
+        `INSERT INTO airdrop_wallets
+         (user_id, wallet_name, wallet_address, network, wallet_type, note, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
-            score,
-            risk,
-            Date.now(),
-            id
+            uid, walletName, address, network,
+            cleanString(data.wallet_type, 40),
+            cleanString(data.note, 500),
+            data.is_active === false ? 0 : 1
         ]
     );
 
+    return getOwnedWallet(uid, insertId(result));
 }
-/* =========================================
-   EXPORTS
-========================================= */
+
+async function updateWallet(userId, walletId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(walletId, "Wallet ID");
+    const wallet = await getOwnedWallet(uid, id);
+
+    if (!wallet) return null;
+
+    const allowed = ["wallet_name", "wallet_address", "network", "wallet_type", "note", "is_active"];
+    const fields = allowed.filter(field => Object.prototype.hasOwnProperty.call(data, field));
+
+    if (!fields.length) return wallet;
+
+    const values = fields.map(field => {
+        if (field === "wallet_name") {
+            const value = cleanString(data[field], 120);
+            if (!value) throw new Error("Wallet name is required");
+            return value;
+        }
+
+        if (field === "wallet_address") {
+            const value = cleanString(data[field], 128);
+            if (!value) throw new Error("Wallet address is required");
+            return value;
+        }
+
+        if (field === "network") {
+            const value = cleanString(data[field], 80);
+            if (!value) throw new Error("Wallet network is required");
+            return value;
+        }
+
+        if (field === "is_active") return data[field] ? 1 : 0;
+        return cleanString(data[field], field === "note" ? 500 : 40);
+    });
+
+    await query(
+        `UPDATE airdrop_wallets
+         SET ${fields.map(field => `${field} = ?`).join(", ")},
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [...values, id, uid]
+    );
+
+    return getOwnedWallet(uid, id);
+}
+
+// =============================================
+// PARTICIPATION
+// =============================================
+
+async function getParticipations(userId, filters = {}) {
+    const uid = requireId(userId, "User ID");
+    const params = [uid];
+    let where = "WHERE pp.user_id = ?";
+
+    if (filters.project_id) {
+        where += " AND pp.project_id = ?";
+        params.push(requireId(filters.project_id, "Project ID"));
+    }
+
+    if (filters.wallet_id) {
+        where += " AND pp.wallet_id = ?";
+        params.push(requireId(filters.wallet_id, "Wallet ID"));
+    }
+
+    if (filters.result_status) {
+        where += " AND pp.result_status = ?";
+        params.push(cleanString(filters.result_status, 30));
+    }
+
+    if (filters.claim_status) {
+        where += " AND pp.claim_status = ?";
+        params.push(cleanString(filters.claim_status, 30));
+    }
+
+    return query(
+        `SELECT pp.*,
+                p.name AS project_name,
+                p.url AS project_url,
+                p.network AS project_network,
+                w.wallet_name,
+                w.wallet_address,
+                w.network AS wallet_network
+         FROM airdrop_project_participations pp
+         INNER JOIN airdrop_projects p
+            ON p.id = pp.project_id AND p.user_id = pp.user_id
+         INNER JOIN airdrop_wallets w
+            ON w.id = pp.wallet_id AND w.user_id = pp.user_id
+         ${where}
+         ORDER BY COALESCE(pp.last_activity_at, pp.started_at, pp.created_at) DESC`,
+        params
+    );
+}
+
+async function createParticipation(userId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const projectId = requireId(data.project_id, "Project ID");
+    const walletId = requireId(data.wallet_id, "Wallet ID");
+
+    const project = await getOwnedProject(uid, projectId);
+    if (!project) throw new Error("Project not found");
+
+    const wallet = await getOwnedWallet(uid, walletId);
+    if (!wallet) throw new Error("Wallet not found");
+
+    const result = await query(
+        `INSERT INTO airdrop_project_participations
+         (user_id, project_id, wallet_id, participation_status,
+          eligibility_status, result_status, claim_status,
+          started_at, last_activity_at, total_fees, fee_currency, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP),
+                 CURRENT_TIMESTAMP, ?, ?, ?)`,
+        [
+            uid, projectId, walletId,
+            cleanString(data.participation_status, 30) || "participating",
+            cleanString(data.eligibility_status, 30) || "unknown",
+            cleanString(data.result_status, 30) || "unknown",
+            cleanString(data.claim_status, 30) || "not_available",
+            data.started_at || null,
+            Math.max(toNumber(data.total_fees), 0),
+            cleanString(data.fee_currency, 30),
+            data.note ?? null
+        ]
+    );
+
+    const participationId = insertId(result);
+
+    await addParticipationHistory(uid, participationId, {
+        event_type: "participation_created",
+        details: "Wallet linked to project"
+    });
+
+    return getOwnedParticipation(uid, participationId);
+}
+
+const PARTICIPATION_FIELDS = [
+    "participation_status", "eligibility_status", "result_status",
+    "claim_status", "started_at", "last_activity_at",
+    "snapshot_at", "result_announced_at", "claim_started_at",
+    "claim_deadline_at", "total_fees", "fee_currency", "note"
+];
+
+async function updateParticipation(userId, participationId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(participationId, "Participation ID");
+    const current = await getOwnedParticipation(uid, id);
+
+    if (!current) return null;
+
+    const fields = PARTICIPATION_FIELDS.filter(field =>
+        Object.prototype.hasOwnProperty.call(data, field)
+    );
+
+    if (!fields.length) return current;
+
+    const values = fields.map(field =>
+        field === "total_fees"
+            ? Math.max(toNumber(data[field]), 0)
+            : field === "note"
+                ? data[field]
+                : field.endsWith("_at")
+                    ? (data[field] || null)
+                    : cleanString(data[field], 30)
+    );
+
+    await query(
+        `UPDATE airdrop_project_participations
+         SET ${fields.map(field => `${field} = ?`).join(", ")},
+             last_activity_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [...values, id, uid]
+    );
+
+    for (let i = 0; i < fields.length; i++) {
+        if (String(current[fields[i]] ?? "") !== String(values[i] ?? "")) {
+            await addParticipationHistory(uid, id, {
+                event_type: "status_updated",
+                old_value: `${fields[i]}: ${current[fields[i]] ?? ""}`,
+                new_value: `${fields[i]}: ${values[i] ?? ""}`,
+                details: `Updated ${fields[i]}`
+            });
+        }
+    }
+
+    return getOwnedParticipation(uid, id);
+}
+
+// =============================================
+// PARTICIPATION HISTORY
+// =============================================
+
+async function addParticipationHistory(userId, participationId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(participationId, "Participation ID");
+    const participation = await getOwnedParticipation(uid, id);
+
+    if (!participation) throw new Error("Participation not found");
+
+    const result = await query(
+        `INSERT INTO airdrop_participation_history
+         (user_id, participation_id, event_type, event_at,
+          old_value, new_value, transaction_hash, details)
+         VALUES (?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP), ?, ?, ?, ?)`,
+        [
+            uid, id,
+            cleanString(data.event_type, 50) || "activity",
+            data.event_at || null,
+            data.old_value ?? null,
+            data.new_value ?? null,
+            cleanString(data.transaction_hash, 255),
+            cleanString(data.details, 1000)
+        ]
+    );
+
+    await query(
+        `UPDATE airdrop_project_participations
+         SET last_activity_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [id, uid]
+    );
+
+    return { id: insertId(result), participation_id: id };
+}
+
+async function getParticipationHistory(userId, participationId) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(participationId, "Participation ID");
+
+    const participation = await getOwnedParticipation(uid, id);
+    if (!participation) return null;
+
+    return query(
+        `SELECT *
+         FROM airdrop_participation_history
+         WHERE user_id = ? AND participation_id = ?
+         ORDER BY event_at DESC, id DESC`,
+        [uid, id]
+    );
+}
+
+// =============================================
+// REWARDS
+// =============================================
+
+async function getRewards(userId, participationId) {
+    const uid = requireId(userId, "User ID");
+    const params = [uid];
+    let where = "WHERE r.user_id = ?";
+
+    if (participationId) {
+        const id = requireId(participationId, "Participation ID");
+        const participation = await getOwnedParticipation(uid, id);
+        if (!participation) return null;
+        where += " AND r.participation_id = ?";
+        params.push(id);
+    }
+
+    return query(
+        `SELECT r.*
+         FROM airdrop_participation_rewards r
+         ${where}
+         ORDER BY r.created_at DESC`,
+        params
+    );
+}
+
+async function createReward(userId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const participationId = requireId(data.participation_id, "Participation ID");
+
+    const participation = await getOwnedParticipation(uid, participationId);
+    if (!participation) throw new Error("Participation not found");
+
+    const symbol = cleanString(data.token_symbol, 40);
+    if (!symbol) throw new Error("Token symbol is required");
+
+    const result = await query(
+        `INSERT INTO airdrop_participation_rewards
+         (user_id, participation_id, token_name, token_symbol,
+          token_contract, network, announced_amount, claimed_amount,
+          received_amount, announced_at, claimed_at, received_at,
+          transaction_hash, note)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            uid, participationId,
+            cleanString(data.token_name, 120),
+            symbol,
+            cleanString(data.token_contract, 128),
+            cleanString(data.network, 80),
+            data.announced_amount ?? null,
+            data.claimed_amount ?? 0,
+            data.received_amount ?? 0,
+            data.announced_at || null,
+            data.claimed_at || null,
+            data.received_at || null,
+            cleanString(data.transaction_hash, 255),
+            cleanString(data.note, 500)
+        ]
+    );
+
+    await addParticipationHistory(uid, participationId, {
+        event_type: "reward_created",
+        transaction_hash: data.transaction_hash,
+        details: `Reward recorded: ${symbol}`
+    });
+
+    return { id: insertId(result), participation_id: participationId };
+}
+
+async function updateReward(userId, rewardId, data = {}) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(rewardId, "Reward ID");
+
+    const rows = await query(
+        `SELECT *
+         FROM airdrop_participation_rewards
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [id, uid]
+    );
+
+    const reward = rows[0];
+    if (!reward) return null;
+
+    const fieldsAllowed = [
+        "token_name", "token_symbol", "token_contract", "network",
+        "announced_amount", "claimed_amount", "received_amount",
+        "announced_at", "claimed_at", "received_at",
+        "transaction_hash", "note"
+    ];
+
+    const fields = fieldsAllowed.filter(field =>
+        Object.prototype.hasOwnProperty.call(data, field)
+    );
+
+    if (!fields.length) return reward;
+
+    const values = fields.map(field => data[field]);
+
+    await query(
+        `UPDATE airdrop_participation_rewards
+         SET ${fields.map(field => `${field} = ?`).join(", ")},
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND user_id = ?`,
+        [...values, id, uid]
+    );
+
+    await addParticipationHistory(uid, reward.participation_id, {
+        event_type: "reward_updated",
+        transaction_hash: data.transaction_hash,
+        details: `Reward #${id} updated`
+    });
+
+    const updated = await query(
+        `SELECT *
+         FROM airdrop_participation_rewards
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [id, uid]
+    );
+
+    return updated[0] || null;
+}
+
+async function deleteReward(userId, rewardId) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(rewardId, "Reward ID");
+
+    const rows = await query(
+        `SELECT participation_id
+         FROM airdrop_participation_rewards
+         WHERE id = ? AND user_id = ?
+         LIMIT 1`,
+        [id, uid]
+    );
+
+    if (!rows[0]) return false;
+
+    await query(
+        `DELETE FROM airdrop_participation_rewards
+         WHERE id = ? AND user_id = ?`,
+        [id, uid]
+    );
+
+    await addParticipationHistory(uid, rows[0].participation_id, {
+        event_type: "reward_deleted",
+        details: `Reward #${id} deleted`
+    });
+
+    return true;
+}
+
+// =============================================
+// PROJECT DETAIL / TRACKING SUMMARY
+// =============================================
+
+async function getProjectTracking(userId, projectId) {
+    const uid = requireId(userId, "User ID");
+    const id = requireId(projectId, "Project ID");
+
+    const project = await getOwnedProject(uid, id);
+    if (!project) return null;
+
+    const participations = await getParticipations(uid, { project_id: id });
+
+    const rewards = await query(
+        `SELECT r.*
+         FROM airdrop_participation_rewards r
+         INNER JOIN airdrop_project_participations pp
+            ON pp.id = r.participation_id
+           AND pp.user_id = r.user_id
+         WHERE r.user_id = ? AND pp.project_id = ?
+         ORDER BY r.created_at DESC`,
+        [uid, id]
+    );
+
+    return { project, participations, rewards };
+}
+
+// =============================================
+// EXPORTS
+// =============================================
 
 module.exports = {
-
-    initTable,
-    validateProject,
-    normalizeProjectInput,
+    // Project
+    getProjects,
+    getProject,
     createProject,
     updateProject,
     deleteProject,
-    updateWatchlist,
-    getProjectById,
-    getProjectsByUser,
-    getProjects,
-    searchProjects,
-    upsertProject,
-    exportJson,
-    exportCsv,
-    getStatistics,
-    updateAnalysisScore
+
+    // Wallet
+    getWallets,
+    createWallet,
+    updateWallet,
+
+    // Participation
+    getParticipations,
+    createParticipation,
+    updateParticipation,
+
+    // History
+    addParticipationHistory,
+    getParticipationHistory,
+
+    // Rewards
+    getRewards,
+    createReward,
+    updateReward,
+    deleteReward,
+
+    // Combined
+    getProjectTracking
 };
