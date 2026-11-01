@@ -164,12 +164,26 @@ async function getActiveProjects() {
 
 async function fetchCoinGecko(project) {
     const coinId = String(project.coingecko_id || "").trim();
+
+    console.log("[CoinGecko] Project:", project.id, project.name);
+    console.log("[CoinGecko] Coin ID:", coinId);
+
     if (!coinId) return {};
 
     const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coinId)}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`;
 
     const data = await fetchJSON(url);
     const market = data.market_data || {};
+
+    console.log("[CoinGecko] Response:", {
+        id: data.id,
+        hasMarketData: !!data.market_data,
+        total_supply: market.total_supply,
+        circulating_supply: market.circulating_supply,
+        max_supply: market.max_supply
+    });
+
+    // Giữ nguyên phần code map và return result bên dưới.
     const result = {};
 
     const map = {
