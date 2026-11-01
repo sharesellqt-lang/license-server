@@ -72,10 +72,11 @@ app.use((req, res, next) => {
 app.use("/api/airdrop", airdropRoutes);
 
 app.get("/api/airdrop-test", (req, res) => {
+    console.log("AIRDROP TEST HIT");
+
     res.json({
         success: true,
-        message: "AIRDROP SERVER IS RUNNING",
-        version: "2026-10-31"
+        message: "AIRDROP SERVER RUNNING"
     });
 });
 //app.use("/api/airdrop",dashboardRoutes);
