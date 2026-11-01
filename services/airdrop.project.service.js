@@ -4,8 +4,7 @@
 // =============================================
 
 "use strict";
-
-const db = require("../config/db");
+const db = require("../db");
 
 // Hỗ trợ mysql2 pool và mysql2 promise pool.
 const connection = typeof db.promise === "function" ? db.promise() : db;
