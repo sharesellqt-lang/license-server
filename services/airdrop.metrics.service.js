@@ -73,7 +73,16 @@ const RAW_COLUMNS = [
 const NUMERIC_COLUMNS = RAW_COLUMNS.filter(
     field => field !== "token_symbol"
 );
-
+const DERIVED_COLUMNS = [
+    "circulating_percent",
+    "locked_percent",
+    "inflation",
+    "seed_roi",
+    "private_roi",
+    "public_roi",
+    "fair_buy_price",
+    "fair_sell_price"
+];
 // Các cột NOT NULL trong database.
 // Khi xóa dữ liệu, lưu 0 nhưng đánh dấu available = false.
 const NOT_NULL_RAW_COLUMNS = new Set([
@@ -195,6 +204,91 @@ function normalizeDatabaseValues(values) {
 }
 
 // =============================================
+// DERIVED INDICATORS ENGINE
+// =============================================
+
+function isMetricAvailable(metrics, field) {
+    const status = parseFieldStatus(metrics?.metrics_field_status);
+    return status[field]?.available === true;
+}
+
+function getValidMetric(metrics, field) {
+    if (!isMetricAvailable(metrics, field)) return null;
+
+    const value = Number(metrics[field]);
+
+    return Number.isFinite(value) ? value : null;
+}
+
+function calculateRatio(numerator, denominator) {
+    if (numerator === null || denominator === null || denominator <= 0) {
+        return null;
+    }
+
+    return Number(((numerator / denominator) * 100).toFixed(8));
+}
+
+function calculateROI(currentPrice, entryPrice) {
+    if (
+        currentPrice === null ||
+        entryPrice === null ||
+        entryPrice <= 0
+    ) {
+        return null;
+    }
+
+    return Number(((currentPrice / entryPrice - 1) * 100).toFixed(8));
+}
+
+function calculateDerivedIndicators(metrics) {
+    const circulatingSupply = getValidMetric(metrics, "circulating_supply");
+    const totalSupply = getValidMetric(metrics, "total_supply");
+    const currentPrice = getValidMetric(metrics, "current_price");
+
+    const seedPrice = getValidMetric(metrics, "seed_price");
+    const privatePrice = getValidMetric(metrics, "private_price");
+    const publicPrice = getValidMetric(metrics, "public_price");
+
+    const circulatingPercent = calculateRatio(
+        circulatingSupply,
+        totalSupply
+    );
+
+    return {
+        circulating_percent: circulatingPercent,
+
+        locked_percent: circulatingPercent === null
+            ? null
+            : Number((100 - circulatingPercent).toFixed(8)),
+
+        seed_roi: calculateROI(currentPrice, seedPrice),
+        private_roi: calculateROI(currentPrice, privatePrice),
+        public_roi: calculateROI(currentPrice, publicPrice)
+    };
+}
+
+async function recalculateDerivedIndicators(userId, projectId) {
+    const metrics = await getMetrics(userId, projectId);
+
+    if (!metrics) return null;
+
+    const derived = calculateDerivedIndicators(metrics);
+
+    const fields = Object.keys(derived);
+
+    await query(
+        `UPDATE airdrop_project_metrics
+         SET ${fields.map(field => `${field} = ?`).join(", ")}
+         WHERE project_id = ?`,
+        [
+            ...fields.map(field => derived[field]),
+            projectId
+        ]
+    );
+
+    return derived;
+}
+// =============================================
 // PROJECT OWNERSHIP
 // =============================================
 
@@ -224,6 +318,7 @@ async function getMetrics(userId, projectId) {
     const rows = await query(
         `SELECT m.project_id,
                 ${RAW_COLUMNS.map(field => `m.${field}`).join(", ")},
+                ${DERIVED_COLUMNS.map(field => `m.${field}`).join(", ")},
                 m.metrics_field_status,
                 m.created_at,
                 m.updated_at
@@ -249,6 +344,7 @@ async function getAllMetrics(userId) {
     return query(
         `SELECT m.project_id,
                 ${RAW_COLUMNS.map(field => `m.${field}`).join(", ")},
+                ${DERIVED_COLUMNS.map(field => `m.${field}`).join(", ")},
                 m.metrics_field_status,
                 m.created_at,
                 m.updated_at
@@ -319,6 +415,8 @@ async function saveMetrics(userId, projectId, data = {}, options = {}) {
         insertValues
     );
 
+    await recalculateDerivedIndicators(uid, pid);
+
     return getMetrics(uid, pid);
 }
 
@@ -371,6 +469,8 @@ async function updateMetrics(userId, projectId, data = {}, options = {}) {
         ]
     );
 
+    await recalculateDerivedIndicators(uid, pid);
+
     return getMetrics(uid, pid);
 }
 
@@ -404,7 +504,10 @@ async function deleteMetrics(userId, projectId) {
 module.exports = {
     RAW_COLUMNS,
     NUMERIC_COLUMNS,
+    DERIVED_COLUMNS,
     normalizeMetrics,
+    calculateDerivedIndicators,
+    recalculateDerivedIndicators,
     getMetrics,
     getAllMetrics,
     saveMetrics,
