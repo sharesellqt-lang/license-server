@@ -70,6 +70,14 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
+app.get("/api/airdrop-test", (req, res) => {
+    res.json({
+        success: true,
+        message: "AIRDROP SERVER IS RUNNING",
+        version: "2026-10-31"
+    });
+});
+//app.use("/api/airdrop",dashboardRoutes);
 app.use(
     "/api/english-learning/progress",
     require("./routes/english-progress")
