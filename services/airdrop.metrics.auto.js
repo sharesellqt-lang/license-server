@@ -394,79 +394,24 @@ async function getDefiLlamaProtocols() {
 }
 
 async function findDefiLlamaSlug(project) {
-    const normalize = value =>
-        String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-
-    const nameKey = normalize(project?.name);
-    const geckoKey = normalize(project?.coingecko_id);
-
-    if (!nameKey && !geckoKey) {
-        throw new Error("Missing project name and CoinGecko ID");
-    }
-
     const protocols = await getDefiLlamaProtocols();
-    const debugMatches = protocols.filter(item =>
-    /chainlink/i.test([
-        item.name,
-        item.slug,
-        item.gecko_id,
-        item.symbol
-    ].join(" "))
-);
 
-console.log("[DefiLlama DEBUG]", {
-    total: protocols.length,
-    firstItemKeys: Object.keys(protocols[0] || {}),
-    matches: debugMatches.map(item => ({
-        name: item.name,
-        slug: item.slug,
-        gecko_id: item.gecko_id,
-        symbol: item.symbol,
-        tvl: item.tvl
-    }))
-});
-
-    if (!Array.isArray(protocols)) {
-        throw new Error("Invalid DefiLlama protocols response");
-    }
-
-    const matches = protocols.filter(item => {
-        const itemName = normalize(item.name);
-        const itemSlug = normalize(item.slug);
-
-        return (
-            (nameKey && (itemName === nameKey || itemSlug === nameKey)) ||
-            (geckoKey && itemSlug === geckoKey)
-        );
-    });
-
-    if (!matches.length) {
-        throw new Error(
-            `DefiLlama protocol not found: ${project.name} (${project.coingecko_id || "no gecko_id"})`
-        );
-    }
-
-    // Ưu tiên slug khớp CoinGecko ID.
-    const geckoMatches = matches.filter(
-        item => geckoKey && normalize(item.slug) === geckoKey
+    const matches = protocols.filter(item =>
+        /chainlink/i.test([
+            item.name,
+            item.slug,
+            item.gecko_id,
+            item.symbol
+        ].join(" "))
     );
 
-    if (geckoMatches.length === 1) {
-        return geckoMatches[0].slug;
-    }
+    console.log("[DefiLlama CHECK]", JSON.stringify({
+        total: protocols.length,
+        firstItem: protocols[0] || null,
+        matches: matches.slice(0, 10)
+    }, null, 2));
 
-    // Nếu không có gecko match duy nhất, dùng tên chính xác.
-    const nameMatches = matches.filter(
-        item => normalize(item.name) === nameKey
-    );
-
-    if (nameMatches.length === 1) {
-        return nameMatches[0].slug;
-    }
-
-    throw new Error(
-        `Ambiguous DefiLlama match for ${project.name}: ${matches.map(x => x.slug).join(", ")}`
-    );
+    throw new Error("DefiLlama diagnostic completed");
 }
 
 function getTvlGrowth(history, days) {
