@@ -410,6 +410,10 @@ async function findDefiLlamaSlug(project) {
         throw new Error("Invalid DefiLlama protocols response");
     }
 
+    // =========================================
+    // 1. DIRECT PROTOCOL MATCH
+    // =========================================
+
     const matches = protocols.filter(item => {
         const itemName = normalize(item.name);
         const itemSlug = normalize(item.slug);
@@ -419,54 +423,6 @@ async function findDefiLlamaSlug(project) {
             (geckoKey && itemSlug === geckoKey)
         );
     });
-
-    // =========================================
-    // DEBUG: KIỂM TRA PROTOCOL CHA / CON
-    // =========================================
-
-    const parentMatches = protocols.filter(item =>
-        normalize(item.parentProtocolSlug) === nameKey ||
-        normalize(item.slug) === nameKey
-    );
-    // =========================================
-    // DEBUG: KIỂM TRA ENDPOINT PROTOCOL CHA
-    // =========================================
-
-    if (nameKey === "chainlink") {
-    const data = await fetchJSON(
-        "https://api.llama.fi/protocol/chainlink"
-    );
-
-    console.log("[DefiLlama PARENT TVL]", JSON.stringify({
-        name: data?.name,
-        isParentProtocol: data?.isParentProtocol,
-        latestTvl: data?.tvl?.slice?.(-3),
-        currentChainTvls: data?.currentChainTvls,
-        chainTvls: Object.fromEntries(
-            Object.entries(data?.chainTvls || {}).map(([key, value]) => [
-                key,
-                {
-                    latest: Array.isArray(value?.tvl)
-                        ? value.tvl.slice(-1)
-                        : null
-                }
-            ])
-        ),
-        otherProtocols: data?.otherProtocols
-    }, null, 2));
-
-    throw new Error("DefiLlama parent diagnostic completed");
-}
-
-    // =========================================
-    // ORIGINAL SLUG RESOLUTION
-    // =========================================
-
-    if (!matches.length) {
-        throw new Error(
-            `DefiLlama protocol not found: ${project.name} (${project.coingecko_id || "no gecko_id"})`
-        );
-    }
 
     const geckoMatches = matches.filter(
         item => geckoKey && normalize(item.slug) === geckoKey
@@ -484,8 +440,49 @@ async function findDefiLlamaSlug(project) {
         return nameMatches[0].slug;
     }
 
+    if (matches.length > 1) {
+        throw new Error(
+            `Ambiguous DefiLlama match for ${project.name}: ${matches.map(x => x.slug).join(", ")}`
+        );
+    }
+
+    // =========================================
+    // 2. PARENT PROTOCOL RESOLUTION
+    // =========================================
+
+    const parentMatches = protocols.filter(item => {
+        const parentKey = normalize(item.parentProtocolSlug);
+
+        return (
+            parentKey &&
+            (parentKey === nameKey || parentKey === geckoKey)
+        );
+    });
+
+    const parentSlugs = [
+        ...new Set(
+            parentMatches
+                .map(item => item.parentProtocolSlug)
+                .filter(Boolean)
+        )
+    ];
+
+    if (parentSlugs.length === 1) {
+        return parentSlugs[0];
+    }
+
+    if (parentSlugs.length > 1) {
+        throw new Error(
+            `Ambiguous DefiLlama parent for ${project.name}: ${parentSlugs.join(", ")}`
+        );
+    }
+
+    // =========================================
+    // 3. NOT FOUND
+    // =========================================
+
     throw new Error(
-        `Ambiguous DefiLlama match for ${project.name}: ${matches.map(x => x.slug).join(", ")}`
+        `DefiLlama protocol not found: ${project.name} (${project.coingecko_id || "no gecko_id"})`
     );
 }
 function getTvlGrowth(history, days) {
