@@ -213,21 +213,35 @@ function isMetricAvailable(metrics, field) {
 }
 
 function getValidMetric(metrics, field) {
+    if (!metrics || !field) return null;
+
     if (!isMetricAvailable(metrics, field)) return null;
 
-    const value = Number(metrics[field]);
+    const rawValue = metrics[field];
 
-    return Number.isFinite(value) ? value : null;
-}
-
-function calculateRatio(numerator, denominator) {
-    if (numerator === null || denominator === null || denominator <= 0) {
+    if (rawValue === null || rawValue === undefined || rawValue === "") {
         return null;
     }
 
-    return Number(((numerator / denominator) * 100).toFixed(8));
-}
+    const value = Number(rawValue);
 
+    return Number.isFinite(value) ? value : null;
+}
+function calculateRatio(numerator, denominator) {
+    if (
+        numerator === null ||
+        denominator === null ||
+        !Number.isFinite(numerator) ||
+        !Number.isFinite(denominator) ||
+        numerator < 0 ||
+        denominator <= 0 ||
+        numerator > denominator
+    ) {
+        return null;
+    }
+
+    return (numerator / denominator) * 100;
+}
 function calculateROI(currentPrice, entryPrice) {
     if (
         currentPrice === null ||
@@ -254,19 +268,18 @@ function calculateDerivedIndicators(metrics) {
         totalSupply
     );
 
+    const lockedPercent = circulatingPercent === null
+        ? null
+        : Number((100 - circulatingPercent).toFixed(8));
+
     return {
         circulating_percent: circulatingPercent,
-
-        locked_percent: circulatingPercent === null
-            ? null
-            : Number((100 - circulatingPercent).toFixed(8)),
-
+        locked_percent: lockedPercent,
         seed_roi: calculateROI(currentPrice, seedPrice),
         private_roi: calculateROI(currentPrice, privatePrice),
         public_roi: calculateROI(currentPrice, publicPrice)
     };
 }
-
 async function recalculateDerivedIndicators(userId, projectId) {
     const metrics = await getMetrics(userId, projectId);
 
