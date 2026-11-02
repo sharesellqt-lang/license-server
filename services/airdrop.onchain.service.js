@@ -172,7 +172,8 @@ async function getProjectOnchainConfig(projectId) {
             `SELECT
                 id, chain, asset_role, symbol, contract_address,
                 decimals, price_mode, peg_price,
-                scan_from_block, last_scanned_block
+                scan_from_block, last_scanned_block,
+                buyback_scan_from_block, buyback_last_scanned_block
              FROM airdrop_project_onchain_assets
              WHERE project_id = ?
                AND is_verified = 1
