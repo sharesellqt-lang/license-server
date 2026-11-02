@@ -16,6 +16,8 @@ let defiProtocolsCache = null;
 let defiProtocolsCacheAt = 0;
 const COINGECKO_CACHE_TTL = 6 * 60 * 60 * 1000;
 const COINGECKO_RATE_LIMIT_WAIT = 60 * 60 * 1000;
+const CRYPTORANK_CACHE_TTL = 24 * 60 * 60 * 1000;
+const cryptorankCache = new Map();
 
 const coingeckoCache = new Map();
 const coingeckoBlockedUntil = new Map();
@@ -648,6 +650,250 @@ async function fetchDefiLlama(project) {
 }
 
 // =============================================
+// CRYPTORANK - PRIVATE / PUBLIC TOKEN SALE PRICE
+// =============================================
+
+function getCryptoRankData(payload) {
+    return payload?.data ?? payload;
+}
+
+function parseSalePrice(value) {
+    if (value === null || value === undefined || value === "") {
+        return null;
+    }
+
+    const price = Number(String(value).replace(/,/g, ""));
+
+    return Number.isFinite(price) && price > 0
+        ? price
+        : null;
+}
+
+function getSaleTimestamp(item) {
+    const value =
+        item?.announcementDate ??
+        item?.startDate ??
+        item?.date ??
+        0;
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+    }
+
+    const parsed = Date.parse(value);
+
+    return Number.isFinite(parsed)
+        ? Math.floor(parsed / 1000)
+        : 0;
+}
+
+function getLatestSalePrice(items, getPrice) {
+    if (!Array.isArray(items)) return null;
+
+    const candidates = items
+        .map(item => ({
+            price: getPrice(item),
+            timestamp: getSaleTimestamp(item)
+        }))
+        .filter(item => item.price !== null)
+        .sort((a, b) => b.timestamp - a.timestamp);
+
+    return candidates[0]?.price ?? null;
+}
+
+function isPublicSaleType(type) {
+    const value = String(type || "").trim();
+
+    return /IDO|ICO|IEO|PUBLIC|CROWD|PRESALE|PRE[\s-]?SALE|LAUNCHPAD/i.test(value);
+}
+
+async function fetchCryptoRankJSON(url) {
+    const apiKey = String(process.env.CRYPTORANK_API_KEY || "").trim();
+
+    if (!apiKey) {
+        throw new Error("Missing CRYPTORANK_API_KEY environment variable");
+    }
+
+    return fetchJSON(url, {
+        "X-Api-Key": apiKey
+    });
+}
+
+async function findCryptoRankCurrency(project) {
+    const contract = String(project.contract_address || "").trim();
+
+    if (!contract) {
+        throw new Error(
+            "Missing contract_address. Cannot safely identify CryptoRank project."
+        );
+    }
+
+    const params = new URLSearchParams({
+        address: contract,
+        type: "token"
+    });
+
+    const response = await fetchCryptoRankJSON(
+        `https://api.cryptorank.io/v2/currencies/search?${params.toString()}`
+    );
+
+    const results = getCryptoRankData(response);
+    const currencies = Array.isArray(results) ? results : [];
+
+    if (!currencies.length) {
+        throw new Error(
+            `CryptoRank project not found for contract ${contract}`
+        );
+    }
+
+    if (currencies.length === 1) {
+        return currencies[0];
+    }
+
+    const normalize = value =>
+        String(value || "").trim().toLowerCase();
+
+    const exactName = currencies.filter(item =>
+        normalize(item.name) === normalize(project.name)
+    );
+
+    if (exactName.length === 1) {
+        return exactName[0];
+    }
+
+    throw new Error(
+        `Ambiguous CryptoRank contract match: ${currencies.map(x => `${x.name} (#${x.id})`).join(", ")}`
+    );
+}
+
+async function fetchCryptoRank(project) {
+    const contract = String(project.contract_address || "")
+        .trim()
+        .toLowerCase();
+
+    const cached = cryptorankCache.get(contract);
+
+    if (
+        cached &&
+        Date.now() - cached.timestamp < CRYPTORANK_CACHE_TTL
+    ) {
+        return {
+            data: { ...cached.data },
+            errors: [...cached.errors]
+        };
+    }
+
+    const currency = await findCryptoRankCurrency(project);
+
+    if (!currency?.id) {
+        throw new Error("CryptoRank returned invalid currency ID");
+    }
+
+    const currencyId = encodeURIComponent(currency.id);
+
+    const endpoints = [
+        {
+            name: "private_price",
+            url: `https://api.cryptorank.io/v2/currencies/${currencyId}/funding-rounds`
+        },
+        {
+            name: "public_price",
+            url: `https://api.cryptorank.io/v2/currencies/${currencyId}/public-sales`
+        }
+    ];
+
+    const responses = await Promise.allSettled(
+        endpoints.map(item => fetchCryptoRankJSON(item.url))
+    );
+
+    const result = {};
+    const errors = [];
+
+    // =========================================
+    // PRIVATE PRICE
+    // Funding rounds: priceUSD
+    // =========================================
+
+    const privateResponse = responses[0];
+
+    if (privateResponse.status === "fulfilled") {
+        const payload = getCryptoRankData(privateResponse.value);
+
+        const rounds = Array.isArray(payload?.fundingRounds)
+            ? payload.fundingRounds
+            : [];
+
+        const privatePrice = getLatestSalePrice(
+            rounds,
+            item => parseSalePrice(item.priceUSD)
+        );
+
+        if (privatePrice !== null) {
+            result.private_price = privatePrice;
+        }
+    } else {
+        errors.push(
+            `Private Price: ${privateResponse.reason?.message || "Request failed"}`
+        );
+    }
+
+    // =========================================
+    // PUBLIC PRICE
+    // Public sales: crowdsales[].price
+    // =========================================
+
+    const publicResponse = responses[1];
+
+    if (publicResponse.status === "fulfilled") {
+        const payload = getCryptoRankData(publicResponse.value);
+
+        const crowdsales = Array.isArray(payload?.crowdsales)
+            ? payload.crowdsales
+            : [];
+
+        const publicSales = crowdsales.filter(item =>
+            isPublicSaleType(item.type)
+        );
+
+        const publicPrice = getLatestSalePrice(
+            publicSales,
+            item => {
+                const currencyCode = String(
+                    item.currency ||
+                    item.priceCurrency ||
+                    item.quoteCurrency ||
+                    "USD"
+                ).trim().toUpperCase();
+
+                // Không tự quy đổi giá bán bằng đồng tiền khác USD.
+                if (currencyCode !== "USD") return null;
+
+                return parseSalePrice(item.price);
+            }
+        );
+
+        if (publicPrice !== null) {
+            result.public_price = publicPrice;
+        }
+    } else {
+        errors.push(
+            `Public Price: ${publicResponse.reason?.message || "Request failed"}`
+        );
+    }
+
+    cryptorankCache.set(contract, {
+        timestamp: Date.now(),
+        data: result,
+        errors
+    });
+
+    return {
+        data: result,
+        errors
+    };
+}
+
+// =============================================
 // FETCH ONE PROJECT
 // =============================================
 
@@ -701,6 +947,50 @@ async function fetchProjectMetrics(project) {
         }
     }
 
+    // =========================================
+// CRYPTORANK - PRIVATE / PUBLIC PRICE
+// =========================================
+
+try {
+    const cryptoRankResult = await fetchCryptoRank(project);
+    const data = cryptoRankResult.data || {};
+    const fields = [];
+
+    for (const [field, value] of Object.entries(data)) {
+        if (
+            value === null ||
+            value === undefined ||
+            !Number.isFinite(Number(value)) ||
+            Number(value) <= 0
+        ) {
+            continue;
+        }
+
+        collected[field] = Number(value);
+        fieldSources[field] = "api";
+        fields.push(field);
+    }
+
+    sourceResults["CryptoRank"] = {
+        success: fields.length > 0,
+        fields,
+        ...(cryptoRankResult.errors.length
+            ? { warnings: cryptoRankResult.errors }
+            : {})
+    };
+
+} catch (error) {
+    sourceResults["CryptoRank"] = {
+        success: false,
+        fields: [],
+        error: error.message
+    };
+
+    console.warn(
+        `[Airdrop Auto] CryptoRank project #${project.id}:`,
+        error.message
+    );
+}
     // =========================================
     // ON-CHAIN METRICS
     // =========================================
