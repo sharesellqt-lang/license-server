@@ -393,10 +393,7 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
         await rpcCall(network, "eth_blockNumber", [])
     );
 
-    const scanStartBlock = await ensureScanStartBlock(
-        asset,
-        latestBlock
-    );
+    const scanStartBlock = await ensureScanStartBlock(asset, latestBlock);
 
     let fromBlock =
         asset.last_scanned_block !== null &&
@@ -417,44 +414,39 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
         validAddress(wallet.address)
     );
 
-    const buybackWallets = networkWallets.filter(wallet =>
-        String(wallet.wallet_type || "").toLowerCase() === "buyback"
+    // Chỉ nhận địa chỉ Buyback/Reserve có nguồn xác minh.
+    const buybackTargets = networkWallets.filter(wallet =>
+        ["buyback", "reserve"].includes(
+            String(wallet.wallet_type || "").toLowerCase()
+        ) &&
+        typeof wallet.source_url === "string" &&
+        wallet.source_url.trim() !== ""
     );
 
-    const buybackPools = networkWallets.filter(wallet =>
-        String(wallet.wallet_type || "").toLowerCase() === "buyback_pool"
-    );
-
-    const buybackWalletMap = new Map(
-        buybackWallets.map(wallet => [
+    const buybackTargetMap = new Map(
+        buybackTargets.map(wallet => [
             normalizeAddress(wallet.address),
             wallet
         ])
     );
 
-    const poolAddresses = [
-        ...new Set(buybackPools.map(wallet =>
-            normalizeAddress(wallet.address)
-        ))
-    ];
-
     const destinationTopics = [
         addressToTopic(ZERO_ADDRESS),
         addressToTopic(DEAD_ADDRESS),
-        ...buybackWallets.map(wallet =>
-            addressToTopic(wallet.address)
-        )
+        ...buybackTargetMap.keys().map(addressToTopic)
     ];
 
     const timestampCache = new Map();
+    const receiptCache = new Map();
 
     const maxBlocks = MAX_SCAN_BLOCKS_PER_RUN > 0n
         ? MAX_SCAN_BLOCKS_PER_RUN
         : 10000n;
 
-    const scanEndLimit = fromBlock + maxBlocks - 1n > latestBlock
-        ? latestBlock
-        : fromBlock + maxBlocks - 1n;
+    const scanEndLimit =
+        fromBlock + maxBlocks - 1n > latestBlock
+            ? latestBlock
+            : fromBlock + maxBlocks - 1n;
 
     let scannedTo = fromBlock - 1n;
 
@@ -464,7 +456,7 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
                 ? scanEndLimit
                 : fromBlock + SCAN_BLOCK_RANGE - 1n;
 
-        // 1. Token Transfer logs: burn + buyback wallet receipts.
+        // 1. Lấy Transfer tới địa chỉ Burn và Buyback/Reserve.
         const transferLogs = await getLogsAdaptive(
             network,
             {
@@ -479,30 +471,7 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
             toBlock
         );
 
-        // 2. Swap logs from configured DEX pools.
-        const swapLogs = [];
-
-        for (const poolAddress of poolAddresses) {
-            const logs = await getLogsAdaptive(
-                network,
-                {
-                    address: poolAddress,
-                    topics: [[SWAP_V2_TOPIC, SWAP_V3_TOPIC]]
-                },
-                fromBlock,
-                toBlock
-            );
-
-            swapLogs.push(...logs);
-        }
-
-        const confirmedSwaps = new Set(
-            swapLogs.map(log =>
-                `${String(log.transactionHash).toLowerCase()}:${normalizeAddress(log.address)}`
-            )
-        );
-
-        // 3. Classify and save events.
+        // 2. Phân loại và lưu event.
         for (const log of transferLogs) {
             if (!Array.isArray(log.topics) || log.topics.length < 3) {
                 continue;
@@ -514,34 +483,71 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
             let eventType = null;
             let sourceType = null;
 
+            // BURN: chuyển token vào Zero/Dead address.
             if (
                 toAddress === ZERO_ADDRESS ||
                 toAddress === DEAD_ADDRESS
             ) {
                 eventType = "burn";
                 sourceType = "transfer";
-            } else if (buybackWalletMap.has(toAddress)) {
-                const isDexBuyback =
-                    poolAddresses.includes(fromAddress) &&
-                    confirmedSwaps.has(
-                        `${String(log.transactionHash).toLowerCase()}:${fromAddress}`
+            }
+
+            // BUYBACK: chuyển token vào ví Buyback/Reserve đã xác minh,
+            // đồng thời transaction phải có Swap log.
+            else if (buybackTargetMap.has(toAddress)) {
+                const txHash = String(log.transactionHash).toLowerCase();
+
+                let receipt = receiptCache.get(txHash);
+
+                if (receipt === undefined) {
+                    receipt = await rpcCall(
+                        network,
+                        "eth_getTransactionReceipt",
+                        [txHash]
                     );
 
-                const wallet = buybackWalletMap.get(toAddress);
+                    if (!receipt) {
+                        throw new Error(
+                            `Missing transaction receipt: ${txHash}`
+                        );
+                    }
 
-                // Chỉ phân loại official khi địa chỉ có nguồn xác minh.
-                if (isDexBuyback) {
+                    receiptCache.set(txHash, receipt);
+                }
+
+                if (
+                    receipt.status &&
+                    hexToBigInt(receipt.status) === 0n
+                ) {
+                    continue;
+                }
+
+                const receiptLogs = Array.isArray(receipt.logs)
+                    ? receipt.logs
+                    : [];
+
+                // Hỗ trợ direct pool swap và router/aggregator multi-hop.
+                const hasSwapEvidence = receiptLogs.some(receiptLog => {
+                    const topic0 = String(
+                        receiptLog.topics?.[0] || ""
+                    ).toLowerCase();
+
+                    return (
+                        topic0 === String(SWAP_V2_TOPIC).toLowerCase() ||
+                        topic0 === String(SWAP_V3_TOPIC).toLowerCase()
+                    );
+                });
+
+                if (hasSwapEvidence) {
                     eventType = "buyback";
                     sourceType = "dex";
-                } else if (wallet.source_url) {
-                    eventType = "buyback";
-                    sourceType = "official_wallet";
                 }
             }
 
             if (!eventType) continue;
 
             const blockNumber = hexToBigInt(log.blockNumber);
+
             const timestamp = await getBlockTimestamp(
                 network,
                 blockNumber,
@@ -574,7 +580,7 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
             });
         }
 
-        // 4. Only advance after all logs and events are processed.
+        // 3. Chỉ cập nhật cursor sau khi xử lý xong toàn bộ logs.
         await query(
             `UPDATE airdrop_project_onchain_assets
              SET last_scanned_block = ?
@@ -586,15 +592,12 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
         fromBlock = toBlock + 1n;
     }
 
-    const completed = scannedTo >= latestBlock;
-
     return {
-        status: completed ? "completed" : "pending",
+        status: scannedTo >= latestBlock ? "completed" : "pending",
         latestBlock: latestBlock.toString(),
         scannedTo: scannedTo.toString()
     };
 }
-
 // =========================================
 // EVENT METRICS
 // =========================================
@@ -606,29 +609,15 @@ async function getProjectOnchainEventMetrics(projectId, assets, wallets) {
         const chain = normalizeNetwork(asset.chain);
         const contract = normalizeAddress(asset.contract_address);
 
-        const buybackWallets = wallets.filter(wallet =>
+        const buybackAvailable = wallets.some(wallet =>
             normalizeNetwork(wallet.chain) === chain &&
-            String(wallet.wallet_type || "").toLowerCase() === "buyback" &&
-            validAddress(wallet.address)
-        );
-
-        const buybackPools = wallets.filter(wallet =>
-            normalizeNetwork(wallet.chain) === chain &&
-            String(wallet.wallet_type || "").toLowerCase() === "buyback_pool" &&
-            validAddress(wallet.address)
-        );
-
-        const hasOfficialBuybackWallet = buybackWallets.some(wallet =>
+            ["buyback", "reserve"].includes(
+                String(wallet.wallet_type || "").toLowerCase()
+            ) &&
+            validAddress(wallet.address) &&
             typeof wallet.source_url === "string" &&
             wallet.source_url.trim() !== ""
         );
-
-        const hasDexBuybackConfig =
-            buybackWallets.length > 0 &&
-            buybackPools.length > 0;
-
-        const hasBuybackWallet =
-            hasOfficialBuybackWallet || hasDexBuybackConfig;
 
         const rows = await query(
             `SELECT
@@ -662,26 +651,30 @@ async function getProjectOnchainEventMetrics(projectId, assets, wallets) {
             token_burn_24h: 0,
             token_burn_30d: 0,
             burn_available: true,
-            buyback_available: hasBuybackWallet
+            buyback_available: buybackAvailable
         };
 
-        if (hasBuybackWallet) {
+        if (buybackAvailable) {
             item.token_buyback = 0;
             item.token_buyback_24h = 0;
             item.token_buyback_30d = 0;
         }
 
         for (const row of rows) {
+            const total = Number(row.total_amount || 0);
+            const amount24h = Number(row.amount_24h || 0);
+            const amount30d = Number(row.amount_30d || 0);
+
             if (row.event_type === "burn") {
-                item.token_burn = Number(row.total_amount);
-                item.token_burn_24h = Number(row.amount_24h);
-                item.token_burn_30d = Number(row.amount_30d);
+                item.token_burn = total;
+                item.token_burn_24h = amount24h;
+                item.token_burn_30d = amount30d;
             }
 
-            if (row.event_type === "buyback" && hasBuybackWallet) {
-                item.token_buyback = Number(row.total_amount);
-                item.token_buyback_24h = Number(row.amount_24h);
-                item.token_buyback_30d = Number(row.amount_30d);
+            if (row.event_type === "buyback" && buybackAvailable) {
+                item.token_buyback = total;
+                item.token_buyback_24h = amount24h;
+                item.token_buyback_30d = amount30d;
             }
         }
 
@@ -693,7 +686,6 @@ async function getProjectOnchainEventMetrics(projectId, assets, wallets) {
         metrics: {}
     };
 
-    // Chỉ tổng hợp metric cấp project khi tất cả asset cùng symbol.
     const symbols = [
         ...new Set(
             assetResults
@@ -702,30 +694,25 @@ async function getProjectOnchainEventMetrics(projectId, assets, wallets) {
         )
     ];
 
-   if (assetResults.length !== 1 || symbols.length !== 1) {
+    // Không cộng số lượng token giữa nhiều asset/contract.
+    if (assetResults.length !== 1 || symbols.length !== 1) {
         return result;
     }
 
-    const sumField = field =>
-        assetResults.reduce(
-            (total, item) => total + Number(item[field] || 0),
-            0
-        );
+    const item = assetResults[0];
 
-    result.metrics.token_burn = sumField("token_burn");
-    result.metrics.token_burn_24h = sumField("token_burn_24h");
-    result.metrics.token_burn_30d = sumField("token_burn_30d");
+    result.metrics.token_burn = item.token_burn;
+    result.metrics.token_burn_24h = item.token_burn_24h;
+    result.metrics.token_burn_30d = item.token_burn_30d;
 
-    // Không công bố Buyback tổng nếu một asset chưa có cấu hình xác minh.
-    if (assetResults.every(item => item.buyback_available)) {
-        result.metrics.token_buyback = sumField("token_buyback");
-        result.metrics.token_buyback_24h = sumField("token_buyback_24h");
-        result.metrics.token_buyback_30d = sumField("token_buyback_30d");
+    if (item.buyback_available) {
+        result.metrics.token_buyback = item.token_buyback;
+        result.metrics.token_buyback_24h = item.token_buyback_24h;
+        result.metrics.token_buyback_30d = item.token_buyback_30d;
     }
 
     return result;
 }
-
 // =========================================
 // MAIN ON-CHAIN METRICS
 // =========================================
@@ -837,9 +824,9 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
     }
 
     const allScansCompleted =
-        projectTokenAssets.length > 0 &&
-        scanResults.length === projectTokenAssets.length &&
-        scanResults.every(item => item.status === "completed");
+    projectTokenAssets.length > 0 &&
+    scanResults.length === projectTokenAssets.length &&
+    scanResults.every(item => item.status === "completed");
 
     const result = {};
 
@@ -866,20 +853,30 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
     const failed = scanResults.some(item => item.status === "failed");
     const pending = scanResults.some(item => item.status === "pending");
 
-    const scannerStatus = allScansCompleted
+    const scannerStatus = projectTokenAssets.length === 0
+    ? "not_configured"
+    : allScansCompleted
         ? "completed"
         : failed
             ? "failed"
             : pending
                 ? "pending"
                 : "not_configured";
-
+const eventMetricStatus = {
+    token_burn: allScansCompleted ? "available" : "pending",
+    token_buyback: allScansCompleted
+        ? eventMetrics.assets.some(item => item.buyback_available)
+            ? "available"
+            : "unavailable"
+        : "pending"
+};
     result._scanner = {
-        status: scannerStatus,
-        updated_at: Math.floor(Date.now() / 1000),
-        scans: scanResults,
-        asset_metrics: eventMetrics.assets
-    };
+    status: scannerStatus,
+    updated_at: Math.floor(Date.now() / 1000),
+    scans: scanResults,
+    asset_metrics: eventMetrics.assets,
+    metric_status: eventMetricStatus
+};
 
     return result;
 }
