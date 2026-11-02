@@ -405,12 +405,17 @@ async function findDefiLlamaSlug(project) {
         ].join(" "))
     );
 
-    console.log("[DefiLlama CHECK]", JSON.stringify({
-        total: protocols.length,
-        firstItem: protocols[0] || null,
-        matches: matches.slice(0, 10)
-    }, null, 2));
+   console.log("[DefiLlama CHECK] total:", protocols.length);
 
+console.log(
+    "[DefiLlama CHECK] firstItem:",
+    JSON.stringify(protocols[0] || null)
+);
+
+console.log(
+    "[DefiLlama CHECK] matches:",
+    JSON.stringify(matches.slice(0, 10))
+);
     throw new Error("DefiLlama diagnostic completed");
 }
 
