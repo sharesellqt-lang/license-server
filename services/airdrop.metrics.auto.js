@@ -485,29 +485,54 @@ async function findDefiLlamaSlug(project) {
         `DefiLlama protocol not found: ${project.name} (${project.coingecko_id || "no gecko_id"})`
     );
 }
-function getTvlGrowth(history, days) {
-    if (!Array.isArray(history) || history.length < 2) return null;
 
-    const latest = history[history.length - 1];
-    const targetTime = Number(latest.date) - days * 86400;
+function getRevenueGrowth30d(chart) {
+    if (!Array.isArray(chart) || chart.length < 2) return null;
 
-    let previous = null;
+    const rows = chart
+        .filter(item =>
+            Array.isArray(item) &&
+            Number.isFinite(Number(item[0])) &&
+            Number.isFinite(Number(item[1])) &&
+            Number(item[1]) >= 0
+        )
+        .map(item => ({
+            date: Number(item[0]),
+            value: Number(item[1])
+        }))
+        .sort((a, b) => a.date - b.date);
 
-    for (const item of history) {
-        if (Number(item.date) <= targetTime) previous = item;
-        else break;
-    }
+    if (rows.length < 2) return null;
 
-    const currentValue = Number(latest.totalLiquidityUSD);
-    const previousValue = Number(previous?.totalLiquidityUSD);
+    const latestTime = rows[rows.length - 1].date;
+    const day = 86400;
 
-    if (
-        !Number.isFinite(currentValue) ||
-        !Number.isFinite(previousValue) ||
-        previousValue <= 0
-    ) return null;
+    const currentStart = latestTime - 30 * day;
+    const previousStart = latestTime - 60 * day;
 
-    return ((currentValue / previousValue) - 1) * 100;
+    const currentRows = rows.filter(
+        item => item.date > currentStart && item.date <= latestTime
+    );
+
+    const previousRows = rows.filter(
+        item => item.date > previousStart && item.date <= currentStart
+    );
+
+    if (!currentRows.length || !previousRows.length) return null;
+
+    const currentRevenue = currentRows.reduce(
+        (sum, item) => sum + item.value, 0
+    );
+
+    const previousRevenue = previousRows.reduce(
+        (sum, item) => sum + item.value, 0
+    );
+
+    if (previousRevenue <= 0) return null;
+
+    return (
+        (currentRevenue / previousRevenue - 1) * 100
+    );
 }
 
 async function fetchDefiLlama(project) {
@@ -541,6 +566,56 @@ async function fetchDefiLlama(project) {
 
     if (growth7d !== null) result.tvl_growth_7d = growth7d;
     if (growth30d !== null) result.tvl_growth_30d = growth30d;
+
+    // FEES
+    try {
+        const fees = await fetchJSON(
+            `https://api.llama.fi/summary/fees/${encodeURIComponent(slug)}?dataType=dailyFees`
+        );
+
+        const feeValue = fees?.total24h;
+
+        if (
+            feeValue !== null &&
+            feeValue !== undefined &&
+            feeValue !== "" &&
+            Number.isFinite(Number(feeValue)) &&
+            Number(feeValue) >= 0
+        ) {
+            result.protocol_fee = Number(feeValue);
+        }
+    } catch (error) {
+        console.warn("[DefiLlama Fees]", error.message);
+    }
+
+    // REVENUE
+    try {
+        const revenue = await fetchJSON(
+            `https://api.llama.fi/summary/fees/${encodeURIComponent(slug)}?dataType=dailyRevenue`
+        );
+
+        const revenueValue = revenue?.total24h;
+
+        if (
+            revenueValue !== null &&
+            revenueValue !== undefined &&
+            revenueValue !== "" &&
+            Number.isFinite(Number(revenueValue)) &&
+            Number(revenueValue) >= 0
+        ) {
+            result.protocol_revenue = Number(revenueValue);
+        }
+
+        const revenueGrowth = getRevenueGrowth30d(
+            revenue?.totalDataChart
+        );
+
+        if (revenueGrowth !== null) {
+            result.revenue_growth_30d = revenueGrowth;
+        }
+    } catch (error) {
+        console.warn("[DefiLlama Revenue]", error.message);
+    }
 
     return result;
 }
