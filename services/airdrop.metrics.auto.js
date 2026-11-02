@@ -429,29 +429,27 @@ async function findDefiLlamaSlug(project) {
         normalize(item.slug) === nameKey
     );
 
-    console.log("[DefiLlama CHECK] project:", project.name);
-    console.log("[DefiLlama CHECK] total:", protocols.length);
-    console.log(
-        "[DefiLlama CHECK] directMatches:",
-        JSON.stringify(matches.map(item => ({
-            name: item.name,
-            slug: item.slug,
-            parentProtocolSlug: item.parentProtocolSlug,
-            tvl: item.tvl,
-            chainTvls: item.chainTvls
-        })))
-    );
-    console.log(
-        "[DefiLlama CHECK] parentMatches:",
-        JSON.stringify(parentMatches.map(item => ({
-            name: item.name,
-            slug: item.slug,
-            parentProtocolSlug: item.parentProtocolSlug,
-            tvl: item.tvl,
-            chainTvls: item.chainTvls
-        })))
-    );
+console.log("[DefiLlama PARENT TVL]", JSON.stringify({
+    name: data?.name,
+    isParentProtocol: data?.isParentProtocol,
 
+    latestTvl: data?.tvl?.slice?.(-3),
+
+    currentChainTvls: data?.currentChainTvls,
+
+    chainTvls: Object.fromEntries(
+        Object.entries(data?.chainTvls || {}).map(([key, value]) => [
+            key,
+            {
+                latest: Array.isArray(value?.tvl)
+                    ? value.tvl.slice(-1)
+                    : null
+            }
+        ])
+    ),
+
+    otherProtocols: data?.otherProtocols
+}, null, 2));
     // =========================================
     // DEBUG: KIỂM TRA ENDPOINT PROTOCOL CHA
     // =========================================
