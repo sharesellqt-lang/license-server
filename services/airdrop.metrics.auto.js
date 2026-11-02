@@ -486,7 +486,7 @@ async function fetchProjectMetrics(project) {
                 if (value === undefined || value === null || value === "") continue;
 
                 collected[field] = value;
-                fieldSources[field] = name;
+                fieldSources[field] = "api";
             }
 
             sourceResults[name] = {
