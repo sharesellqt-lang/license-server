@@ -55,61 +55,6 @@ async function fetchJSON(url, headers = {}) {
     }
 }
 
-// =========================================
-// ON-CHAIN METRICS - ALL PROJECTS
-// =========================================
-
-try {
-    let tokenPrice = collected.current_price;
-
-    if (
-        tokenPrice === undefined ||
-        tokenPrice === null ||
-        !Number.isFinite(Number(tokenPrice)) ||
-        Number(tokenPrice) <= 0
-    ) {
-        const rows = await query(
-            `SELECT current_price
-             FROM airdrop_project_metrics
-             WHERE project_id = ?
-             LIMIT 1`,
-            [project.id]
-        );
-
-        tokenPrice = rows[0]?.current_price;
-    }
-
-    const onchainData =
-        await onchainService.fetchProjectOnchainMetrics(
-            project,
-            tokenPrice
-        );
-
-    const fields = Object.keys(onchainData);
-
-    for (const [field, value] of Object.entries(onchainData)) {
-        if (value === undefined || value === null) continue;
-
-        collected[field] = value;
-        fieldSources[field] = "onchain";
-    }
-
-    sourceResults["On-chain"] = {
-        success: fields.length > 0,
-        fields
-    };
-
-} catch (error) {
-    sourceResults["On-chain"] = {
-        success: false,
-        error: error.message
-    };
-
-    console.warn(
-        `[Airdrop Auto] On-chain project #${project.id}:`,
-        error.message
-    );
-}
 // =============================================
 // DEXSCREENER - NETWORK
 // =============================================
@@ -719,6 +664,10 @@ async function fetchProjectMetrics(project) {
 
     const sourceResults = {};
 
+    // =========================================
+    // API SOURCES
+    // =========================================
+
     for (const [name, fetcher] of sources) {
         try {
             const data = await fetcher();
@@ -750,13 +699,13 @@ async function fetchProjectMetrics(project) {
     }
 
     // =========================================
-    // CHAINLINK RESERVE
+    // ON-CHAIN METRICS - ALL PROJECTS
     // =========================================
 
     try {
         let tokenPrice = collected.current_price;
 
-        // Nếu lần fetch này không có giá, dùng giá đã lưu.
+        // Nếu API không trả giá, dùng giá đã lưu.
         if (
             tokenPrice === undefined ||
             tokenPrice === null ||
@@ -774,102 +723,41 @@ async function fetchProjectMetrics(project) {
             tokenPrice = rows[0]?.current_price;
         }
 
-        const reserveData = await fetchChainlinkReserveMetrics(
-            project,
-            tokenPrice
-        );
+        const onchainData =
+            await onchainService.fetchProjectOnchainMetrics(
+                project,
+                tokenPrice
+            );
 
-        const fields = Object.keys(reserveData);
+        const fields = Object.keys(onchainData || {});
 
-        for (const [field, value] of Object.entries(reserveData)) {
+        for (const [field, value] of Object.entries(onchainData || {})) {
             if (value === undefined || value === null) continue;
 
             collected[field] = value;
             fieldSources[field] = "onchain";
         }
 
-        sourceResults["Chainlink Reserve"] = {
+        sourceResults["On-chain"] = {
             success: fields.length > 0,
             fields
         };
 
     } catch (error) {
-        sourceResults["Chainlink Reserve"] = {
+        sourceResults["On-chain"] = {
             success: false,
             error: error.message
         };
 
         console.warn(
-            `[Airdrop Auto] Chainlink Reserve project #${project.id}:`,
-            error.message
-        );
-    }
-
-        // =========================================
-    // CHAINLINK STABLECOIN RESERVE
-    // =========================================
-
-    try {
-        const reserveData =
-            await fetchChainlinkStablecoinReserveMetrics(project);
-
-        const fields = Object.keys(reserveData);
-
-        for (const [field, value] of Object.entries(reserveData)) {
-            if (value === undefined || value === null) continue;
-
-            collected[field] = value;
-            fieldSources[field] = "onchain";
-        }
-
-        sourceResults["Chainlink Stablecoin Reserve"] = {
-            success: fields.length > 0,
-            fields
-        };
-
-    } catch (error) {
-        sourceResults["Chainlink Stablecoin Reserve"] = {
-            success: false,
-            error: error.message
-        };
-
-        console.warn(
-            `[Airdrop Auto] Chainlink Stablecoin Reserve project #${project.id}:`,
+            `[Airdrop Auto] On-chain project #${project.id}:`,
             error.message
         );
     }
 
     // =========================================
-// CHAINLINK TOKEN BURN
-// =========================================
-
-try {
-    const burnData = await fetchChainlinkBurnMetrics(project);
-    const fields = Object.keys(burnData);
-
-    for (const [field, value] of Object.entries(burnData)) {
-        if (value === undefined || value === null) continue;
-
-        collected[field] = value;
-        fieldSources[field] = "contract";
-    }
-
-    sourceResults["Chainlink Token Burn"] = {
-        success: fields.length > 0,
-        fields
-    };
-
-} catch (error) {
-    sourceResults["Chainlink Token Burn"] = {
-        success: false,
-        error: error.message
-    };
-
-    console.warn(
-        `[Airdrop Auto] Chainlink Token Burn project #${project.id}:`,
-        error.message
-    );
-}
+    // SAVE METRICS
+    // =========================================
 
     const fields = Object.keys(collected);
 
@@ -896,7 +784,6 @@ try {
         sources: sourceResults
     };
 }
-
 // =============================================
 // RUN ALL PROJECTS
 // =============================================
