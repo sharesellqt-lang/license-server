@@ -441,6 +441,7 @@ async function recalculateDerivedIndicators(userId, projectId) {
 
     for (const [field, calculatedValue] of Object.entries(calculated)) {
         const previous = fieldStatus[field] || {};
+
         const isProtectedSource =
             ["manual", "api", "fetch"].includes(previous.source) &&
             previous.available === true;
@@ -453,7 +454,7 @@ async function recalculateDerivedIndicators(userId, projectId) {
 
         updates[field] = value;
 
-        if (!isManual) {
+        if (!isProtectedSource) {
             fieldStatus[field] = {
                 available: value !== null && Number.isFinite(value),
                 source: "calculated",
@@ -463,6 +464,8 @@ async function recalculateDerivedIndicators(userId, projectId) {
     }
 
     const fields = Object.keys(updates);
+
+    if (!fields.length) return {};
 
     await query(
         `UPDATE airdrop_project_metrics
