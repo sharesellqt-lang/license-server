@@ -258,6 +258,11 @@ async function fetchChainlinkStablecoinReserveMetrics(project) {
 
         for (const item of balances) {
             totalUsd += item.balance;
+
+            console.log(
+                `[Chainlink Reserve] ${item.symbol}:`,
+                item.balance
+            );
         }
     }
 
