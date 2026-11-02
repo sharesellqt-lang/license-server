@@ -3,6 +3,7 @@
 
 const db = require("../db");
 const metricsService = require("./airdrop.metrics.service");
+const onchainService = require("./airdrop.onchain.service");
 
 const connection = typeof db.promise === "function" ? db.promise() : db;
 
@@ -54,225 +55,60 @@ async function fetchJSON(url, headers = {}) {
     }
 }
 
-// =============================================
-// CHAINLINK RESERVE - ON-CHAIN
-// =============================================
+// =========================================
+// ON-CHAIN METRICS - ALL PROJECTS
+// =========================================
 
-const ETHEREUM_RPC_URL = "https://ethereum-rpc.publicnode.com";
-const CHAINLINK_LINK_CONTRACT = "0x514910771af9ca656af840dff83e8264ecf986ca";
-const CHAINLINK_STABLECOINS = [
-    {
-        symbol: "USDC",
-        address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
-        decimals: 6
-    },
-    {
-        symbol: "USDT",
-        address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
-        decimals: 6
-    },
-    {
-        symbol: "DAI",
-        address: "0x6b175474e89094c44da98b954eedeac495271d0f",
-        decimals: 18
-    }
-];
-const ERC20_BALANCE_OF_SELECTOR = "70a08231";
+try {
+    let tokenPrice = collected.current_price;
 
-async function fetchEthereumRpc(method, params = []) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
-    try {
-        const response = await fetch(ETHEREUM_RPC_URL, {
-            method: "POST",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 1,
-                method,
-                params
-            }),
-            signal: controller.signal
-        });
-
-        if (!response.ok) {
-            throw new Error(`Ethereum RPC HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-            throw new Error(
-                data.error.message || "Ethereum RPC returned an error"
-            );
-        }
-
-        if (data.result === undefined || data.result === null) {
-            throw new Error("Ethereum RPC returned empty result");
-        }
-
-        return data.result;
-
-    } finally {
-        clearTimeout(timer);
-    }
-}
-
-async function getERC20Balance(tokenAddress, walletAddress, decimals = 18) {
-    const token = String(tokenAddress || "").trim();
-    const wallet = String(walletAddress || "").trim();
-
-    if (!/^0x[a-fA-F0-9]{40}$/.test(token)) {
-        throw new Error("Invalid ERC20 token address");
-    }
-
-    if (!/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
-        throw new Error("Invalid Treasury wallet address");
-    }
-
-    const encodedWallet = wallet.slice(2).toLowerCase().padStart(64, "0");
-
-    const result = await fetchEthereumRpc("eth_call", [
-        {
-            to: token,
-            data: `0x${ERC20_BALANCE_OF_SELECTOR}${encodedWallet}`
-        },
-        "latest"
-    ]);
-
-    if (!/^0x[0-9a-fA-F]{64}$/.test(result)) {
-        throw new Error("Invalid ERC20 balance response");
-    }
-
-    const rawBalance = BigInt(result);
-    const balance = Number(rawBalance) / (10 ** decimals);
-
-    if (!Number.isFinite(balance)) {
-        throw new Error("Invalid ERC20 balance value");
-    }
-
-    return balance;
-}
-
-async function fetchChainlinkReserveMetrics(project, tokenPrice) {
     if (
-        String(project?.coingecko_id || "").toLowerCase() !== "chainlink" ||
-        String(project?.contract_address || "").toLowerCase() !==
-            CHAINLINK_LINK_CONTRACT.toLowerCase()
+        tokenPrice === undefined ||
+        tokenPrice === null ||
+        !Number.isFinite(Number(tokenPrice)) ||
+        Number(tokenPrice) <= 0
     ) {
-        return {};
-    }
-
-    const wallets = await query(
-        `SELECT address
-         FROM airdrop_project_treasury_wallets
-         WHERE project_id = ?
-           AND chain = 'Ethereum'
-           AND wallet_type = 'reserve'
-           AND is_verified = 1`,
-        [project.id]
-    );
-
-    if (!wallets.length) {
-        throw new Error("No verified Chainlink Reserve wallet found");
-    }
-
-    const price = Number(tokenPrice);
-
-    if (!Number.isFinite(price) || price <= 0) {
-        throw new Error("Valid LINK current_price is unavailable");
-    }
-
-    let totalLink = 0;
-
-    for (const wallet of wallets) {
-        const balance = await getERC20Balance(
-            CHAINLINK_LINK_CONTRACT,
-            wallet.address,
-            18
+        const rows = await query(
+            `SELECT current_price
+             FROM airdrop_project_metrics
+             WHERE project_id = ?
+             LIMIT 1`,
+            [project.id]
         );
 
-        totalLink += balance;
+        tokenPrice = rows[0]?.current_price;
     }
 
-    const treasuryValue = Number((totalLink * price).toFixed(8));
-
-    if (!Number.isFinite(treasuryValue)) {
-        throw new Error("Invalid Chainlink Reserve valuation");
-    }
-
-    return {
-        treasury: treasuryValue
-    };
-}
-
-// =============================================
-// CHAINLINK STABLECOIN RESERVE
-// =============================================
-
-async function fetchChainlinkStablecoinReserveMetrics(project) {
-    if (
-        String(project?.coingecko_id || "").toLowerCase() !== "chainlink" ||
-        String(project?.contract_address || "").toLowerCase() !==
-            CHAINLINK_LINK_CONTRACT.toLowerCase()
-    ) {
-        return {};
-    }
-
-    const wallets = await query(
-        `SELECT address
-         FROM airdrop_project_treasury_wallets
-         WHERE project_id = ?
-           AND chain = 'Ethereum'
-           AND wallet_type = 'reserve'
-           AND is_verified = 1`,
-        [project.id]
-    );
-
-    if (!wallets.length) {
-        throw new Error("No verified Chainlink Reserve wallet found");
-    }
-
-    let totalUsd = 0;
-
-    // Đọc toàn bộ stablecoin trong tất cả ví đã xác minh.
-    for (const wallet of wallets) {
-        const balances = await Promise.all(
-            CHAINLINK_STABLECOINS.map(async token => {
-                const balance = await getERC20Balance(
-                    token.address,
-                    wallet.address,
-                    token.decimals
-                );
-
-                return {
-                    symbol: token.symbol,
-                    balance
-                };
-            })
+    const onchainData =
+        await onchainService.fetchProjectOnchainMetrics(
+            project,
+            tokenPrice
         );
 
-        for (const item of balances) {
-            totalUsd += item.balance;
+    const fields = Object.keys(onchainData);
 
-            console.log(
-                `[Chainlink Reserve] ${item.symbol}:`,
-                item.balance
-            );
-        }
+    for (const [field, value] of Object.entries(onchainData)) {
+        if (value === undefined || value === null) continue;
+
+        collected[field] = value;
+        fieldSources[field] = "onchain";
     }
 
-    if (!Number.isFinite(totalUsd)) {
-        throw new Error("Invalid stablecoin reserve valuation");
-    }
-
-    return {
-        stablecoin_reserve: Number(totalUsd.toFixed(8))
+    sourceResults["On-chain"] = {
+        success: fields.length > 0,
+        fields
     };
+
+} catch (error) {
+    sourceResults["On-chain"] = {
+        success: false,
+        error: error.message
+    };
+
+    console.warn(
+        `[Airdrop Auto] On-chain project #${project.id}:`,
+        error.message
+    );
 }
 // =============================================
 // DEXSCREENER - NETWORK
@@ -1002,6 +838,38 @@ async function fetchProjectMetrics(project) {
             error.message
         );
     }
+
+    // =========================================
+// CHAINLINK TOKEN BURN
+// =========================================
+
+try {
+    const burnData = await fetchChainlinkBurnMetrics(project);
+    const fields = Object.keys(burnData);
+
+    for (const [field, value] of Object.entries(burnData)) {
+        if (value === undefined || value === null) continue;
+
+        collected[field] = value;
+        fieldSources[field] = "contract";
+    }
+
+    sourceResults["Chainlink Token Burn"] = {
+        success: fields.length > 0,
+        fields
+    };
+
+} catch (error) {
+    sourceResults["Chainlink Token Burn"] = {
+        success: false,
+        error: error.message
+    };
+
+    console.warn(
+        `[Airdrop Auto] Chainlink Token Burn project #${project.id}:`,
+        error.message
+    );
+}
 
     const fields = Object.keys(collected);
 
