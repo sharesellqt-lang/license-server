@@ -405,6 +405,26 @@ async function findDefiLlamaSlug(project) {
     }
 
     const protocols = await getDefiLlamaProtocols();
+    const debugMatches = protocols.filter(item =>
+    /chainlink/i.test([
+        item.name,
+        item.slug,
+        item.gecko_id,
+        item.symbol
+    ].join(" "))
+);
+
+console.log("[DefiLlama DEBUG]", {
+    total: protocols.length,
+    firstItemKeys: Object.keys(protocols[0] || {}),
+    matches: debugMatches.map(item => ({
+        name: item.name,
+        slug: item.slug,
+        gecko_id: item.gecko_id,
+        symbol: item.symbol,
+        tvl: item.tvl
+    }))
+});
 
     if (!Array.isArray(protocols)) {
         throw new Error("Invalid DefiLlama protocols response");
