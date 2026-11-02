@@ -202,9 +202,12 @@ function filterIncomingValues(current, values, sourceByField = {}) {
         ).toLowerCase();
 
         const existing = status[field] || {};
+        const existingSource = String(existing.source || "").toLowerCase();
 
+        // Bảo vệ dữ liệu thủ công hợp lệ khỏi API.
+        // Dữ liệu default luôn được phép cập nhật.
         if (
-            existing.source === "manual" &&
+            existingSource === "manual" &&
             existing.available === true &&
             incomingSource !== "manual"
         ) continue;
@@ -441,9 +444,10 @@ async function recalculateDerivedIndicators(userId, projectId) {
 
     for (const [field, calculatedValue] of Object.entries(calculated)) {
         const previous = fieldStatus[field] || {};
+        const previousSource = String(previous.source || "").toLowerCase();
 
         const isProtectedSource =
-            ["manual", "api", "fetch"].includes(previous.source) &&
+            ["manual", "api", "fetch"].includes(previousSource) &&
             previous.available === true;
 
         const value = isProtectedSource
@@ -456,7 +460,7 @@ async function recalculateDerivedIndicators(userId, projectId) {
 
         if (!isProtectedSource) {
             fieldStatus[field] = {
-                available: value !== null && Number.isFinite(value),
+                available: value !== null && Number.isFinite(Number(value)),
                 source: "calculated",
                 updated_at: Math.floor(Date.now() / 1000)
             };
@@ -464,7 +468,6 @@ async function recalculateDerivedIndicators(userId, projectId) {
     }
 
     const fields = Object.keys(updates);
-
     if (!fields.length) return {};
 
     await query(
