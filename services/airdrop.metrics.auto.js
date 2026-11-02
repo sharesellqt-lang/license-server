@@ -393,19 +393,60 @@ async function getDefiLlamaProtocols() {
     return data;
 }
 
-async function findDefiLlamaSlug(projectName) {
-    const name = String(projectName || "").trim().toLowerCase();
-    if (!name) return null;
+async function findDefiLlamaSlug(project) {
+    const normalize = value =>
+        String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    const nameKey = normalize(project?.name);
+    const geckoKey = normalize(project?.coingecko_id);
+
+    if (!nameKey && !geckoKey) {
+        throw new Error("Missing project name and CoinGecko ID");
+    }
 
     const protocols = await getDefiLlamaProtocols();
 
-    const matches = protocols.filter(item =>
-        String(item.name || "").trim().toLowerCase() === name &&
-        item.slug
+    if (!Array.isArray(protocols)) {
+        throw new Error("Invalid DefiLlama protocols response");
+    }
+
+    const matches = protocols.filter(item => {
+        const itemName = normalize(item.name);
+        const itemSlug = normalize(item.slug);
+
+        return (
+            (nameKey && (itemName === nameKey || itemSlug === nameKey)) ||
+            (geckoKey && itemSlug === geckoKey)
+        );
+    });
+
+    if (!matches.length) {
+        throw new Error(
+            `DefiLlama protocol not found: ${project.name} (${project.coingecko_id || "no gecko_id"})`
+        );
+    }
+
+    // Ưu tiên slug khớp CoinGecko ID.
+    const geckoMatches = matches.filter(
+        item => geckoKey && normalize(item.slug) === geckoKey
     );
 
-    // Chỉ chấp nhận kết quả khớp tên duy nhất.
-    return matches.length === 1 ? matches[0].slug : null;
+    if (geckoMatches.length === 1) {
+        return geckoMatches[0].slug;
+    }
+
+    // Nếu không có gecko match duy nhất, dùng tên chính xác.
+    const nameMatches = matches.filter(
+        item => normalize(item.name) === nameKey
+    );
+
+    if (nameMatches.length === 1) {
+        return nameMatches[0].slug;
+    }
+
+    throw new Error(
+        `Ambiguous DefiLlama match for ${project.name}: ${matches.map(x => x.slug).join(", ")}`
+    );
 }
 
 function getTvlGrowth(history, days) {
@@ -434,20 +475,28 @@ function getTvlGrowth(history, days) {
 }
 
 async function fetchDefiLlama(project) {
-    const slug = await findDefiLlamaSlug(project.name);
-    if (!slug) return {};
+    const slug = await findDefiLlamaSlug(project);
 
     const data = await fetchJSON(
         `https://api.llama.fi/protocol/${encodeURIComponent(slug)}`
     );
 
-    const history = Array.isArray(data.tvl) ? data.tvl : [];
-    if (!history.length) return {};
+    const history = Array.isArray(data?.tvl) ? data.tvl : [];
+
+    if (!history.length) {
+        throw new Error(
+            `DefiLlama returned no TVL history for protocol: ${slug}`
+        );
+    }
 
     const latest = history[history.length - 1];
     const tvl = Number(latest.totalLiquidityUSD);
 
-    if (!Number.isFinite(tvl)) return {};
+    if (!Number.isFinite(tvl)) {
+        throw new Error(
+            `Invalid latest TVL value for protocol: ${slug}`
+        );
+    }
 
     const result = { tvl };
 
