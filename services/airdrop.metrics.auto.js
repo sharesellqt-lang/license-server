@@ -60,6 +60,23 @@ async function fetchJSON(url, headers = {}) {
 
 const ETHEREUM_RPC_URL = "https://ethereum-rpc.publicnode.com";
 const CHAINLINK_LINK_CONTRACT = "0x514910771af9ca656af840dff83e8264ecf986ca";
+const CHAINLINK_STABLECOINS = [
+    {
+        symbol: "USDC",
+        address: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        decimals: 6
+    },
+    {
+        symbol: "USDT",
+        address: "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        decimals: 6
+    },
+    {
+        symbol: "DAI",
+        address: "0x6b175474e89094c44da98b954eedeac495271d0f",
+        decimals: 18
+    }
+];
 const ERC20_BALANCE_OF_SELECTOR = "70a08231";
 
 async function fetchEthereumRpc(method, params = []) {
@@ -190,6 +207,66 @@ async function fetchChainlinkReserveMetrics(project, tokenPrice) {
 
     return {
         treasury: treasuryValue
+    };
+}
+
+// =============================================
+// CHAINLINK STABLECOIN RESERVE
+// =============================================
+
+async function fetchChainlinkStablecoinReserveMetrics(project) {
+    if (
+        String(project?.coingecko_id || "").toLowerCase() !== "chainlink" ||
+        String(project?.contract_address || "").toLowerCase() !==
+            CHAINLINK_LINK_CONTRACT.toLowerCase()
+    ) {
+        return {};
+    }
+
+    const wallets = await query(
+        `SELECT address
+         FROM airdrop_project_treasury_wallets
+         WHERE project_id = ?
+           AND chain = 'Ethereum'
+           AND wallet_type = 'reserve'
+           AND is_verified = 1`,
+        [project.id]
+    );
+
+    if (!wallets.length) {
+        throw new Error("No verified Chainlink Reserve wallet found");
+    }
+
+    let totalUsd = 0;
+
+    // Đọc toàn bộ stablecoin trong tất cả ví đã xác minh.
+    for (const wallet of wallets) {
+        const balances = await Promise.all(
+            CHAINLINK_STABLECOINS.map(async token => {
+                const balance = await getERC20Balance(
+                    token.address,
+                    wallet.address,
+                    token.decimals
+                );
+
+                return {
+                    symbol: token.symbol,
+                    balance
+                };
+            })
+        );
+
+        for (const item of balances) {
+            totalUsd += item.balance;
+        }
+    }
+
+    if (!Number.isFinite(totalUsd)) {
+        throw new Error("Invalid stablecoin reserve valuation");
+    }
+
+    return {
+        stablecoin_reserve: Number(totalUsd.toFixed(8))
     };
 }
 // =============================================
@@ -883,6 +960,40 @@ async function fetchProjectMetrics(project) {
 
         console.warn(
             `[Airdrop Auto] Chainlink Reserve project #${project.id}:`,
+            error.message
+        );
+    }
+
+        // =========================================
+    // CHAINLINK STABLECOIN RESERVE
+    // =========================================
+
+    try {
+        const reserveData =
+            await fetchChainlinkStablecoinReserveMetrics(project);
+
+        const fields = Object.keys(reserveData);
+
+        for (const [field, value] of Object.entries(reserveData)) {
+            if (value === undefined || value === null) continue;
+
+            collected[field] = value;
+            fieldSources[field] = "onchain";
+        }
+
+        sourceResults["Chainlink Stablecoin Reserve"] = {
+            success: fields.length > 0,
+            fields
+        };
+
+    } catch (error) {
+        sourceResults["Chainlink Stablecoin Reserve"] = {
+            success: false,
+            error: error.message
+        };
+
+        console.warn(
+            `[Airdrop Auto] Chainlink Stablecoin Reserve project #${project.id}:`,
             error.message
         );
     }
