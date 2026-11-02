@@ -61,12 +61,14 @@ function formatUnits(rawValue, decimals) {
         : whole.toString();
 }
 
+
 async function rpcCall(network, method, params = []) {
+    const rpcUrl = getRpcUrl(network);
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
     try {
-        const response = await fetch(getRpcUrl(network), {
+        const response = await fetch(rpcUrl, {
             method: "POST",
             headers: {
                 Accept: "application/json",
@@ -82,13 +84,26 @@ async function rpcCall(network, method, params = []) {
         });
 
         if (!response.ok) {
-            throw new Error(`RPC HTTP ${response.status}`);
+            const responseText = await response.text().catch(() => "");
+
+            throw new Error(
+                `RPC HTTP ${response.status}` +
+                ` | Network: ${network}` +
+                ` | Method: ${method}` +
+                ` | URL: ${rpcUrl}` +
+                ` | Response: ${responseText.slice(0, 500)}`
+            );
         }
 
         const data = await response.json();
 
         if (data.error) {
-            throw new Error(data.error.message || "RPC error");
+            throw new Error(
+                `RPC ERROR | Network: ${network}` +
+                ` | Method: ${method}` +
+                ` | Code: ${data.error.code}` +
+                ` | Message: ${data.error.message || "Unknown RPC error"}`
+            );
         }
 
         if (data.result === undefined || data.result === null) {
@@ -96,10 +111,20 @@ async function rpcCall(network, method, params = []) {
         }
 
         return data.result;
+
+    } catch (error) {
+        if (error.name === "AbortError") {
+            throw new Error(
+                `RPC TIMEOUT | Network: ${network} | Method: ${method}`
+            );
+        }
+
+        throw error;
     } finally {
         clearTimeout(timer);
     }
 }
+
 
 async function getERC20Balance(network, tokenAddress, walletAddress, decimals = 18) {
     if (!validAddress(tokenAddress) || !validAddress(walletAddress)) {
