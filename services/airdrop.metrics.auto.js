@@ -654,6 +654,7 @@ async function fetchDefiLlama(project) {
 async function fetchProjectMetrics(project) {
     const collected = {};
     const fieldSources = {};
+    let scannerStatus = null;
 
     const sources = [
         ["DexScreener", () => fetchDexScreener(project)],
@@ -674,7 +675,9 @@ async function fetchProjectMetrics(project) {
             const fields = Object.keys(data || {});
 
             for (const [field, value] of Object.entries(data || {})) {
-                if (value === undefined || value === null || value === "") continue;
+                if (value === undefined || value === null || value === "") {
+                    continue;
+                }
 
                 collected[field] = value;
                 fieldSources[field] = "api";
@@ -698,9 +701,8 @@ async function fetchProjectMetrics(project) {
         }
     }
 
-   
     // =========================================
-    // ON-CHAIN METRICS - ALL PROJECTS
+    // ON-CHAIN METRICS
     // =========================================
 
     try {
@@ -729,9 +731,12 @@ async function fetchProjectMetrics(project) {
                 tokenPrice
             );
 
-        const scannerStatus = onchainData?._scanner || null;
+        scannerStatus = onchainData?._scanner || {
+            status: "not_configured",
+            updated_at: Math.floor(Date.now() / 1000),
+            scans: []
+        };
 
-        // Không đưa metadata scanner vào bảng metrics.
         const metricEntries = Object.entries(onchainData || {})
             .filter(([field, value]) =>
                 field !== "_scanner" &&
@@ -751,9 +756,17 @@ async function fetchProjectMetrics(project) {
         };
 
     } catch (error) {
+        scannerStatus = {
+            status: "failed",
+            updated_at: Math.floor(Date.now() / 1000),
+            error: error.message,
+            scans: []
+        };
+
         sourceResults["On-chain"] = {
             success: false,
-            error: error.message
+            error: error.message,
+            scanner: scannerStatus
         };
 
         console.warn(
@@ -762,34 +775,45 @@ async function fetchProjectMetrics(project) {
         );
     }
 
-
     // =========================================
     // SAVE METRICS
     // =========================================
 
     const fields = Object.keys(collected);
 
-    if (!fields.length) {
-        return {
-            updated: false,
-            fields: [],
-            sources: sourceResults
-        };
+    if (fields.length) {
+        await metricsService.updateMetrics(
+            project.user_id,
+            project.id,
+            collected,
+            {
+                sourceByField: fieldSources
+            }
+        );
     }
 
-    await metricsService.updateMetrics(
-        project.user_id,
-        project.id,
-        collected,
-        {
-            sourceByField: fieldSources
-        }
-    );
+    // =========================================
+    // SAVE SCANNER STATUS - SEPARATE JSON
+    // =========================================
+
+    if (scannerStatus) {
+        await query(
+            `UPDATE airdrop_project_metrics
+             SET onchain_scanner_status = ?,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE project_id = ?`,
+            [
+                JSON.stringify(scannerStatus),
+                project.id
+            ]
+        );
+    }
 
     return {
-        updated: true,
+        updated: fields.length > 0,
         fields,
-        sources: sourceResults
+        sources: sourceResults,
+        scanner: scannerStatus
     };
 }
 // =============================================

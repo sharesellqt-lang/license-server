@@ -599,54 +599,128 @@ async function scanProjectTokenEvents(project, asset, allWallets) {
 // EVENT METRICS
 // =========================================
 
-async function getProjectOnchainEventMetrics(projectId, hasBuybackWallet) {
-    const rows = await query(
-        `SELECT
-            event_type,
-            COALESCE(SUM(amount), 0) AS total_amount,
-            COALESCE(SUM(
-                CASE
-                    WHEN block_timestamp >= UTC_TIMESTAMP() - INTERVAL 1 DAY
-                    THEN amount ELSE 0
-                END
-            ), 0) AS amount_24h,
-            COALESCE(SUM(
-                CASE
-                    WHEN block_timestamp >= UTC_TIMESTAMP() - INTERVAL 30 DAY
-                    THEN amount ELSE 0
-                END
-            ), 0) AS amount_30d
-         FROM airdrop_project_onchain_events
-         WHERE project_id = ?
-         GROUP BY event_type`,
-        [projectId]
-    );
+async function getProjectOnchainEventMetrics(projectId, assets, wallets) {
+    const assetResults = [];
 
-    const result = {
-        token_burn: 0,
-        token_burn_24h: 0,
-        token_burn_30d: 0
-    };
+    for (const asset of assets) {
+        const chain = normalizeNetwork(asset.chain);
+        const contract = normalizeAddress(asset.contract_address);
 
-    if (hasBuybackWallet) {
-        result.token_buyback = 0;
-        result.token_buyback_24h = 0;
-        result.token_buyback_30d = 0;
+        const buybackWallets = wallets.filter(wallet =>
+            normalizeNetwork(wallet.chain) === chain &&
+            String(wallet.wallet_type || "").toLowerCase() === "buyback" &&
+            validAddress(wallet.address)
+        );
+
+        const buybackPools = wallets.filter(wallet =>
+            normalizeNetwork(wallet.chain) === chain &&
+            String(wallet.wallet_type || "").toLowerCase() === "buyback_pool" &&
+            validAddress(wallet.address)
+        );
+
+        const hasOfficialBuybackWallet = buybackWallets.some(wallet =>
+            typeof wallet.source_url === "string" &&
+            wallet.source_url.trim() !== ""
+        );
+
+        const hasDexBuybackConfig =
+            buybackWallets.length > 0 &&
+            buybackPools.length > 0;
+
+        const hasBuybackWallet =
+            hasOfficialBuybackWallet || hasDexBuybackConfig;
+
+        const rows = await query(
+            `SELECT
+                event_type,
+                COALESCE(SUM(amount), 0) AS total_amount,
+                COALESCE(SUM(
+                    CASE
+                        WHEN block_timestamp >= UTC_TIMESTAMP() - INTERVAL 1 DAY
+                        THEN amount ELSE 0
+                    END
+                ), 0) AS amount_24h,
+                COALESCE(SUM(
+                    CASE
+                        WHEN block_timestamp >= UTC_TIMESTAMP() - INTERVAL 30 DAY
+                        THEN amount ELSE 0
+                    END
+                ), 0) AS amount_30d
+             FROM airdrop_project_onchain_events
+             WHERE project_id = ?
+               AND chain = ?
+               AND LOWER(contract_address) = LOWER(?)
+             GROUP BY event_type`,
+            [projectId, asset.chain, contract]
+        );
+
+        const item = {
+            symbol: asset.symbol,
+            chain: asset.chain,
+            contract,
+            token_burn: 0,
+            token_burn_24h: 0,
+            token_burn_30d: 0,
+            burn_available: true,
+            buyback_available: hasBuybackWallet
+        };
+
+        if (hasBuybackWallet) {
+            item.token_buyback = 0;
+            item.token_buyback_24h = 0;
+            item.token_buyback_30d = 0;
+        }
+
+        for (const row of rows) {
+            if (row.event_type === "burn") {
+                item.token_burn = Number(row.total_amount);
+                item.token_burn_24h = Number(row.amount_24h);
+                item.token_burn_30d = Number(row.amount_30d);
+            }
+
+            if (row.event_type === "buyback" && hasBuybackWallet) {
+                item.token_buyback = Number(row.total_amount);
+                item.token_buyback_24h = Number(row.amount_24h);
+                item.token_buyback_30d = Number(row.amount_30d);
+            }
+        }
+
+        assetResults.push(item);
     }
 
-    for (const row of rows) {
-        const prefix = row.event_type === "burn"
-            ? "token_burn"
-            : row.event_type === "buyback"
-                ? "token_buyback"
-                : null;
+    const result = {
+        assets: assetResults,
+        metrics: {}
+    };
 
-        if (!prefix) continue;
-        if (prefix === "token_buyback" && !hasBuybackWallet) continue;
+    // Chỉ tổng hợp metric cấp project khi tất cả asset cùng symbol.
+    const symbols = [
+        ...new Set(
+            assetResults
+                .map(item => String(item.symbol || "").trim().toUpperCase())
+                .filter(Boolean)
+        )
+    ];
 
-        result[prefix] = Number(row.total_amount);
-        result[`${prefix}_24h`] = Number(row.amount_24h);
-        result[`${prefix}_30d`] = Number(row.amount_30d);
+   if (assetResults.length !== 1 || symbols.length !== 1) {
+        return result;
+    }
+
+    const sumField = field =>
+        assetResults.reduce(
+            (total, item) => total + Number(item[field] || 0),
+            0
+        );
+
+    result.metrics.token_burn = sumField("token_burn");
+    result.metrics.token_burn_24h = sumField("token_burn_24h");
+    result.metrics.token_burn_30d = sumField("token_burn_30d");
+
+    // Không công bố Buyback tổng nếu một asset chưa có cấu hình xác minh.
+    if (assetResults.every(item => item.buyback_available)) {
+        result.metrics.token_buyback = sumField("token_buyback");
+        result.metrics.token_buyback_24h = sumField("token_buyback_24h");
+        result.metrics.token_buyback_30d = sumField("token_buyback_30d");
     }
 
     return result;
@@ -663,7 +737,8 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
         return {
             _scanner: {
                 status: "not_configured",
-                message: "No verified on-chain assets"
+                updated_at: Math.floor(Date.now() / 1000),
+                assets: []
             }
         };
     }
@@ -683,7 +758,8 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
             normalizeNetwork(wallet.chain) === assetChain &&
             ["treasury", "reserve"].includes(
                 String(wallet.wallet_type || "").toLowerCase()
-            )
+            ) &&
+            validAddress(wallet.address)
         );
 
         for (const wallet of matchingWallets) {
@@ -721,7 +797,7 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
         }
     }
 
-    // 2. Scan all verified project token contracts.
+    // 2. Scan all project token contracts.
     const projectTokenAssets = assets.filter(asset =>
         asset.asset_role === "project_token"
     );
@@ -737,14 +813,16 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
             );
 
             scanResults.push({
-                asset: asset.symbol,
+                asset_id: asset.id,
+                symbol: asset.symbol,
                 chain: asset.chain,
                 contract: asset.contract_address,
                 ...scan
             });
         } catch (error) {
             scanResults.push({
-                asset: asset.symbol,
+                asset_id: asset.id,
+                symbol: asset.symbol,
                 chain: asset.chain,
                 contract: asset.contract_address,
                 status: "failed",
@@ -773,34 +851,34 @@ async function fetchProjectOnchainMetrics(project, tokenPrice) {
         result.stablecoin_reserve = Number(stablecoinReserve.toFixed(8));
     }
 
-    // Never publish a partial historical total as a complete metric.
+    let eventMetrics = { assets: [], metrics: {} };
+
     if (allScansCompleted) {
-        const hasBuybackWallet = wallets.some(wallet =>
-            String(wallet.wallet_type || "").toLowerCase() === "buyback" &&
-            validAddress(wallet.address)
+        eventMetrics = await getProjectOnchainEventMetrics(
+            project.id,
+            projectTokenAssets,
+            wallets
         );
 
-        Object.assign(
-            result,
-            await getProjectOnchainEventMetrics(
-                project.id,
-                hasBuybackWallet
-            )
-        );
+        Object.assign(result, eventMetrics.metrics);
     }
 
     const failed = scanResults.some(item => item.status === "failed");
     const pending = scanResults.some(item => item.status === "pending");
 
+    const scannerStatus = allScansCompleted
+        ? "completed"
+        : failed
+            ? "failed"
+            : pending
+                ? "pending"
+                : "not_configured";
+
     result._scanner = {
-        status: allScansCompleted
-            ? "completed"
-            : failed
-                ? "failed"
-                : pending
-                    ? "pending"
-                    : "not_configured",
-        scans: scanResults
+        status: scannerStatus,
+        updated_at: Math.floor(Date.now() / 1000),
+        scans: scanResults,
+        asset_metrics: eventMetrics.assets
     };
 
     return result;
