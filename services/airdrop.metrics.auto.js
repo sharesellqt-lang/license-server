@@ -698,6 +698,7 @@ async function fetchProjectMetrics(project) {
         }
     }
 
+   
     // =========================================
     // ON-CHAIN METRICS - ALL PROJECTS
     // =========================================
@@ -705,7 +706,6 @@ async function fetchProjectMetrics(project) {
     try {
         let tokenPrice = collected.current_price;
 
-        // Nếu API không trả giá, dùng giá đã lưu.
         if (
             tokenPrice === undefined ||
             tokenPrice === null ||
@@ -729,18 +729,25 @@ async function fetchProjectMetrics(project) {
                 tokenPrice
             );
 
-        const fields = Object.keys(onchainData || {});
+        const scannerStatus = onchainData?._scanner || null;
 
-        for (const [field, value] of Object.entries(onchainData || {})) {
-            if (value === undefined || value === null) continue;
+        // Không đưa metadata scanner vào bảng metrics.
+        const metricEntries = Object.entries(onchainData || {})
+            .filter(([field, value]) =>
+                field !== "_scanner" &&
+                value !== undefined &&
+                value !== null
+            );
 
+        for (const [field, value] of metricEntries) {
             collected[field] = value;
             fieldSources[field] = "onchain";
         }
 
         sourceResults["On-chain"] = {
-            success: fields.length > 0,
-            fields
+            success: metricEntries.length > 0,
+            fields: metricEntries.map(([field]) => field),
+            scanner: scannerStatus
         };
 
     } catch (error) {
@@ -754,6 +761,7 @@ async function fetchProjectMetrics(project) {
             error.message
         );
     }
+
 
     // =========================================
     // SAVE METRICS
