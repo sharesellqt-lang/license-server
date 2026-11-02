@@ -642,7 +642,10 @@ router.post("/projects/:id/metrics/fetch", authMiddleware, async (req, res) => {
         const project = await projectService.getProject(userId, projectId);
 
         if (!project) {
-            return sendError(res, 404, "Project not found");
+            return res.status(404).json({
+                success: false,
+                message: "Project not found"
+            });
         }
 
         const result = await metricsAutoService.fetchProjectMetrics(project);
@@ -654,7 +657,7 @@ router.post("/projects/:id/metrics/fetch", authMiddleware, async (req, res) => {
         }, "Metrics fetch completed");
 
     } catch (error) {
-        return handleStatus(res, error);
+        return sendError(res, error, "FETCH METRICS", handleStatus(error));
     }
 });
 

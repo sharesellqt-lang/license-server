@@ -28,7 +28,7 @@ const RAW_COLUMNS = [
     "max_supply", "market_cap", "fdv", "volume_24h", "liquidity",
     "price_change_24h", "tvl", "tvl_growth_7d", "tvl_growth_30d",
     "protocol_fee", "protocol_revenue", "revenue_growth_30d", "treasury",
-    "cash_runway_months", "stablecoin_reserve", "token_buyback", "token_burn",
+    "cash_runway_months", "monthly_operating_expenses", "stablecoin_reserve", "token_buyback", "token_burn",
     "holders", "transactions_24h", "seed_price", "private_price", "public_price",
     "ath_price", "atl_price", "funding_amount", "github_stars", "github_forks",
     "github_watchers", "github_contributors", "github_recent_commits",
@@ -189,6 +189,32 @@ function normalizeDatabaseValues(values) {
 }
 
 // =============================================
+// SOURCE PRIORITY
+// =============================================
+
+function filterIncomingValues(current, values, sourceByField = {}) {
+    const status = parseFieldStatus(current?.metrics_field_status);
+    const accepted = {};
+
+    for (const [field, value] of Object.entries(values)) {
+        const incomingSource = String(
+            sourceByField[field] || "manual"
+        ).toLowerCase();
+
+        const existing = status[field] || {};
+
+        if (
+            existing.source === "manual" &&
+            existing.available === true &&
+            incomingSource !== "manual"
+        ) continue;
+
+        accepted[field] = value;
+    }
+
+    return accepted;
+}
+// =============================================
 // RAW METRIC VALIDATION
 // =============================================
 
@@ -243,10 +269,95 @@ function calculateROI(currentPrice, entryPrice) {
 }
 
 // =============================================
+// HISTORICAL METRICS + GROWTH
+// =============================================
+
+const HISTORY_FIELDS = ["tvl", "protocol_revenue"];
+
+const HISTORY_LOOKBACK_SECONDS = 2 * 86400;
+
+async function recordMetricHistory(projectId, values, sourceByField = {}) {
+    const now = Math.floor(Date.now() / 1000);
+
+    for (const field of HISTORY_FIELDS) {
+        const source = String(sourceByField[field] || "").toLowerCase();
+        const value = values[field];
+
+        if (
+            !["api", "fetch"].includes(source) ||
+            value === null ||
+            value === undefined ||
+            !Number.isFinite(Number(value)) ||
+            Number(value) < 0
+        ) continue;
+
+        await query(
+            `INSERT INTO airdrop_metric_history
+             (project_id, metric_key, metric_value, source, recorded_at)
+             VALUES (?, ?, ?, 'api', ?)`,
+            [projectId, field, Number(value), now]
+        );
+    }
+}
+
+async function getMetricHistory(projectId) {
+    return query(
+        `SELECT metric_key, metric_value, recorded_at
+         FROM airdrop_metric_history
+         WHERE project_id = ?
+           AND metric_key IN ('tvl', 'protocol_revenue')
+           AND recorded_at >= ?
+         ORDER BY recorded_at ASC`,
+        [projectId, Math.floor(Date.now() / 1000) - 35 * 86400]
+    );
+}
+
+function calculateHistoricalGrowth(currentValue, historyRows, field, days) {
+    if (
+        !Number.isFinite(currentValue) ||
+        currentValue < 0
+    ) return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    const target = now - days * 86400;
+
+    const baselineRows = historyRows
+        .filter(row =>
+            row.metric_key === field &&
+            Number.isFinite(Number(row.metric_value)) &&
+            Number(row.recorded_at) <= target &&
+            Number(row.recorded_at) >= target - HISTORY_LOOKBACK_SECONDS
+        )
+        .sort((a, b) => Number(b.recorded_at) - Number(a.recorded_at));
+
+    if (!baselineRows.length) return null;
+
+    const baseline = Number(baselineRows[0].metric_value);
+
+    if (!Number.isFinite(baseline) || baseline <= 0) return null;
+
+    return Number(((currentValue / baseline - 1) * 100).toFixed(8));
+}
+
+function calculateCashRunway(treasury, monthlyExpenses) {
+    if (
+        !Number.isFinite(treasury) ||
+        !Number.isFinite(monthlyExpenses) ||
+        treasury < 0 ||
+        monthlyExpenses <= 0
+    ) return null;
+
+    return Number((treasury / monthlyExpenses).toFixed(4));
+}
+// =============================================
 // DERIVED INDICATORS ENGINE
 // =============================================
 
-function calculateDerivedIndicators(metrics) {
+// =============================================
+// DERIVED INDICATORS ENGINE
+// =============================================
+
+function calculateDerivedIndicators(metrics, historyRows = []) {
     const circulatingSupply = getValidMetric(metrics, "circulating_supply");
     const totalSupply = getValidMetric(metrics, "total_supply");
     const currentPrice = getValidMetric(metrics, "current_price");
@@ -255,37 +366,118 @@ function calculateDerivedIndicators(metrics) {
     const privatePrice = getValidMetric(metrics, "private_price");
     const publicPrice = getValidMetric(metrics, "public_price");
 
-    const circulatingPercent = calculateRatio(circulatingSupply, totalSupply);
-    const lockedPercent = circulatingPercent === null
-        ? null
-        : Number((100 - circulatingPercent).toFixed(8));
+    const tvl = getValidMetric(metrics, "tvl");
+    const revenue = getValidMetric(metrics, "protocol_revenue");
 
+    const treasury = getValidMetric(metrics, "treasury");
+    const monthlyExpenses = getValidMetric(
+        metrics,
+        "monthly_operating_expenses"
+    );
+
+    const circulatingPercent = calculateRatio(
+        circulatingSupply,
+        totalSupply
+    );
+
+    const maxSupply = getValidMetric(metrics, "max_supply");
+
+    const marketCap = currentPrice !== null && circulatingSupply !== null
+        ? currentPrice * circulatingSupply
+        : null;
+
+    const fdv = currentPrice !== null && maxSupply !== null && maxSupply > 0
+        ? currentPrice * maxSupply
+        : null;
     return {
         circulating_percent: circulatingPercent,
-        locked_percent: lockedPercent,
+        locked_percent: circulatingPercent === null
+            ? null
+            : Number((100 - circulatingPercent).toFixed(8)),
+
         seed_roi: calculateROI(currentPrice, seedPrice),
         private_roi: calculateROI(currentPrice, privatePrice),
-        public_roi: calculateROI(currentPrice, publicPrice)
+        public_roi: calculateROI(currentPrice, publicPrice),
+
+        tvl_growth_7d: tvl === null
+            ? null
+            : calculateHistoricalGrowth(tvl, historyRows, "tvl", 7),
+
+        tvl_growth_30d: tvl === null
+            ? null
+            : calculateHistoricalGrowth(tvl, historyRows, "tvl", 30),
+
+        revenue_growth_30d: revenue === null
+            ? null
+            : calculateHistoricalGrowth(
+                revenue,
+                historyRows,
+                "protocol_revenue",
+                30
+            ),
+
+            market_cap: marketCap,
+                fdv,
+
+        cash_runway_months: calculateCashRunway(
+            treasury,
+            monthlyExpenses
+        )
     };
 }
 
 async function recalculateDerivedIndicators(userId, projectId) {
-    const metrics = await getMetrics(userId, projectId);
+    const uid = requireId(userId, "User ID");
+    const pid = requireId(projectId, "Project ID");
+
+    const metrics = await getMetrics(uid, pid);
     if (!metrics) return null;
 
-    const derived = calculateDerivedIndicators(metrics);
-    const fields = Object.keys(derived);
+    const historyRows = await getMetricHistory(pid);
+    const calculated = calculateDerivedIndicators(metrics, historyRows);
+
+    const fieldStatus = parseFieldStatus(metrics.metrics_field_status);
+    const updates = {};
+
+    for (const [field, calculatedValue] of Object.entries(calculated)) {
+        const previous = fieldStatus[field] || {};
+        const isProtectedSource =
+            ["manual", "api", "fetch"].includes(previous.source) &&
+            previous.available === true;
+
+        const value = isProtectedSource
+            ? metrics[field] === null || metrics[field] === undefined
+                ? null
+                : Number(metrics[field])
+            : calculatedValue;
+
+        updates[field] = value;
+
+        if (!isManual) {
+            fieldStatus[field] = {
+                available: value !== null && Number.isFinite(value),
+                source: "calculated",
+                updated_at: Math.floor(Date.now() / 1000)
+            };
+        }
+    }
+
+    const fields = Object.keys(updates);
 
     await query(
         `UPDATE airdrop_project_metrics
-         SET ${fields.map(field => `${field} = ?`).join(", ")}
+         SET ${fields.map(field => `${field} = ?`).join(", ")},
+             metrics_field_status = ?
          WHERE project_id = ?`,
-        [...fields.map(field => derived[field]), projectId]
+        [
+            ...fields.map(field => updates[field]),
+            JSON.stringify(fieldStatus),
+            pid
+        ]
     );
 
-    return derived;
+    return updates;
 }
-
 // =============================================
 // SCORING HELPERS
 // =============================================
@@ -889,6 +1081,9 @@ async function recalculateAllMetrics(userId, projectId) {
 // =============================================
 // SAVE / UPSERT METRICS
 // =============================================
+// =============================================
+// SAVE / UPSERT METRICS
+// =============================================
 
 async function saveMetrics(userId, projectId, data = {}, options = {}) {
     const uid = requireId(userId, "User ID");
@@ -897,17 +1092,27 @@ async function saveMetrics(userId, projectId, data = {}, options = {}) {
     const project = await getOwnedProject(uid, pid);
     if (!project) throw new Error("Project not found");
 
-    const values = normalizeMetrics(data);
+    const current = await getMetrics(uid, pid);
+    const sourceByField = options.sourceByField || {};
+
+    let values = normalizeMetrics(data);
+
+    values = filterIncomingValues(
+        current,
+        values,
+        sourceByField
+    );
+
     const fields = Object.keys(values);
 
-    if (!fields.length) return getMetrics(uid, pid);
-
-    const current = await getMetrics(uid, pid);
+    if (!fields.length) {
+        return getMetrics(uid, pid);
+    }
 
     const fieldStatus = buildFieldStatus(
         current?.metrics_field_status,
         values,
-        options.sourceByField || {}
+        sourceByField
     );
 
     const dbValues = normalizeDatabaseValues(values);
@@ -938,6 +1143,7 @@ async function saveMetrics(userId, projectId, data = {}, options = {}) {
         insertValues
     );
 
+    await recordMetricHistory(pid, values, sourceByField);
     await recalculateDerivedIndicators(uid, pid);
     await recalculateEvaluationScores(uid, pid);
 
@@ -955,21 +1161,32 @@ async function updateMetrics(userId, projectId, data = {}, options = {}) {
     const project = await getOwnedProject(uid, pid);
     if (!project) throw new Error("Project not found");
 
-    const values = normalizeMetrics(data);
-    const fields = Object.keys(values);
-
-    if (!fields.length) return getMetrics(uid, pid);
-
     const current = await getMetrics(uid, pid);
 
     if (!current) {
-        return saveMetrics(uid, pid, values, options);
+        return saveMetrics(uid, pid, data, options);
+    }
+
+    const sourceByField = options.sourceByField || {};
+
+    let values = normalizeMetrics(data);
+
+    values = filterIncomingValues(
+        current,
+        values,
+        sourceByField
+    );
+
+    const fields = Object.keys(values);
+
+    if (!fields.length) {
+        return getMetrics(uid, pid);
     }
 
     const fieldStatus = buildFieldStatus(
         current.metrics_field_status,
         values,
-        options.sourceByField || {}
+        sourceByField
     );
 
     const dbValues = normalizeDatabaseValues(values);
@@ -987,12 +1204,12 @@ async function updateMetrics(userId, projectId, data = {}, options = {}) {
         ]
     );
 
+    await recordMetricHistory(pid, values, sourceByField);
     await recalculateDerivedIndicators(uid, pid);
     await recalculateEvaluationScores(uid, pid);
 
     return getMetrics(uid, pid);
 }
-
 // =============================================
 // DELETE METRICS
 // =============================================
