@@ -428,65 +428,35 @@ async function findDefiLlamaSlug(project) {
         normalize(item.parentProtocolSlug) === nameKey ||
         normalize(item.slug) === nameKey
     );
-
-console.log("[DefiLlama PARENT TVL]", JSON.stringify({
-    name: data?.name,
-    isParentProtocol: data?.isParentProtocol,
-
-    latestTvl: data?.tvl?.slice?.(-3),
-
-    currentChainTvls: data?.currentChainTvls,
-
-    chainTvls: Object.fromEntries(
-        Object.entries(data?.chainTvls || {}).map(([key, value]) => [
-            key,
-            {
-                latest: Array.isArray(value?.tvl)
-                    ? value.tvl.slice(-1)
-                    : null
-            }
-        ])
-    ),
-
-    otherProtocols: data?.otherProtocols
-}, null, 2));
     // =========================================
     // DEBUG: KIỂM TRA ENDPOINT PROTOCOL CHA
     // =========================================
 
     if (nameKey === "chainlink") {
-        const data = await fetchJSON(
-            "https://api.llama.fi/protocol/chainlink"
-        );
+    const data = await fetchJSON(
+        "https://api.llama.fi/protocol/chainlink"
+    );
 
-        console.log(
-            "[DefiLlama PARENT CHECK]",
-            JSON.stringify({
-                keys: Object.keys(data || {}),
-                tvlType: Array.isArray(data?.tvl)
-                    ? "array"
-                    : typeof data?.tvl,
-                tvlLength: data?.tvl?.length || 0,
-                chainTvls: Object.keys(data?.chainTvls || {}),
-                latestTvl: data?.tvl?.slice?.(-1),
-                chainTvlKeys: Object.fromEntries(
-                    Object.entries(data?.chainTvls || {}).map(
-                        ([key, value]) => [
-                            key,
-                            {
-                                tvlType: Array.isArray(value?.tvl)
-                                    ? "array"
-                                    : typeof value?.tvl,
-                                tvlLength: value?.tvl?.length || 0
-                            }
-                        ]
-                    )
-                )
-            }, null, 2)
-        );
+    console.log("[DefiLlama PARENT TVL]", JSON.stringify({
+        name: data?.name,
+        isParentProtocol: data?.isParentProtocol,
+        latestTvl: data?.tvl?.slice?.(-3),
+        currentChainTvls: data?.currentChainTvls,
+        chainTvls: Object.fromEntries(
+            Object.entries(data?.chainTvls || {}).map(([key, value]) => [
+                key,
+                {
+                    latest: Array.isArray(value?.tvl)
+                        ? value.tvl.slice(-1)
+                        : null
+                }
+            ])
+        ),
+        otherProtocols: data?.otherProtocols
+    }, null, 2));
 
-        throw new Error("DefiLlama parent diagnostic completed");
-    }
+    throw new Error("DefiLlama parent diagnostic completed");
+}
 
     // =========================================
     // ORIGINAL SLUG RESOLUTION
