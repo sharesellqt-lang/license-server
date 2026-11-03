@@ -58,10 +58,14 @@ async function proxyRequest(req, res, path) {
     const status = error.response?.status || 502;
 
     console.error("STOCK DATA API ERROR:", {
-      message: error.message,
-      status,
-      path
-    });
+    message: error.message,
+    status: error.response?.status,
+    response: error.response?.data,
+    path,
+    target: PYTHON_API_URL,
+    apiKeyExists: Boolean(PYTHON_API_KEY),
+    apiKeyLength: PYTHON_API_KEY?.length || 0
+});
 
     return res.status(status).json(
       error.response?.data || {
