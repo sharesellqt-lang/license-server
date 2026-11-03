@@ -41,41 +41,67 @@ async function checkAccess(req, res, next) {
 }
 
 async function proxyRequest(req, res, path) {
-  try {
-    if (!PYTHON_API_URL || !PYTHON_API_KEY) {
-      return res.status(503).json({
-        success: false,
-        error: "Stock Data API chưa được cấu hình."
-      });
+    try {
+        if (!PYTHON_API_URL || !PYTHON_API_KEY) {
+            return res.status(503).json({
+                success: false,
+                error: "Stock Data API chưa được cấu hình."
+            });
+        }
+
+        // =========================================
+        // LOG: PYTHON API REQUEST
+        // =========================================
+        console.log("PYTHON API REQUEST:", {
+            target: PYTHON_API_URL,
+            path,
+            method: "GET",
+            apiKeyExists: Boolean(PYTHON_API_KEY),
+            apiKeyLength: PYTHON_API_KEY?.length || 0
+        });
+
+        const response = await api.get(path, {
+            params: req.query
+        });
+
+        // =========================================
+        // LOG: PYTHON API RESPONSE
+        // =========================================
+        console.log("PYTHON API RESPONSE:", {
+            status: response.status,
+            path,
+            target: PYTHON_API_URL
+        });
+
+        return res.status(response.status).json(response.data);
+
+    } catch (error) {
+        const status = error.response?.status || 502;
+
+        // =========================================
+        // LOG: PYTHON API CONNECTION ERROR
+        // =========================================
+        console.error("STOCK DATA API ERROR:", {
+            message: error.message,
+            code: error.code,
+            status: error.response?.status,
+            response: error.response?.data,
+            path,
+            target: PYTHON_API_URL,
+            requestUrl: error.config?.url,
+            requestBaseURL: error.config?.baseURL,
+            apiKeyExists: Boolean(PYTHON_API_KEY),
+            apiKeyLength: PYTHON_API_KEY?.length || 0
+        });
+
+        return res.status(status).json(
+            error.response?.data || {
+                success: false,
+                error: "Không thể kết nối Stock Data API."
+            }
+        );
     }
-
-    const response = await api.get(path, {
-      params: req.query
-    });
-
-    return res.status(response.status).json(response.data);
-  } catch (error) {
-    const status = error.response?.status || 502;
-
-    console.error("STOCK DATA API ERROR:", {
-    message: error.message,
-    status: error.response?.status,
-    response: error.response?.data,
-    path,
-    target: PYTHON_API_URL,
-    apiKeyExists: Boolean(PYTHON_API_KEY),
-    apiKeyLength: PYTHON_API_KEY?.length || 0
-});
-
-    return res.status(status).json(
-      error.response?.data || {
-        success: false,
-        error: "Không thể kết nối Stock Data API."
-      }
-    );
-  }
 }
-
 // Stock information and financial statements
 router.get(
   "/stock/:symbol",
