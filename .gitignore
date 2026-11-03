@@ -1,5 +1,6 @@
 node_modules/
 .env
+venv-stock/
 client_secret_*.json
 
 # Python virtual environments
