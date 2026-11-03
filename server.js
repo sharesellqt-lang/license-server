@@ -14,6 +14,7 @@ const fs = require("fs");
 const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
+
 app.use(express.json());
 app.use((req,res,next)=>{
 
@@ -70,6 +71,7 @@ app.use((req, res, next) => {
 // ROUTES
 // =========================
 app.use("/api/airdrop", airdropRoutes);
+app.use("/api/stock-data", require("./routes/stock-data.routes"));
 
 app.get("/api/airdrop-test", (req, res) => {
     console.log("AIRDROP TEST HIT");

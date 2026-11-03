@@ -80,7 +80,10 @@ module.exports = {
       trialDays: 3
     },
 
-   
+      stockAnalysis: {
+      requiredPlan: "pro",
+      trialDays: 3
+    },
 
     // csvExport đã tồn tại ở trên
     // KHÔNG khai báo lần thứ 2

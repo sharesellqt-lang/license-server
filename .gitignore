@@ -20,4 +20,4 @@ node_modules/
 
 # Temporary files
 __pycache__/
-*.pyc
+*.pycvenv-stock/

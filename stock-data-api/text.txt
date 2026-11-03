@@ -1,0 +1,47 @@
+Vì `main.py` nằm trên branch `stock-data-api`, bạn mở CMD và chạy lần lượt các lệnh sau:
+
+Bước 1: Vào thư mục dự án
+
+```
+cd /d D:\Tool\sharesell\license-server-main
+```
+
+Bước 2: Chuyển sang branch Python API
+
+```
+git checkout stock-data-api
+```
+
+Bước 3: Kiểm tra file đã sửa
+
+```
+git status
+```
+
+Bước 4: Đưa file `main.py` vào Git
+
+```
+git add stock-data-api/main.py
+```
+
+Bước 5: Commit
+
+```
+git commit -m "Add API key authentication to stock data API"
+```
+
+Bước 6: Push lên GitHub
+
+```
+git push origin stock-data-api
+```
+
+
+
+Hoàn tất
+
+&#x20;Render sẽ tự động deploy lại Python API nếu Auto-Deploy đang bật.
+
+
+
+Lưu ý: Không chạy `git add .` ở bước này, tránh đưa nhầm các file khác vào commit.
