@@ -4,19 +4,31 @@ STOCK DATA API
 Vnstock 5 adapter for Stock Analysis
 """
 
+import os
 import json
+import secrets
+
 from datetime import date
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+    Header,
+    Depends
+)
+
 from fastapi.middleware.cors import CORSMiddleware
 
 from vnstock import Market, Reference, Fundamental
+
 
 app = FastAPI(
     title="Stock Analysis Data API",
     version="1.0.0"
 )
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,6 +38,38 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+
+# =========================================
+# API KEY AUTHENTICATION
+# =========================================
+
+def verify_api_key(
+    x_api_key: Optional[str] = Header(
+        default=None,
+        alias="X-API-Key"
+    )
+):
+    expected_key = os.getenv("STOCK_DATA_API_KEY")
+
+    if not expected_key:
+        raise HTTPException(
+            status_code=500,
+            detail="API Key chưa được cấu hình."
+        )
+
+    if (
+        not x_api_key
+        or not secrets.compare_digest(x_api_key, expected_key)
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="API Key không hợp lệ."
+        )
+
+
+# =========================================
+# DATA HELPERS
+# =========================================
 
 def dataframe_records(df):
     if df is None:
@@ -69,6 +113,11 @@ def success(data):
     }
 
 
+# =========================================
+# HEALTH CHECK
+# Public endpoint for Render monitoring
+# =========================================
+
 @app.get("/api/stock-data/health")
 def health():
     return success({
@@ -78,7 +127,14 @@ def health():
     })
 
 
-@app.get("/api/stock-data/stock/{symbol}")
+# =========================================
+# STOCK INFORMATION
+# =========================================
+
+@app.get(
+    "/api/stock-data/stock/{symbol}",
+    dependencies=[Depends(verify_api_key)]
+)
 def get_stock(symbol: str):
     symbol = validate_symbol(symbol)
 
@@ -113,7 +169,12 @@ def get_stock(symbol: str):
         )
     )
 
-    if quote_error and overview_error and income_error and balance_error:
+    if (
+        quote_error
+        and overview_error
+        and income_error
+        and balance_error
+    ):
         raise HTTPException(
             status_code=502,
             detail="Không lấy được dữ liệu cổ phiếu từ Vnstock."
@@ -133,13 +194,17 @@ def get_stock(symbol: str):
 
     return success({
         "symbol": symbol,
+
         "company": overview[0] if overview else {},
+
         "quote": quote[0] if quote else {},
+
         "financials": {
             "incomeStatement": income,
             "balanceSheet": balance,
             "cashFlow": cashflow
         },
+
         "metadata": {
             "source": "vnstock",
             "fetchedAt": date.today().isoformat(),
@@ -148,7 +213,14 @@ def get_stock(symbol: str):
     })
 
 
-@app.get("/api/stock-data/history/{symbol}")
+# =========================================
+# HISTORICAL STOCK PRICES
+# =========================================
+
+@app.get(
+    "/api/stock-data/history/{symbol}",
+    dependencies=[Depends(verify_api_key)]
+)
 def get_history(
     symbol: str,
     length: str = Query("5Y"),
@@ -191,11 +263,22 @@ def get_history(
 
     except HTTPException:
         raise
+
     except Exception as error:
-        raise HTTPException(status_code=502, detail=str(error))
+        raise HTTPException(
+            status_code=502,
+            detail=str(error)
+        )
 
 
-@app.get("/api/stock-data/benchmark")
+# =========================================
+# MARKET BENCHMARK
+# =========================================
+
+@app.get(
+    "/api/stock-data/benchmark",
+    dependencies=[Depends(verify_api_key)]
+)
 def get_benchmark(
     symbol: str = Query("VNINDEX"),
     length: str = Query("5Y"),
@@ -220,6 +303,7 @@ def get_benchmark(
             kwargs["length"] = length
 
         df = Market().index(symbol).ohlcv(**kwargs)
+
         bars = dataframe_records(df)
 
         if not bars:
@@ -237,5 +321,9 @@ def get_benchmark(
 
     except HTTPException:
         raise
+
     except Exception as error:
-        raise HTTPException(status_code=502, detail=str(error))
+        raise HTTPException(
+            status_code=502,
+            detail=str(error)
+        )
