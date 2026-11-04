@@ -1,22 +1,33 @@
-
 import json
 import os
-import time
-import threading
-
-from collections import deque
 from datetime import date
 from typing import Optional
+
+import vnstock
+from vnstock import Market, Reference, Fundamental
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from vnstock import Market, Reference, Fundamental
+# =========================================
+# VNSTOCK AUTHENTICATION
+# =========================================
 
+api_key = os.environ.get("VNSTOCK_API_KEY")
+
+if api_key:
+    vnstock.login(api_key)
+    print("VNSTOCK:", vnstock.status())
+else:
+    print("VNSTOCK API KEY: NOT CONFIGURED")
+
+# =========================================
+# FASTAPI
+# =========================================
 
 app = FastAPI(
     title="Stock Analysis Data API",
-    version="1.1.0"
+    version="1.0.0"
 )
 
 app.add_middleware(
