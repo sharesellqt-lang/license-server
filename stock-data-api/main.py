@@ -1,3 +1,4 @@
+
 import json
 import os
 import time
@@ -7,36 +8,161 @@ from collections import deque
 from datetime import date
 from typing import Optional
 
-import vnstock
-from vnstock import Market, Reference, Fundamental
+from vnstock_persistence import (
+    prepare_vnstock_home,
+    save_vnstock_home
+)
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+
+
+# =========================================
+# VNSTOCK STORAGE INITIALIZATION
+# =========================================
+
+ALLOW_ONE_TIME_REGISTRATION = (
+    os.getenv("VNSTOCK_ALLOW_ONE_TIME_REGISTRATION", "false").lower()
+    == "true"
+)
+
+VNSTOCK_STORAGE_MODE = prepare_vnstock_home(
+    allow_registration=ALLOW_ONE_TIME_REGISTRATION
+)
+
+
+# =========================================
+# IMPORT VNSTOCK AFTER RESTORE
+# =========================================
+
+import vnstock
+from vnstock import Market, Reference, Fundamental
+
 
 # =========================================
 # VNSTOCK AUTHENTICATION
 # =========================================
 
-api_key = os.environ.get("VNSTOCK_API_KEY")
 VNSTOCK_AUTHENTICATED = False
 
-if api_key:
+
+def check_vnstock_status():
     try:
-        vnstock.login(api_key)
-        status = vnstock.status()
+        result = vnstock.status()
 
-        VNSTOCK_AUTHENTICATED = bool(
-            status.get("authenticated") and status.get("active")
+        if not isinstance(result, dict):
+            return False
+
+        return bool(
+            result.get("authenticated")
+            and result.get("active")
         )
 
-        print("VNSTOCK:", status)
-
-    except Exception as e:
+    except Exception as exc:
         print(
-            f"VNSTOCK AUTH FAILED: {type(e).__name__}: {e}"
+            "VNSTOCK STATUS CHECK FAILED:",
+            type(exc).__name__
         )
+        return False
+
+
+api_key = os.environ.get("VNSTOCK_API_KEY")
+
+
+if VNSTOCK_STORAGE_MODE == "register_once":
+
+    if not api_key:
+        raise RuntimeError(
+            "One-time registration requested but API key is not configured."
+        )
+
+    try:
+        print("VNSTOCK: executing authorized one-time registration.")
+
+        vnstock.login(api_key)
+
+        VNSTOCK_AUTHENTICATED = check_vnstock_status()
+
+        if not VNSTOCK_AUTHENTICATED:
+            raise RuntimeError(
+                "Vnstock registration completed but authentication is not active."
+            )
+
+        # Save immediately after successful registration.
+        save_vnstock_home()
+
+        print(
+            "VNSTOCK: one-time registration and MySQL backup completed."
+        )
+
+    except Exception as exc:
+        VNSTOCK_AUTHENTICATED = False
+
+        print(
+            "VNSTOCK ONE-TIME REGISTRATION FAILED:",
+            type(exc).__name__
+        )
+
+        raise RuntimeError(
+            "Vnstock registration or state backup failed. "
+            "Startup stopped to protect the device registration."
+        ) from None
+
+
+elif VNSTOCK_STORAGE_MODE in (
+    "restored",
+    "local_unbacked",
+    "registration_pending"
+):
+
+    VNSTOCK_AUTHENTICATED = check_vnstock_status()
+
+    if VNSTOCK_AUTHENTICATED:
+
+        print(
+            "VNSTOCK: existing device state is authenticated."
+        )
+
+        # Save a snapshot if local state exists but MySQL has none,
+        # or if a previous registration attempt left a pending marker.
+        if VNSTOCK_STORAGE_MODE in (
+            "local_unbacked",
+            "registration_pending"
+        ):
+            try:
+                save_vnstock_home()
+                print(
+                    "VNSTOCK: existing local state backed up to MySQL."
+                )
+
+            except Exception as exc:
+                VNSTOCK_AUTHENTICATED = False
+
+                print(
+                    "VNSTOCK BACKUP FAILED:",
+                    type(exc).__name__
+                )
+
+                raise RuntimeError(
+                    "Existing Vnstock state could not be backed up. "
+                    "Startup stopped."
+                ) from None
+
+    else:
+        print(
+            "VNSTOCK: saved device state is not authenticated. "
+            "Automatic login is disabled."
+        )
+
+
 else:
-    print("VNSTOCK API KEY: NOT CONFIGURED")
+    print(
+        "VNSTOCK: authentication unavailable. "
+        f"Storage mode: {VNSTOCK_STORAGE_MODE}"
+    )
+
+
+
 # =========================================
 # FASTAPI
 # =========================================
