@@ -2,3 +2,4 @@
 vnstock
 fastapi
 uvicorn[standard]
+PyMySQL
