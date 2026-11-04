@@ -18,13 +18,25 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================================
 
 api_key = os.environ.get("VNSTOCK_API_KEY")
+VNSTOCK_AUTHENTICATED = False
 
 if api_key:
-    vnstock.login(api_key)
-    print("VNSTOCK:", vnstock.status())
+    try:
+        vnstock.login(api_key)
+        status = vnstock.status()
+
+        VNSTOCK_AUTHENTICATED = bool(
+            status.get("authenticated") and status.get("active")
+        )
+
+        print("VNSTOCK:", status)
+
+    except Exception as e:
+        print(
+            f"VNSTOCK AUTH FAILED: {type(e).__name__}: {e}"
+        )
 else:
     print("VNSTOCK API KEY: NOT CONFIGURED")
-
 # =========================================
 # FASTAPI
 # =========================================
