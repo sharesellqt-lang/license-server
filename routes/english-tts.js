@@ -178,6 +178,10 @@ async function refundCharacters(userId, periodStart, characters) {
 
 /* GET /api/english-learning/tts/voices */
 router.get("/voices", async (req, res) => {
+    console.log("[TTS] GET /voices", {
+    userId: req.user?.id,
+    projectId: process.env.GOOGLE_CLOUD_PROJECT || "not-set"
+});
     try {
         const voices = await getGoogleVoices();
 
@@ -201,7 +205,12 @@ router.get("/voices", async (req, res) => {
             note: "Các lựa chọn tuổi/độ tuổi là mô phỏng gần đúng bằng cao độ và tốc độ giọng đọc."
         });
     } catch (error) {
-        console.error("[ENGLISH TTS VOICES]", error);
+   
+        console.error("[TTS VOICES ERROR]", {
+    message: err.message,
+    code: err.code,
+    details: err.details
+});
 
         res.status(503).json({
             success: false,
