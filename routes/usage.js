@@ -37,7 +37,13 @@ router.post(
       );
 
       const user = userRows[0];
-      const isExpired = new Date(user.expire_at) < new Date();
+      if (!user) {
+          return res.status(401).json({ error: "User not found" });
+        }
+
+        const isExpired =
+          user.expire_at &&
+          new Date(user.expire_at) < new Date();
 
       if (isExpired) {
         return res.json({
