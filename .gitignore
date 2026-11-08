@@ -36,3 +36,4 @@ __pycache__/
 # ========================================
 *.tmp
 *.temp
+/google-tts-service-account.json

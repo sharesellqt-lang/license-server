@@ -86,11 +86,18 @@ app.use(
     "/api/english-learning/progress",
     require("./routes/english-progress")
 );
+
+// GOOGLE CLOUD TEXT-TO-SPEECH
+app.use(
+    "/api/english-learning/tts",
+    require("./routes/english-tts")
+);
+
+// ENGLISH LEARNING
 app.use(
     "/api/english-learning",
     require("./routes/english-learning")
 );
-
 
 
 // =========================

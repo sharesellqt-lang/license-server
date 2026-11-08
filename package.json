@@ -8,6 +8,7 @@
   "dependencies": {
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
+    "@google-cloud/text-to-speech": "^7.2.0",
     "axios": "^1.18.1",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.79.2",
