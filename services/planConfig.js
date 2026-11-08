@@ -63,12 +63,18 @@ module.exports = {
     vip: -1
   },
   // =========================
-  // Image Studio
+  //image studio
   // =========================
-  "image-studio": {
-  free: 20,
-  pro: 200,
-  vip: -1
+"image-studio": {
+    free: 20,
+    pro: 200,
+    vip: -1
+},
+
+"image-studio-ai": {
+    free: 0,
+    pro: 0,
+    vip: 10
 }
 
 };
