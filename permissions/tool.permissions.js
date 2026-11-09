@@ -4,7 +4,7 @@ module.exports = {
 
     proMode: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     vipMode: {
