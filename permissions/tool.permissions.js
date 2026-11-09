@@ -21,32 +21,32 @@ module.exports = {
 
     galxeScanner: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     zealyScanner: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     layer3Scanner: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     questnScanner: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     csvExport: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     telegramAlert: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     // Airdrop Hunter VIP
@@ -72,17 +72,17 @@ module.exports = {
 
     saveHistory: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     batchCalculation: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
       stockAnalysis: {
       requiredPlan: "pro",
-      trialDays: 3
+      trialDays: 2
     },
 
     // csvExport đã tồn tại ở trên
