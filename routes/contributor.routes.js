@@ -5,6 +5,9 @@ const express = require("express");
 const router = express.Router();
 
 const auth = require("../middleware/auth");
+const requireContributorPermission =
+    require("../middleware/requireContributorPermission");
+
 const taskService = require("../services/contributor.task.service");
 
 function handleError(res, err, label) {
@@ -32,85 +35,116 @@ function handleError(res, err, label) {
 
     return res.status(status).json({
         success: false,
-        error: status === 500 ? "CONTRIBUTOR_OPERATION_FAILED" : err.message
+        error: status === 500
+            ? "CONTRIBUTOR_OPERATION_FAILED"
+            : err.message
     });
 }
 
 // GET /api/contributor/tasks
-router.get("/tasks", auth, async (req, res) => {
-    try {
-        const result = await taskService.getTasks(
-            req.query.page,
-            req.query.limit
-        );
+router.get(
+    "/tasks",
+    auth,
+    requireContributorPermission("task.view"),
+    async (req, res) => {
+        try {
+            const result = await taskService.getTasks(
+                req.query.page,
+                req.query.limit
+            );
 
-        return res.json({ success: true, ...result });
-    } catch (err) {
-        return handleError(res, err, "TASK LIST");
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "TASK LIST");
+        }
     }
-});
+);
 
 // POST /api/contributor/tasks/:id/accept
-router.post("/tasks/:id/accept", auth, async (req, res) => {
-    try {
-        const result = await taskService.acceptTask(
-            req.user.id,
-            req.params.id
-        );
+router.post(
+    "/tasks/:id/accept",
+    auth,
+    requireContributorPermission("task.accept"),
+    async (req, res) => {
+        try {
+            const result = await taskService.acceptTask(
+                req.user.id,
+                req.params.id
+            );
 
-        return res.status(201).json({
-            success: true,
-            assignment: result
-        });
-    } catch (err) {
-        return handleError(res, err, "ACCEPT TASK");
+            return res.status(201).json({
+                success: true,
+                assignment: result
+            });
+        } catch (err) {
+            return handleError(res, err, "ACCEPT TASK");
+        }
     }
-});
+);
 
 // POST /api/contributor/assignments/:id/submit
-router.post("/assignments/:id/submit", auth, async (req, res) => {
-    try {
-        const result = await taskService.submitWork(
-            req.user.id,
-            req.params.id,
-            req.body
-        );
+router.post(
+    "/assignments/:id/submit",
+    auth,
+    requireContributorPermission("submission.create"),
+    async (req, res) => {
+        try {
+            const result = await taskService.submitWork(
+                req.user.id,
+                req.params.id,
+                req.body
+            );
 
-        return res.status(201).json({
-            success: true,
-            submission: result
-        });
-    } catch (err) {
-        return handleError(res, err, "SUBMIT WORK");
+            return res.status(201).json({
+                success: true,
+                submission: result
+            });
+        } catch (err) {
+            return handleError(res, err, "SUBMIT WORK");
+        }
     }
-});
+);
 
 // GET /api/contributor/my-assignments
-router.get("/my-assignments", auth, async (req, res) => {
-    try {
-        const assignments = await taskService.getMyAssignments(req.user.id);
+router.get(
+    "/my-assignments",
+    auth,
+    requireContributorPermission("task.view"),
+    async (req, res) => {
+        try {
+            const assignments = await taskService.getMyAssignments(
+                req.user.id
+            );
 
-        return res.json({
-            success: true,
-            assignments
-        });
-    } catch (err) {
-        return handleError(res, err, "MY ASSIGNMENTS");
+            return res.json({
+                success: true,
+                assignments
+            });
+        } catch (err) {
+            return handleError(res, err, "MY ASSIGNMENTS");
+        }
     }
-});
+);
 
 // GET /api/contributor/my-submissions
-router.get("/my-submissions", auth, async (req, res) => {
-    try {
-        const submissions = await taskService.getMySubmissions(req.user.id);
+router.get(
+    "/my-submissions",
+    auth,
+    requireContributorPermission("submission.view"),
+    async (req, res) => {
+        try {
+            const submissions = await taskService.getMySubmissions(
+                req.user.id
+            );
 
-        return res.json({
-            success: true,
-            submissions
-        });
-    } catch (err) {
-        return handleError(res, err, "MY SUBMISSIONS");
+            return res.json({
+                success: true,
+                submissions
+            });
+        } catch (err) {
+            return handleError(res, err, "MY SUBMISSIONS");
+        }
     }
-});
+);
 
 module.exports = router;
