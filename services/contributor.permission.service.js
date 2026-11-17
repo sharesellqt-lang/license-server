@@ -29,7 +29,7 @@ async function isSuperAdmin(userId) {
         `SELECT 1
          FROM users u
          INNER JOIN admin a
-            ON LOWER(a.email) = LOWER(u.email)
+            ON LOWER(TRIM(a.email)) = LOWER(TRIM(u.email))
          INNER JOIN admin_permissions ap
             ON ap.admin_id = a.id
          WHERE u.id = ?
