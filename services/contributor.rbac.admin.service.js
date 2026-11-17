@@ -1,7 +1,7 @@
 
 "use strict";
 
-const { db } = require("../db");
+const db = require("../db");
 const permissionService = require("./contributor.permission.service");
 
 function positiveId(value, error = "INVALID_USER_ID") {
