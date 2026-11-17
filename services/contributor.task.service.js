@@ -3,6 +3,8 @@
 
 const db = require("../db");
 
+const rewardsLedger = require("./rewards.ledger.service");
+
 const MAX_CREDITS = BigInt("18446744073709551615");
 
 function positiveId(value, error = "INVALID_ID") {
@@ -369,6 +371,202 @@ async function getMySubmissions(userId) {
     return rows;
 }
 
+
+async function reviewSubmission(reviewerId, submissionId, data = {}, audit = {}) {
+    reviewerId = positiveId(reviewerId, "INVALID_REVIEWER_ID");
+    submissionId = positiveId(submissionId, "INVALID_SUBMISSION_ID");
+
+    const decision = String(data.decision || "").trim();
+    const feedback = data.feedback == null
+        ? null
+        : String(data.feedback).trim();
+
+    if (!["approved", "rejected", "revision_requested"].includes(decision)) {
+        throw new Error("INVALID_REVIEW_DECISION");
+    }
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        // Khóa submission và lấy thông tin người nộp, nhiệm vụ.
+        const [rows] = await conn.execute(
+            `SELECT
+                s.id,
+                s.assignment_id,
+                s.attempt_no,
+                s.status AS submission_status,
+                s.reward_transaction_id,
+                a.user_id AS contributor_user_id,
+                a.status AS assignment_status,
+                a.task_id,
+                t.title AS task_title,
+                t.reward_credits
+             FROM contributor_submissions s
+             JOIN contributor_task_assignments a
+                ON a.id = s.assignment_id
+             JOIN contributor_tasks t
+                ON t.id = a.task_id
+             WHERE s.id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [submissionId]
+        );
+
+        if (!rows.length) {
+            throw new Error("SUBMISSION_NOT_FOUND");
+        }
+
+        const submission = rows[0];
+
+        // Không cho phép tự xét duyệt.
+        if (Number(submission.contributor_user_id) === reviewerId) {
+            throw new Error("SELF_REVIEW_NOT_ALLOWED");
+        }
+
+        // Chỉ xét duyệt bài đang chờ xử lý.
+        if (submission.submission_status !== "submitted") {
+            throw new Error("SUBMISSION_ALREADY_REVIEWED");
+        }
+
+        if (submission.reward_transaction_id != null) {
+            throw new Error("REWARD_ALREADY_GRANTED");
+        }
+
+        // Ghi kết quả xét duyệt.
+        const [reviewResult] = await conn.execute(
+            `INSERT INTO contributor_reviews (
+                submission_id,
+                reviewer_user_id,
+                decision,
+                feedback
+            ) VALUES (?, ?, ?, ?)`,
+            [
+                submissionId,
+                reviewerId,
+                decision,
+                feedback
+            ]
+        );
+
+        let rewardResult = null;
+        let rewardCredits = 0;
+
+        if (decision === "approved") {
+            const credits = BigInt(submission.reward_credits);
+
+            if (credits < 0n || credits > MAX_CREDITS) {
+                throw new Error("INVALID_REWARD");
+            }
+
+            // Chỉ cộng Credits nếu nhiệm vụ có mức thưởng lớn hơn 0.
+            if (credits > 0n) {
+                rewardResult = await rewardsLedger.creditWalletWithConnection(
+                    conn,
+                    {
+                        userId: Number(submission.contributor_user_id),
+                        amount: credits.toString(),
+                        source: "contributor_task",
+                        idempotencyKey: `contributor_submission:${submissionId}:approved`,
+                        referenceType: "contributor_submission",
+                        referenceId: String(submissionId),
+                        description: `Hoàn thành nhiệm vụ: ${submission.task_title}`,
+                        metadata: {
+                            submissionId,
+                            assignmentId: Number(submission.assignment_id),
+                            taskId: Number(submission.task_id),
+                            reviewerId
+                        }
+                    }
+                );
+
+                rewardCredits = credits.toString();
+            }
+
+            // Hoàn thành assignment.
+            await conn.execute(
+                `UPDATE contributor_task_assignments
+                 SET status = 'completed',
+                     completed_at = NOW()
+                 WHERE id = ?`,
+                [submission.assignment_id]
+            );
+        }
+
+        // Cập nhật trạng thái submission.
+        await conn.execute(
+            `UPDATE contributor_submissions
+             SET status = ?,
+                 reviewed_at = NOW(),
+                 reward_transaction_id = ?
+             WHERE id = ?`,
+            [
+                decision,
+                rewardResult ? rewardResult.transactionId : null,
+                submissionId
+            ]
+        );
+
+        // Ghi Audit Log trong cùng transaction.
+        await conn.execute(
+            `INSERT INTO contributor_audit_logs (
+                actor_user_id,
+                target_user_id,
+                action,
+                entity_type,
+                entity_id,
+                old_data,
+                new_data,
+                ip_address,
+                user_agent
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                reviewerId,
+                submission.contributor_user_id,
+                "submission.reviewed",
+                "contributor_submission",
+                String(submissionId),
+                JSON.stringify({
+                    status: submission.submission_status
+                }),
+                JSON.stringify({
+                    decision,
+                    feedback,
+                    rewardCredits,
+                    rewardTransactionId: rewardResult
+                        ? rewardResult.transactionId
+                        : null
+                }),
+                audit.ipAddress || null,
+                audit.userAgent || null
+            ]
+        );
+
+        await conn.commit();
+
+        return {
+            success: true,
+            submissionId,
+            reviewId: reviewResult.insertId,
+            decision,
+            reward: {
+                credits: rewardCredits,
+                transactionId: rewardResult
+                    ? rewardResult.transactionId
+                    : null
+            }
+        };
+
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+
 module.exports = {
     createTask,
     publishTask,
@@ -376,5 +574,6 @@ module.exports = {
     acceptTask,
     submitWork,
     getMyAssignments,
-    getMySubmissions
+    getMySubmissions,
+    reviewSubmission
 };

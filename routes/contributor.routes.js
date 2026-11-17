@@ -13,23 +13,37 @@ const taskService = require("../services/contributor.task.service");
 function handleError(res, err, label) {
     console.error(`[CONTRIBUTOR ${label}]`, err);
 
-    const errors = {
-        INVALID_USER_ID: 400,
-        INVALID_TASK_ID: 400,
-        INVALID_ASSIGNMENT_ID: 400,
-        SUBMISSION_CONTENT_REQUIRED: 400,
-        INVALID_ATTACHMENTS: 400,
-        INVALID_ATTACHMENT_URL: 400,
-        TASK_NOT_FOUND: 404,
-        ASSIGNMENT_NOT_FOUND: 404,
-        TASK_NOT_AVAILABLE: 409,
-        TASK_DEADLINE_PASSED: 409,
-        TASK_ALREADY_ACCEPTED: 409,
-        TASK_FULL: 409,
-        TASK_CLOSED: 409,
-        ASSIGNMENT_NOT_SUBMITTABLE: 409,
-        REVISION_NOT_REQUESTED: 409
-    };
+    
+const errors = {
+    INVALID_USER_ID: 400,
+    INVALID_TASK_ID: 400,
+    INVALID_ASSIGNMENT_ID: 400,
+    INVALID_REVIEWER_ID: 400,
+    INVALID_SUBMISSION_ID: 400,
+    INVALID_REVIEW_DECISION: 400,
+    SUBMISSION_CONTENT_REQUIRED: 400,
+    INVALID_ATTACHMENTS: 400,
+    INVALID_ATTACHMENT_URL: 400,
+    INVALID_REWARD: 400,
+
+    TASK_NOT_FOUND: 404,
+    ASSIGNMENT_NOT_FOUND: 404,
+    SUBMISSION_NOT_FOUND: 404,
+
+    TASK_NOT_AVAILABLE: 409,
+    TASK_DEADLINE_PASSED: 409,
+    TASK_ALREADY_ACCEPTED: 409,
+    TASK_FULL: 409,
+    TASK_CLOSED: 409,
+    ASSIGNMENT_NOT_SUBMITTABLE: 409,
+    REVISION_NOT_REQUESTED: 409,
+
+    SUBMISSION_ALREADY_REVIEWED: 409,
+    REWARD_ALREADY_GRANTED: 409,
+
+    SELF_REVIEW_NOT_ALLOWED: 403
+};
+
 
     const status = errors[err.message] || 500;
 
@@ -104,6 +118,35 @@ router.post(
         }
     }
 );
+
+
+// POST /api/contributor/submissions/:id/review
+router.post(
+    "/submissions/:id/review",
+    auth,
+    requireContributorPermission("submission.review"),
+    async (req, res) => {
+        try {
+            const result = await taskService.reviewSubmission(
+                req.user.id,
+                req.params.id,
+                req.body,
+                {
+                    ipAddress: req.ip,
+                    userAgent: req.get("user-agent") || null
+                }
+            );
+
+            return res.json({
+                success: true,
+                review: result
+            });
+        } catch (err) {
+            return handleError(res, err, "REVIEW SUBMISSION");
+        }
+    }
+);
+
 
 // GET /api/contributor/my-assignments
 router.get(

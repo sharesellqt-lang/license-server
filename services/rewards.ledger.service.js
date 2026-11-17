@@ -93,169 +93,185 @@ function validateInput(data) {
     };
 }
 
-async function applyTransaction(input) {
+/**
+ * Thực hiện giao dịch trên connection được truyền vào.
+ * Không tự beginTransaction, commit, rollback hoặc release.
+ */
+async function applyTransactionWithConnection(conn, input) {
+    if (!conn || typeof conn.execute !== "function") {
+        throw new Error("INVALID_DATABASE_CONNECTION");
+    }
+
     const data = validateInput(input);
+
+    // Tạo ví nếu chưa tồn tại.
+    await conn.execute(
+        `INSERT IGNORE INTO reward_wallets (user_id)
+         VALUES (?)`,
+        [data.userId]
+    );
+
+    // Khóa ví.
+    const [walletRows] = await conn.execute(
+        `SELECT id, user_id, balance, lifetime_earned,
+                lifetime_spent, status
+         FROM reward_wallets
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [data.userId]
+    );
+
+    if (!walletRows.length) {
+        throw new Error("WALLET_NOT_FOUND");
+    }
+
+    const wallet = walletRows[0];
+
+    if (wallet.status !== "active") {
+        throw new Error("WALLET_LOCKED");
+    }
+
+    // Kiểm tra idempotency.
+    const [existingRows] = await conn.execute(
+        `SELECT id, user_id, type, source, amount,
+                balance_before, balance_after,
+                idempotency_key, created_at
+         FROM reward_transactions
+         WHERE idempotency_key = ?
+         LIMIT 1`,
+        [data.idempotencyKey]
+    );
+
+    if (existingRows.length) {
+        const existing = existingRows[0];
+
+        if (Number(existing.user_id) !== data.userId) {
+            throw new Error("IDEMPOTENCY_KEY_CONFLICT");
+        }
+
+        if (
+            existing.type !== data.type ||
+            existing.source !== data.source ||
+            BigInt(existing.amount) !== data.amount
+        ) {
+            throw new Error("IDEMPOTENCY_KEY_REUSED");
+        }
+
+        return {
+            success: true,
+            duplicate: true,
+            transaction: existing,
+            transactionId: existing.id,
+            balance: outputNumber(wallet.balance)
+        };
+    }
+
+    const balanceBefore = BigInt(wallet.balance);
+    let balanceAfter;
+
+    if (data.type === "credit") {
+        balanceAfter = balanceBefore + data.amount;
+
+        if (balanceAfter > MAX_CREDITS) {
+            throw new Error("BALANCE_OVERFLOW");
+        }
+    } else {
+        if (balanceBefore < data.amount) {
+            throw new Error("INSUFFICIENT_CREDITS");
+        }
+
+        balanceAfter = balanceBefore - data.amount;
+    }
+
+    // Cập nhật ví.
+    if (data.type === "credit") {
+        await conn.execute(
+            `UPDATE reward_wallets
+             SET balance = ?,
+                 lifetime_earned = lifetime_earned + ?
+             WHERE id = ?`,
+            [
+                balanceAfter.toString(),
+                data.amount.toString(),
+                wallet.id
+            ]
+        );
+    } else {
+        await conn.execute(
+            `UPDATE reward_wallets
+             SET balance = ?,
+                 lifetime_spent = lifetime_spent + ?
+             WHERE id = ?`,
+            [
+                balanceAfter.toString(),
+                data.amount.toString(),
+                wallet.id
+            ]
+        );
+    }
+
+    // Ghi Ledger.
+    const [result] = await conn.execute(
+        `INSERT INTO reward_transactions (
+            wallet_id,
+            user_id,
+            type,
+            source,
+            amount,
+            balance_before,
+            balance_after,
+            reference_type,
+            reference_id,
+            idempotency_key,
+            description,
+            metadata,
+            created_by_admin_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            wallet.id,
+            data.userId,
+            data.type,
+            data.source,
+            data.amount.toString(),
+            balanceBefore.toString(),
+            balanceAfter.toString(),
+            data.referenceType || null,
+            data.referenceId || null,
+            data.idempotencyKey,
+            data.description || null,
+            data.metadata == null
+                ? null
+                : JSON.stringify(data.metadata),
+            data.createdByAdminId || null
+        ]
+    );
+
+    return {
+        success: true,
+        duplicate: false,
+        transactionId: result.insertId,
+        type: data.type,
+        amount: outputNumber(data.amount),
+        balanceBefore: outputNumber(balanceBefore),
+        balanceAfter: outputNumber(balanceAfter)
+    };
+}
+
+/**
+ * API cũ: tự quản lý connection và transaction.
+ */
+async function applyTransaction(input) {
     const conn = await db.getConnection();
 
     try {
         await conn.beginTransaction();
 
-        // Tạo ví nếu chưa tồn tại.
-        await conn.execute(
-            `INSERT IGNORE INTO reward_wallets (user_id)
-             VALUES (?)`,
-            [data.userId]
-        );
-
-        // Khóa ví để ngăn hai giao dịch cập nhật đồng thời.
-        const [walletRows] = await conn.execute(
-            `SELECT id, user_id, balance, lifetime_earned,
-                    lifetime_spent, status
-             FROM reward_wallets
-             WHERE user_id = ?
-             LIMIT 1
-             FOR UPDATE`,
-            [data.userId]
-        );
-
-        if (!walletRows.length) {
-            throw new Error("WALLET_NOT_FOUND");
-        }
-
-        const wallet = walletRows[0];
-
-        if (wallet.status !== "active") {
-            throw new Error("WALLET_LOCKED");
-        }
-
-        // Kiểm tra giao dịch đã được xử lý chưa.
-        const [existingRows] = await conn.execute(
-            `SELECT id, user_id, type, source, amount,
-                    balance_before, balance_after,
-                    idempotency_key, created_at
-             FROM reward_transactions
-             WHERE idempotency_key = ?
-             LIMIT 1`,
-            [data.idempotencyKey]
-        );
-
-        if (existingRows.length) {
-            const existing = existingRows[0];
-
-            if (Number(existing.user_id) !== data.userId) {
-                throw new Error("IDEMPOTENCY_KEY_CONFLICT");
-            }
-
-            if (
-                existing.type !== data.type ||
-                existing.source !== data.source ||
-                BigInt(existing.amount) !== data.amount
-            ) {
-                throw new Error("IDEMPOTENCY_KEY_REUSED");
-            }
-
-            await conn.commit();
-
-            return {
-                success: true,
-                duplicate: true,
-                transaction: existing,
-                balance: outputNumber(wallet.balance)
-            };
-        }
-
-        const balanceBefore = BigInt(wallet.balance);
-        let balanceAfter;
-
-        if (data.type === "credit") {
-            balanceAfter = balanceBefore + data.amount;
-
-            if (balanceAfter > MAX_CREDITS) {
-                throw new Error("BALANCE_OVERFLOW");
-            }
-        } else {
-            if (balanceBefore < data.amount) {
-                throw new Error("INSUFFICIENT_CREDITS");
-            }
-
-            balanceAfter = balanceBefore - data.amount;
-        }
-
-        // Cập nhật ví.
-        if (data.type === "credit") {
-            await conn.execute(
-                `UPDATE reward_wallets
-                 SET balance = ?,
-                     lifetime_earned = lifetime_earned + ?
-                 WHERE id = ?`,
-                [
-                    balanceAfter.toString(),
-                    data.amount.toString(),
-                    wallet.id
-                ]
-            );
-        } else {
-            await conn.execute(
-                `UPDATE reward_wallets
-                 SET balance = ?,
-                     lifetime_spent = lifetime_spent + ?
-                 WHERE id = ?`,
-                [
-                    balanceAfter.toString(),
-                    data.amount.toString(),
-                    wallet.id
-                ]
-            );
-        }
-
-        // Ghi Ledger. Không cập nhật/xóa giao dịch cũ.
-        const [result] = await conn.execute(
-            `INSERT INTO reward_transactions (
-                wallet_id,
-                user_id,
-                type,
-                source,
-                amount,
-                balance_before,
-                balance_after,
-                reference_type,
-                reference_id,
-                idempotency_key,
-                description,
-                metadata,
-                created_by_admin_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                wallet.id,
-                data.userId,
-                data.type,
-                data.source,
-                data.amount.toString(),
-                balanceBefore.toString(),
-                balanceAfter.toString(),
-                data.referenceType || null,
-                data.referenceId || null,
-                data.idempotencyKey,
-                data.description || null,
-                data.metadata == null
-                    ? null
-                    : JSON.stringify(data.metadata),
-                data.createdByAdminId || null
-            ]
-        );
+        const result = await applyTransactionWithConnection(conn, input);
 
         await conn.commit();
 
-        return {
-            success: true,
-            duplicate: false,
-            transactionId: result.insertId,
-            type: data.type,
-            amount: outputNumber(data.amount),
-            balanceBefore: outputNumber(balanceBefore),
-            balanceAfter: outputNumber(balanceAfter)
-        };
-
+        return result;
     } catch (err) {
         await conn.rollback();
         throw err;
@@ -278,7 +294,19 @@ async function debitWallet(data) {
     });
 }
 
+/**
+ * API mới: cộng Credits trong transaction bên ngoài.
+ * Caller chịu trách nhiệm commit/rollback.
+ */
+async function creditWalletWithConnection(conn, data) {
+    return applyTransactionWithConnection(conn, {
+        ...data,
+        type: "credit"
+    });
+}
+
 module.exports = {
     creditWallet,
-    debitWallet
+    debitWallet,
+    creditWalletWithConnection
 };
