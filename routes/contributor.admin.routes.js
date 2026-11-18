@@ -12,8 +12,13 @@ const rbacService = require("../services/contributor.rbac.admin.service");
 const taskService = require("../services/contributor.task.service");
 const memberService = require("../services/contributor.member.admin.service");
 const auditService = require("../services/contributor.audit.admin.service");
+router.use((req, res, next) => {
+    console.log("[ADMIN ROUTER ENTER]", req.method, req.originalUrl);
+    next();
+});
 
 router.use(auth);
+
 
 function handleError(res, err, label = "ADMIN") {
     console.error(`[CONTRIBUTOR ${label}]`, err);

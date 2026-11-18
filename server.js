@@ -84,6 +84,11 @@ app.use((req, res, next) => {
 app.use("/api/airdrop", airdropRoutes);
 app.use("/api/rewards", require("./routes/rewards.routes"));
 app.use("/api/contributor", require("./routes/contributor.routes"));
+app.use("/api/contributor/admin", (req, res, next) => {
+    console.log("[ADMIN PREFIX HIT]", req.method, req.originalUrl);
+    next();
+});
+
 app.use(
     "/api/contributor/admin",
     require("./routes/contributor.admin.routes")
