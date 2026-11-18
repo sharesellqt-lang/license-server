@@ -670,7 +670,6 @@ async function acceptTask(userId, taskId) {
 async function cancelAssignment(userId, assignmentId, reason = null, audit = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
     assignmentId = positiveId(assignmentId, "INVALID_ASSIGNMENT_ID");
-    console.log("[CANCEL ASSIGNMENT INPUT]", { userId, assignmentId });
 
     if (reason != null && typeof reason !== "string") {
         throw new Error("INVALID_CANCEL_REASON");
@@ -695,10 +694,7 @@ async function cancelAssignment(userId, assignmentId, reason = null, audit = {})
              FOR UPDATE`,
             [assignmentId, userId]
         );
-        console.log("[CANCEL ASSIGNMENT RESULT]", {
-            rowsFound: rows.length,
-            rows
-        });
+
         if (!rows.length) {
             throw new Error("ASSIGNMENT_NOT_FOUND");
         }
@@ -979,6 +975,128 @@ async function getMySubmissions(userId) {
     });
 }
 
+
+async function getAdminSubmissions(query = {}) {
+    const page = Math.max(1, parseInt(query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    const conditions = [];
+    const params = [];
+
+    const allowedStatuses = [
+        "submitted",
+        "approved",
+        "rejected",
+        "revision_requested"
+    ];
+
+    if (query.status) {
+        const status = String(query.status).trim();
+        if (!allowedStatuses.includes(status)) {
+            throw new Error("INVALID_DATA");
+        }
+        conditions.push("s.status = ?");
+        params.push(status);
+    }
+
+    if (query.taskId) {
+        const taskId = positiveId(query.taskId, "INVALID_TASK_ID");
+        conditions.push("a.task_id = ?");
+        params.push(taskId);
+    }
+
+    const where = conditions.length
+        ? `WHERE ${conditions.join(" AND ")}`
+        : "";
+
+    const [[count]] = await db.execute(
+        `SELECT COUNT(*) AS total
+         FROM contributor_submissions s
+         JOIN contributor_task_assignments a
+            ON a.id = s.assignment_id
+         JOIN contributor_tasks t
+            ON t.id = a.task_id
+         ${where}`,
+        params
+    );
+
+    const [rows] = await db.execute(
+        `SELECT
+            s.id,
+            s.assignment_id,
+            s.attempt_no,
+            s.content,
+            s.attachment_urls,
+            s.status,
+            s.submitted_at,
+            s.reviewed_at,
+            s.reward_transaction_id,
+            a.user_id AS contributor_user_id,
+            a.status AS assignment_status,
+            a.task_id,
+            t.title AS task_title,
+            t.reward_credits,
+            (
+                SELECT r.feedback
+                FROM contributor_reviews r
+                WHERE r.submission_id = s.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS feedback,
+            (
+                SELECT r.decision
+                FROM contributor_reviews r
+                WHERE r.submission_id = s.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS review_decision,
+            (
+                SELECT r.reviewer_user_id
+                FROM contributor_reviews r
+                WHERE r.submission_id = s.id
+                ORDER BY r.id DESC
+                LIMIT 1
+            ) AS reviewer_user_id
+         FROM contributor_submissions s
+         JOIN contributor_task_assignments a
+            ON a.id = s.assignment_id
+         JOIN contributor_tasks t
+            ON t.id = a.task_id
+         ${where}
+         ORDER BY s.id DESC
+         LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
+    );
+
+    const total = Number(count.total);
+
+    return {
+        submissions: rows.map(row => {
+            let attachmentUrls = [];
+
+            try {
+                attachmentUrls = row.attachment_urls
+                    ? JSON.parse(row.attachment_urls)
+                    : [];
+            } catch {
+                attachmentUrls = [];
+            }
+
+            return {
+                ...row,
+                attachment_urls: attachmentUrls
+            };
+        }),
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
+}
+
 async function reviewSubmission(reviewerId, submissionId, data = {}, audit = {}) {
     reviewerId = positiveId(reviewerId, "INVALID_REVIEWER_ID");
     submissionId = positiveId(submissionId, "INVALID_SUBMISSION_ID");
@@ -1187,5 +1305,6 @@ module.exports = {
     submitWork,
     getMyAssignments,
     getMySubmissions,
+    getAdminSubmissions,
     reviewSubmission
 };

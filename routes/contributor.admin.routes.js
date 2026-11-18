@@ -38,7 +38,12 @@ function handleError(res, err, label = "ADMIN") {
         TASK_CANNOT_BE_PUBLISHED: 409,
         TASK_CANNOT_BE_PAUSED: 409,
         TASK_CANNOT_BE_RESUMED: 409,
-        TASK_CANNOT_BE_CLOSED: 409
+        TASK_CANNOT_BE_CLOSED: 409,
+        INVALID_SUBMISSION_ID: 400,
+        INVALID_PAGE: 400,
+        INVALID_LIMIT: 400,
+
+        SUBMISSION_NOT_FOUND: 404,
     };
 
     const status = errors[err.message] || 500;
@@ -333,6 +338,20 @@ router.post(
             return res.json({ success: true, task });
         } catch (err) {
             return handleError(res, err, "CLOSE TASK");
+        }
+    }
+);
+
+// ADMIN: GET SUBMISSIONS
+router.get(
+    "/submissions",
+    requireContributorPermission("submission.review"),
+    async (req, res) => {
+        try {
+            const result = await taskService.getAdminSubmissions(req.query);
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET ADMIN SUBMISSIONS");
         }
     }
 );
