@@ -64,6 +64,24 @@ function getAuditInfo(req) {
     };
 }
 
+// GET /api/contributor/me/access
+router.get(
+    "/me/access",
+    auth,
+    async (req, res) => {
+        try {
+            const access = await require("../services/contributor.rbac.admin.service")
+                .getUserAccess(req.user.id);
+
+            return res.json({
+                success: true,
+                access
+            });
+        } catch (err) {
+            return handleError(res, err, "MY ACCESS");
+        }
+    }
+);
 // GET /api/contributor/tasks
 router.get(
     "/tasks",
