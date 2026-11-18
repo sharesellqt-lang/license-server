@@ -11,6 +11,7 @@ const requireContributorPermission =
 const rbacService = require("../services/contributor.rbac.admin.service");
 const taskService = require("../services/contributor.task.service");
 const memberService = require("../services/contributor.member.admin.service");
+const auditService = require("../services/contributor.audit.admin.service");
 
 router.use(auth);
 
@@ -47,6 +48,7 @@ function handleError(res, err, label = "ADMIN") {
         SUBMISSION_NOT_FOUND: 404,
         INVALID_PAGE: 400,
         INVALID_LIMIT: 400,
+        INVALID_DATE_RANGE: 400,
     };
 
     const status = errors[err.message] || 500;
@@ -426,6 +428,29 @@ router.get(
             return res.json({ success: true, ...result });
         } catch (err) {
             return handleError(res, err, "GET MEMBER TRANSACTIONS");
+        }
+    }
+);
+
+
+// =========================
+// AUDIT LOGS
+// =========================
+
+// GET /api/contributor/admin/audit-logs
+router.get(
+    "/audit-logs",
+    requireContributorPermission("audit.view"),
+    async (req, res) => {
+        try {
+            const result = await auditService.getAuditLogs(req.query);
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (err) {
+            return handleError(res, err, "GET AUDIT LOGS");
         }
     }
 );
