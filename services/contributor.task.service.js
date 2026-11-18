@@ -670,6 +670,7 @@ async function acceptTask(userId, taskId) {
 async function cancelAssignment(userId, assignmentId, reason = null, audit = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
     assignmentId = positiveId(assignmentId, "INVALID_ASSIGNMENT_ID");
+    console.log("[CANCEL ASSIGNMENT INPUT]", { userId, assignmentId });
 
     if (reason != null && typeof reason !== "string") {
         throw new Error("INVALID_CANCEL_REASON");
@@ -694,7 +695,10 @@ async function cancelAssignment(userId, assignmentId, reason = null, audit = {})
              FOR UPDATE`,
             [assignmentId, userId]
         );
-
+        console.log("[CANCEL ASSIGNMENT RESULT]", {
+            rowsFound: rows.length,
+            rows
+        });
         if (!rows.length) {
             throw new Error("ASSIGNMENT_NOT_FOUND");
         }
