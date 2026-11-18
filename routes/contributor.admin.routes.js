@@ -249,8 +249,8 @@ router.put(
         try {
             const task = await taskService.updateTask(
                 req.params.id,
-                req.body,
                 req.user.id,
+                req.body,
                 getAuditInfo(req)
             );
 
