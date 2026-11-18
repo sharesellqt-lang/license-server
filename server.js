@@ -88,6 +88,10 @@ app.use(
     "/api/contributor/admin",
     require("./routes/contributor.admin.routes")
 );
+console.log(
+    "[CHECK CONTRIBUTOR ADMIN ROUTER]",
+    typeof require("./routes/contributor.admin.routes")
+);
 app.use("/api/stock-data", require("./routes/stock-data.routes"));
 
 app.get("/api/airdrop-test", (req, res) => {
