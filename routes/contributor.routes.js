@@ -13,37 +13,39 @@ const taskService = require("../services/contributor.task.service");
 function handleError(res, err, label) {
     console.error(`[CONTRIBUTOR ${label}]`, err);
 
-    
-const errors = {
-    INVALID_USER_ID: 400,
-    INVALID_TASK_ID: 400,
-    INVALID_ASSIGNMENT_ID: 400,
-    INVALID_REVIEWER_ID: 400,
-    INVALID_SUBMISSION_ID: 400,
-    INVALID_REVIEW_DECISION: 400,
-    SUBMISSION_CONTENT_REQUIRED: 400,
-    INVALID_ATTACHMENTS: 400,
-    INVALID_ATTACHMENT_URL: 400,
-    INVALID_REWARD: 400,
+    const errors = {
+        INVALID_USER_ID: 400,
+        INVALID_TASK_ID: 400,
+        INVALID_ASSIGNMENT_ID: 400,
+        INVALID_REVIEWER_ID: 400,
+        INVALID_SUBMISSION_ID: 400,
+        INVALID_REVIEW_DECISION: 400,
+        INVALID_REWARD: 400,
+        INVALID_DATA: 400,
+        INVALID_ATTACHMENTS: 400,
+        INVALID_ATTACHMENT_URL: 400,
+        INVALID_CANCEL_REASON: 400,
+        INVALID_FEEDBACK: 400,
+        SUBMISSION_CONTENT_REQUIRED: 400,
 
-    TASK_NOT_FOUND: 404,
-    ASSIGNMENT_NOT_FOUND: 404,
-    SUBMISSION_NOT_FOUND: 404,
+        TASK_NOT_FOUND: 404,
+        ASSIGNMENT_NOT_FOUND: 404,
+        SUBMISSION_NOT_FOUND: 404,
 
-    TASK_NOT_AVAILABLE: 409,
-    TASK_DEADLINE_PASSED: 409,
-    TASK_ALREADY_ACCEPTED: 409,
-    TASK_FULL: 409,
-    TASK_CLOSED: 409,
-    ASSIGNMENT_NOT_SUBMITTABLE: 409,
-    REVISION_NOT_REQUESTED: 409,
+        TASK_NOT_AVAILABLE: 409,
+        TASK_DEADLINE_PASSED: 409,
+        TASK_ALREADY_ACCEPTED: 409,
+        TASK_FULL: 409,
+        TASK_CLOSED: 409,
+        ASSIGNMENT_NOT_SUBMITTABLE: 409,
+        ASSIGNMENT_CANNOT_BE_CANCELLED: 409,
+        REVISION_NOT_REQUESTED: 409,
+        SUBMISSION_ALREADY_REVIEWED: 409,
+        REWARD_ALREADY_GRANTED: 409,
+        ASSIGNMENT_NOT_REVIEWABLE: 409,
 
-    SUBMISSION_ALREADY_REVIEWED: 409,
-    REWARD_ALREADY_GRANTED: 409,
-
-    SELF_REVIEW_NOT_ALLOWED: 403
-};
-
+        SELF_REVIEW_NOT_ALLOWED: 403
+    };
 
     const status = errors[err.message] || 500;
 
@@ -53,6 +55,13 @@ const errors = {
             ? "CONTRIBUTOR_OPERATION_FAILED"
             : err.message
     });
+}
+
+function getAuditInfo(req) {
+    return {
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent") || null
+    };
 }
 
 // GET /api/contributor/tasks
@@ -70,6 +79,21 @@ router.get(
             return res.json({ success: true, ...result });
         } catch (err) {
             return handleError(res, err, "TASK LIST");
+        }
+    }
+);
+
+// GET /api/contributor/tasks/:id
+router.get(
+    "/tasks/:id",
+    auth,
+    requireContributorPermission("task.view"),
+    async (req, res) => {
+        try {
+            const task = await taskService.getTaskById(req.params.id);
+            return res.json({ success: true, task });
+        } catch (err) {
+            return handleError(res, err, "TASK DETAIL");
         }
     }
 );
@@ -96,6 +120,30 @@ router.post(
     }
 );
 
+// POST /api/contributor/assignments/:id/cancel
+router.post(
+    "/assignments/:id/cancel",
+    auth,
+    requireContributorPermission("task.accept"),
+    async (req, res) => {
+        try {
+            const result = await taskService.cancelAssignment(
+                req.user.id,
+                req.params.id,
+                req.body?.reason,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                assignment: result
+            });
+        } catch (err) {
+            return handleError(res, err, "CANCEL ASSIGNMENT");
+        }
+    }
+);
+
 // POST /api/contributor/assignments/:id/submit
 router.post(
     "/assignments/:id/submit",
@@ -106,7 +154,8 @@ router.post(
             const result = await taskService.submitWork(
                 req.user.id,
                 req.params.id,
-                req.body
+                req.body,
+                getAuditInfo(req)
             );
 
             return res.status(201).json({
@@ -119,7 +168,6 @@ router.post(
     }
 );
 
-
 // POST /api/contributor/submissions/:id/review
 router.post(
     "/submissions/:id/review",
@@ -131,10 +179,7 @@ router.post(
                 req.user.id,
                 req.params.id,
                 req.body,
-                {
-                    ipAddress: req.ip,
-                    userAgent: req.get("user-agent") || null
-                }
+                getAuditInfo(req)
             );
 
             return res.json({
@@ -146,7 +191,6 @@ router.post(
         }
     }
 );
-
 
 // GET /api/contributor/my-assignments
 router.get(

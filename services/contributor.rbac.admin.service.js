@@ -3,6 +3,7 @@
 
 const db = require("../db");
 const permissionService = require("./contributor.permission.service");
+const { writeAudit } = require("./contributor.audit.service");
 
 function positiveId(value, error = "INVALID_USER_ID") {
     const id = Number(value);
@@ -15,26 +16,6 @@ function validKey(value, error) {
         throw new Error(error);
     }
     return value;
-}
-
-async function writeAudit(conn, data) {
-    await conn.execute(
-        `INSERT INTO contributor_audit_logs
-         (actor_user_id, target_user_id, action, entity_type,
-          entity_id, old_data, new_data, ip_address, user_agent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            data.actorUserId,
-            data.targetUserId,
-            data.action,
-            data.entityType,
-            data.entityId || null,
-            data.oldData ? JSON.stringify(data.oldData) : null,
-            data.newData ? JSON.stringify(data.newData) : null,
-            data.ipAddress || null,
-            data.userAgent || null
-        ]
-    );
 }
 
 async function getRoles() {

@@ -11,6 +11,8 @@ const requireContributorPermission =
 const rbacService = require("../services/contributor.rbac.admin.service");
 const taskService = require("../services/contributor.task.service");
 
+router.use(auth);
+
 function handleError(res, err, label = "ADMIN") {
     console.error(`[CONTRIBUTOR ${label}]`, err);
 
@@ -18,19 +20,25 @@ function handleError(res, err, label = "ADMIN") {
         INVALID_USER_ID: 400,
         INVALID_ROLE_KEY: 400,
         INVALID_PERMISSION_KEY: 400,
-        INVALID_PERMISSION_EFFECT: 400,
+        INVALID_EFFECT: 400,
+        INVALID_TASK_ID: 400,
         INVALID_TITLE: 400,
         INVALID_DESCRIPTION: 400,
         INVALID_CATEGORY: 400,
         INVALID_REWARD: 400,
         INVALID_MAX_PARTICIPANTS: 400,
         INVALID_DEADLINE: 400,
-        INVALID_TASK_ID: 400,
+        INVALID_DATA: 400,
+
         TARGET_USER_NOT_FOUND: 404,
         ROLE_NOT_FOUND: 404,
         PERMISSION_NOT_FOUND: 404,
         TASK_NOT_FOUND: 404,
-        TASK_CANNOT_BE_PUBLISHED: 409
+
+        TASK_CANNOT_BE_PUBLISHED: 409,
+        TASK_CANNOT_BE_PAUSED: 409,
+        TASK_CANNOT_BE_RESUMED: 409,
+        TASK_CANNOT_BE_CLOSED: 409
     };
 
     const status = errors[err.message] || 500;
@@ -50,14 +58,10 @@ function getAuditInfo(req) {
     };
 }
 
-// Tất cả API quản trị đều cần xác thực.
-router.use(auth);
+// =========================
+// RBAC
+// =========================
 
-// ========================================
-// RBAC MANAGEMENT - roles.manage
-// ========================================
-
-// GET /api/contributor/admin/roles
 router.get(
     "/roles",
     requireContributorPermission("roles.manage"),
@@ -71,7 +75,6 @@ router.get(
     }
 );
 
-// GET /api/contributor/admin/permissions
 router.get(
     "/permissions",
     requireContributorPermission("roles.manage"),
@@ -85,13 +88,14 @@ router.get(
     }
 );
 
-// GET /api/contributor/admin/users/:userId/access
 router.get(
     "/users/:userId/access",
     requireContributorPermission("roles.manage"),
     async (req, res) => {
         try {
-            const access = await rbacService.getUserAccess(req.params.userId);
+            const access = await rbacService.getUserAccess(
+                req.params.userId
+            );
 
             return res.json({ success: true, access });
         } catch (err) {
@@ -100,7 +104,6 @@ router.get(
     }
 );
 
-// PUT /api/contributor/admin/users/:userId/roles/:roleKey
 router.put(
     "/users/:userId/roles/:roleKey",
     requireContributorPermission("roles.manage"),
@@ -120,7 +123,6 @@ router.put(
     }
 );
 
-// DELETE /api/contributor/admin/users/:userId/roles/:roleKey
 router.delete(
     "/users/:userId/roles/:roleKey",
     requireContributorPermission("roles.manage"),
@@ -140,7 +142,6 @@ router.delete(
     }
 );
 
-// PUT /api/contributor/admin/users/:userId/permissions/:permissionKey
 router.put(
     "/users/:userId/permissions/:permissionKey",
     requireContributorPermission("roles.manage"),
@@ -162,7 +163,6 @@ router.put(
     }
 );
 
-// DELETE /api/contributor/admin/users/:userId/permissions/:permissionKey
 router.delete(
     "/users/:userId/permissions/:permissionKey",
     requireContributorPermission("roles.manage"),
@@ -182,9 +182,40 @@ router.delete(
     }
 );
 
-// ========================================
+// =========================
 // TASK MANAGEMENT
-// ========================================
+// =========================
+
+// GET /api/contributor/admin/tasks
+router.get(
+    "/tasks",
+    requireContributorPermission("task.view"),
+    async (req, res) => {
+        try {
+            const result = await taskService.getAdminTasks(req.query);
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET ADMIN TASKS");
+        }
+    }
+);
+
+// GET /api/contributor/admin/tasks/:id/assignments
+router.get(
+    "/tasks/:id/assignments",
+    requireContributorPermission("task.view"),
+    async (req, res) => {
+        try {
+            const assignments = await taskService.getTaskAssignments(
+                req.params.id
+            );
+
+            return res.json({ success: true, assignments });
+        } catch (err) {
+            return handleError(res, err, "GET TASK ASSIGNMENTS");
+        }
+    }
+);
 
 // POST /api/contributor/admin/tasks
 router.post(
@@ -192,10 +223,13 @@ router.post(
     requireContributorPermission("task.create"),
     async (req, res) => {
         try {
-            const task = await taskService.createTask({
-                ...req.body,
-                createdByUserId: req.user.id
-            });
+            const task = await taskService.createTask(
+                {
+                    ...req.body,
+                    createdByUserId: req.user.id
+                },
+                getAuditInfo(req)
+            );
 
             return res.status(201).json({
                 success: true,
@@ -207,20 +241,98 @@ router.post(
     }
 );
 
+// PUT /api/contributor/admin/tasks/:id
+router.put(
+    "/tasks/:id",
+    requireContributorPermission("task.edit"),
+    async (req, res) => {
+        try {
+            const task = await taskService.updateTask(
+                req.params.id,
+                req.body,
+                req.user.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({ success: true, task });
+        } catch (err) {
+            return handleError(res, err, "UPDATE TASK");
+        }
+    }
+);
+
 // POST /api/contributor/admin/tasks/:id/publish
 router.post(
     "/tasks/:id/publish",
     requireContributorPermission("task.publish"),
     async (req, res) => {
         try {
-            const task = await taskService.publishTask(req.params.id);
+            const task = await taskService.publishTask(
+                req.params.id,
+                req.user.id,
+                getAuditInfo(req)
+            );
 
-            return res.json({
-                success: true,
-                task
-            });
+            return res.json({ success: true, task });
         } catch (err) {
             return handleError(res, err, "PUBLISH TASK");
+        }
+    }
+);
+
+// POST /api/contributor/admin/tasks/:id/pause
+router.post(
+    "/tasks/:id/pause",
+    requireContributorPermission("task.edit"),
+    async (req, res) => {
+        try {
+            const task = await taskService.pauseTask(
+                req.params.id,
+                req.user.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({ success: true, task });
+        } catch (err) {
+            return handleError(res, err, "PAUSE TASK");
+        }
+    }
+);
+
+// POST /api/contributor/admin/tasks/:id/resume
+router.post(
+    "/tasks/:id/resume",
+    requireContributorPermission("task.publish"),
+    async (req, res) => {
+        try {
+            const task = await taskService.resumeTask(
+                req.params.id,
+                req.user.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({ success: true, task });
+        } catch (err) {
+            return handleError(res, err, "RESUME TASK");
+        }
+    }
+);
+
+// POST /api/contributor/admin/tasks/:id/close
+router.post(
+    "/tasks/:id/close",
+    requireContributorPermission("task.edit"),
+    async (req, res) => {
+        try {
+            const task = await taskService.closeTask(
+                req.params.id,
+                req.user.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({ success: true, task });
+        } catch (err) {
+            return handleError(res, err, "CLOSE TASK");
         }
     }
 );
