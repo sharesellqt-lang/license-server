@@ -12,17 +12,6 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const app = express();
-// =========================
-// HEALTH CHECK - RENDER WAKE UP
-// =========================
-app.get("/healthz", (req, res) => {
-    res.status(200).json({
-        success: true,
-        status: "ok",
-        service: "license-server",
-        timestamp: new Date().toISOString()
-    });
-});
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
@@ -41,34 +30,29 @@ app.use((req,res,next)=>{
 });
 
 // =========================
-// CORS CONFIG (CHUẨN 1 LỚP DUY NHẤT)
+// CORS CONFIG
 // =========================
 const corsOptions = {
     origin: "https://sharesell.net",
-
     credentials: true,
-
-    methods: [
-        "GET",
-        "POST",
-        "PUT",
-        "PATCH",
-        "DELETE",
-        "OPTIONS"
-    ],
-
-    allowedHeaders: [
-        "Content-Type",
-        "Authorization"
-    ]
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
 };
 
-
-// MUST BE FIRST
 app.use(cors(corsOptions));
-
-// 👉 handle preflight
 app.options("*", cors(corsOptions));
+
+// =========================
+// HEALTH CHECK
+// =========================
+app.get("/healthz", (req, res) => {
+    res.status(200).json({
+        success: true,
+        status: "ok",
+        service: "license-server",
+        timestamp: new Date().toISOString()
+    });
+});
 
 // =========================
 // DEBUG LOG (OPTIONAL)
@@ -84,19 +68,11 @@ app.use((req, res, next) => {
 app.use("/api/airdrop", airdropRoutes);
 app.use("/api/rewards", require("./routes/rewards.routes"));
 app.use("/api/contributor", require("./routes/contributor.routes"));
-app.use("/api/contributor/admin", (req, res, next) => {
-    console.log("[ADMIN PREFIX HIT]", req.method, req.originalUrl);
-    next();
-});
-
 app.use(
     "/api/contributor/admin",
     require("./routes/contributor.admin.routes")
 );
-console.log(
-    "[CHECK CONTRIBUTOR ADMIN ROUTER]",
-    typeof require("./routes/contributor.admin.routes")
-);
+
 app.use("/api/stock-data", require("./routes/stock-data.routes"));
 
 app.get("/api/airdrop-test", (req, res) => {
@@ -573,7 +549,6 @@ function checkRate(key) {
 // HEALTH
 // =========================
 app.get("/", (req, res) => res.send("ok"));
-app.get("/healthz", (req, res) => res.send("ok"));
 
 // =========================
 // VERIFY LICENSE
