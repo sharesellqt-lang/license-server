@@ -12,6 +12,17 @@ const jwt = require("jsonwebtoken");
 const path = require("path");
 const fs = require("fs");
 const app = express();
+// =========================
+// HEALTH CHECK - RENDER WAKE UP
+// =========================
+app.get("/healthz", (req, res) => {
+    res.status(200).json({
+        success: true,
+        status: "ok",
+        service: "license-server",
+        timestamp: new Date().toISOString()
+    });
+});
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
@@ -109,23 +120,6 @@ app.use(
   "/api/image-studio",
   require("./routes/image-studio.routes")
 );
-
-
-// =========================
-// BOOTSTRAP
-// =========================
-
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "https://sharesell.net");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-
-  next();
-});
 
 // =========================
 // BODY PARSER
