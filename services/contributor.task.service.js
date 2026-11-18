@@ -860,7 +860,7 @@ async function submitWork(userId, assignmentId, data, audit = {}) {
 
         await writeAudit(conn, auditData(
             userId,
-            "submission.created",
+            attemptNo === 1 ? "submission.created" : "submission.resubmitted",
             "contributor_submission",
             result.insertId,
             null,
@@ -868,10 +868,12 @@ async function submitWork(userId, assignmentId, data, audit = {}) {
                 assignmentId,
                 attemptNo,
                 status: "submitted"
-            },
-            audit
+                    },
+            {
+                ...audit,
+                targetUserId: Number(submission.contributor_user_id)
+            }
         ));
-
         await conn.commit();
 
         return {
