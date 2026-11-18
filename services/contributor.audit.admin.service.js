@@ -15,6 +15,23 @@ function validSearch(value) {
         : "";
 }
 
+const ACTION_SEARCH_MAP = {
+    "gửi bài nộp": "submission.created",
+    "gửi lại bài nộp": "submission.resubmitted",
+    "duyệt bài nộp": "submission.reviewed",
+    "phân công vai trò": "role.assigned",
+    "thu hồi vai trò": "role.revoked",
+    "cập nhật quyền": "permission.updated",
+    "xóa quyền": "permission.removed"
+};
+
+function normalizeActionSearch(value) {
+    const normalized = value
+        .trim()
+        .toLocaleLowerCase("vi");
+
+    return ACTION_SEARCH_MAP[normalized] || value;
+}
 function validDate(value) {
     if (typeof value !== "string" || !value.trim()) return "";
 
@@ -27,7 +44,8 @@ async function getAuditLogs(query = {}) {
     const limit = validPage(query.limit, 20, 100);
     const offset = (page - 1) * limit;
 
-    const search = validSearch(query.search);
+    const rawSearch = validSearch(query.search);
+    const search = normalizeActionSearch(rawSearch);
     const action = validSearch(query.action);
     const entityType = validSearch(query.entity_type);
     const dateFrom = validDate(query.date_from);
