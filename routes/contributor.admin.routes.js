@@ -10,6 +10,7 @@ const requireContributorPermission =
 
 const rbacService = require("../services/contributor.rbac.admin.service");
 const taskService = require("../services/contributor.task.service");
+const memberService = require("../services/contributor.member.admin.service");
 
 router.use(auth);
 
@@ -44,6 +45,8 @@ function handleError(res, err, label = "ADMIN") {
         INVALID_LIMIT: 400,
 
         SUBMISSION_NOT_FOUND: 404,
+        INVALID_PAGE: 400,
+        INVALID_LIMIT: 400,
     };
 
     const status = errors[err.message] || 500;
@@ -352,6 +355,77 @@ router.get(
             return res.json({ success: true, ...result });
         } catch (err) {
             return handleError(res, err, "GET ADMIN SUBMISSIONS");
+        }
+    }
+);
+
+// =========================
+// MEMBER MANAGEMENT
+// =========================
+
+// GET /api/contributor/admin/members
+router.get(
+    "/members",
+    requireContributorPermission("contributor.manage"),
+    async (req, res) => {
+        try {
+            const result = await memberService.getMembers(req.query);
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET MEMBERS");
+        }
+    }
+);
+
+// GET /api/contributor/admin/members/:userId
+router.get(
+    "/members/:userId",
+    requireContributorPermission("contributor.manage"),
+    async (req, res) => {
+        try {
+            const result = await memberService.getMemberDetail(
+                req.params.userId
+            );
+
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET MEMBER DETAIL");
+        }
+    }
+);
+
+// GET /api/contributor/admin/members/:userId/activity
+router.get(
+    "/members/:userId/activity",
+    requireContributorPermission("contributor.manage"),
+    async (req, res) => {
+        try {
+            const result = await memberService.getMemberActivity(
+                req.params.userId,
+                req.query
+            );
+
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET MEMBER ACTIVITY");
+        }
+    }
+);
+
+// GET /api/contributor/admin/members/:userId/transactions
+router.get(
+    "/members/:userId/transactions",
+    requireContributorPermission("contributor.manage"),
+    async (req, res) => {
+        try {
+            const result = await memberService.getMemberTransactions(
+                req.params.userId,
+                req.query
+            );
+
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET MEMBER TRANSACTIONS");
         }
     }
 );
