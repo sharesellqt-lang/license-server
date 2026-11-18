@@ -612,9 +612,11 @@ async function acceptTask(userId, taskId) {
 
         const [existing] = await conn.execute(
             `SELECT id, status
-             FROM contributor_task_assignments
-             WHERE task_id = ? AND user_id = ?
-             LIMIT 1`,
+            FROM contributor_task_assignments
+            WHERE task_id = ?
+            AND user_id = ?
+            AND status <> 'cancelled'
+            LIMIT 1`,
             [taskId, userId]
         );
 
