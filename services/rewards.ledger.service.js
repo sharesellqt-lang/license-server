@@ -1,6 +1,8 @@
 
 "use strict";
 
+const { writeAudit } = require("./contributor.audit.service");
+
 const db = require("../db");
 
 const MAX_CREDITS = BigInt("18446744073709551615");
@@ -85,9 +87,20 @@ function validateInput(data) {
         throw new Error("INVALID_ADMIN_ID");
     }
 
+    if (
+        data.actorUserId != null &&
+        (!Number.isSafeInteger(Number(data.actorUserId)) ||
+         Number(data.actorUserId) <= 0)
+    ) {
+        throw new Error("INVALID_ACTOR_ID");
+    }
+
     return {
         ...data,
         userId,
+        actorUserId: data.actorUserId == null
+            ? null
+            : Number(data.actorUserId),
         amount: parseCredits(data.amount),
         source: data.source.trim()
     };
@@ -247,6 +260,26 @@ async function applyTransactionWithConnection(conn, input) {
         ]
     );
 
+await writeAudit(conn, {
+    actorUserId: data.actorUserId,
+    targetUserId: data.userId,
+    action: data.type === "credit"
+        ? "credits.credited"
+        : "credits.debited",
+    entityType: "reward_transaction",
+    entityId: result.insertId,
+    oldData: {
+        balance: outputNumber(balanceBefore)
+    },
+    newData: {
+        balance: outputNumber(balanceAfter),
+        type: data.type,
+        amount: outputNumber(data.amount),
+        source: data.source,
+        referenceType: data.referenceType || null,
+        referenceId: data.referenceId || null
+    }
+});
     return {
         success: true,
         duplicate: false,

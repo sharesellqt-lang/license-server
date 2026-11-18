@@ -87,13 +87,13 @@ async function assignRole(actorUserId, targetUserId, roleKey, audit = {}) {
         );
 
         await writeAudit(conn, {
+            ...audit,
             actorUserId: actorId,
             targetUserId: targetId,
             action: "role.assigned",
             entityType: "role",
             entityId: role.role_key,
-            newData: { roleKey: role.role_key, roleName: role.name },
-            ...audit
+            newData: { roleKey: role.role_key, roleName: role.name }
         });
 
         await conn.commit();
@@ -116,6 +116,12 @@ async function revokeRole(actorUserId, targetUserId, roleKey, audit = {}) {
     try {
         await conn.beginTransaction();
 
+        const [users] = await conn.execute(
+            "SELECT id FROM users WHERE id = ? LIMIT 1 FOR UPDATE",
+            [targetId]
+        );
+        if (!users.length) throw new Error("TARGET_USER_NOT_FOUND");
+
         const [roles] = await conn.execute(
             "SELECT id, role_key, name FROM contributor_roles WHERE role_key = ? LIMIT 1",
             [key]
@@ -130,15 +136,15 @@ async function revokeRole(actorUserId, targetUserId, roleKey, audit = {}) {
             [targetId, role.id]
         );
 
-        if (result.affectedRows) {
+       if (result.affectedRows) {
             await writeAudit(conn, {
+                ...audit,
                 actorUserId: actorId,
                 targetUserId: targetId,
                 action: "role.revoked",
                 entityType: "role",
                 entityId: role.role_key,
-                oldData: { roleKey: role.role_key, roleName: role.name },
-                ...audit
+                oldData: { roleKey: role.role_key, roleName: role.name }
             });
         }
 
@@ -213,16 +219,15 @@ async function setUserPermission(
         );
 
         await writeAudit(conn, {
+            ...audit,
             actorUserId: actorId,
             targetUserId: targetId,
             action: "permission.updated",
             entityType: "permission",
             entityId: permission.permission_key,
             oldData,
-            newData: { effect, reason: reason || null },
-            ...audit
+            newData: { effect, reason: reason || null }
         });
-
         await conn.commit();
         return { permission: key, effect };
     } catch (error) {
@@ -248,6 +253,13 @@ async function removeUserPermission(
     try {
         await conn.beginTransaction();
 
+        const [users] = await conn.execute(
+            "SELECT id FROM users WHERE id = ? LIMIT 1 FOR UPDATE",
+            [targetId]
+        );
+
+        if (!users.length) throw new Error("TARGET_USER_NOT_FOUND");
+
         const [permissions] = await conn.execute(
             "SELECT id FROM contributor_permissions WHERE permission_key = ? LIMIT 1",
             [key]
@@ -271,16 +283,15 @@ async function removeUserPermission(
              WHERE user_id = ? AND permission_id = ?`,
             [targetId, permissionId]
         );
-
         if (result.affectedRows) {
             await writeAudit(conn, {
+                ...audit,
                 actorUserId: actorId,
                 targetUserId: targetId,
                 action: "permission.removed",
                 entityType: "permission",
                 entityId: key,
-                oldData,
-                ...audit
+                oldData
             });
         }
 
@@ -330,6 +341,212 @@ async function getUserAccess(userId) {
     };
 }
 
+
+function positiveNumber(value, fallback, min, max) {
+    const number = Number(value);
+    return Number.isSafeInteger(number) && number >= min
+        ? Math.min(number, max)
+        : fallback;
+}
+
+async function getMembers(params = {}) {
+    const page = positiveNumber(params.page, 1, 1, 1000000);
+    const limit = positiveNumber(params.limit, 20, 1, 100);
+    const offset = (page - 1) * limit;
+
+    const search = String(params.search || "").trim().slice(0, 255);
+    const roleKey = params.role ? validKey(params.role, "INVALID_ROLE_KEY") : null;
+    const plan = ["free", "pro", "vip"].includes(params.plan)
+        ? params.plan
+        : null;
+
+    const where = [];
+    const values = [];
+
+    if (search) {
+        if (/^\d+$/.test(search)) {
+            where.push("(u.id = ? OR u.email LIKE ?)");
+            values.push(Number(search), `%${search}%`);
+        } else {
+            where.push("u.email LIKE ?");
+            values.push(`%${search}%`);
+        }
+    }
+
+    if (plan) {
+        where.push("u.plan = ?");
+        values.push(plan);
+    }
+
+    if (roleKey) {
+        where.push(`EXISTS (
+            SELECT 1
+            FROM contributor_user_roles ur
+            INNER JOIN contributor_roles r ON r.id = ur.role_id
+            WHERE ur.user_id = u.id
+              AND r.role_key = ?
+              AND r.enabled = 1
+              AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+        )`);
+        values.push(roleKey);
+    }
+
+    const condition = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
+    const [[count]] = await db.execute(
+        `SELECT COUNT(*) AS total
+         FROM users u
+         ${condition}`,
+        values
+    );
+
+    const [rows] = await db.execute(
+        `SELECT
+            u.id AS user_id,
+            u.email,
+            u.plan,
+            u.expire_at,
+            u.created_at,
+
+            COALESCE(w.balance, 0) AS credits_balance,
+            COALESCE(w.lifetime_earned, 0) AS lifetime_earned,
+            COALESCE(w.lifetime_spent, 0) AS lifetime_spent,
+            COALESCE(w.status, 'none') AS wallet_status,
+
+            COALESCE(a.accepted_count, 0) AS accepted_count,
+            COALESCE(a.submitted_count, 0) AS assignment_submitted_count,
+            COALESCE(a.completed_count, 0) AS completed_count,
+            COALESCE(a.rejected_count, 0) AS assignment_rejected_count,
+            COALESCE(a.cancelled_count, 0) AS cancelled_count,
+
+            COALESCE(s.total_submissions, 0) AS total_submissions,
+            COALESCE(s.approved_count, 0) AS approved_count,
+            COALESCE(s.rejected_count, 0) AS submission_rejected_count,
+            COALESCE(s.revision_count, 0) AS revision_count,
+            COALESCE(s.pending_count, 0) AS pending_count,
+
+            COALESCE(r.roles, '') AS roles
+
+         FROM users u
+
+         LEFT JOIN reward_wallets w ON w.user_id = u.id
+
+         LEFT JOIN (
+            SELECT
+                user_id,
+                SUM(status = 'accepted') AS accepted_count,
+                SUM(status = 'submitted') AS submitted_count,
+                SUM(status = 'completed') AS completed_count,
+                SUM(status = 'rejected') AS rejected_count,
+                SUM(status = 'cancelled') AS cancelled_count
+            FROM contributor_task_assignments
+            GROUP BY user_id
+         ) a ON a.user_id = u.id
+
+         LEFT JOIN (
+            SELECT
+                ta.user_id,
+                COUNT(s.id) AS total_submissions,
+                SUM(s.status = 'approved') AS approved_count,
+                SUM(s.status = 'rejected') AS rejected_count,
+                SUM(s.status = 'revision_requested') AS revision_count,
+                SUM(s.status IN ('submitted', 'under_review')) AS pending_count
+            FROM contributor_task_assignments ta
+            INNER JOIN contributor_submissions s
+                ON s.assignment_id = ta.id
+            GROUP BY ta.user_id
+         ) s ON s.user_id = u.id
+
+         LEFT JOIN (
+            SELECT
+                ur.user_id,
+                GROUP_CONCAT(DISTINCT r.name ORDER BY r.name SEPARATOR ', ') AS roles
+            FROM contributor_user_roles ur
+            INNER JOIN contributor_roles r ON r.id = ur.role_id
+            WHERE r.enabled = 1
+              AND (ur.expires_at IS NULL OR ur.expires_at > NOW())
+            GROUP BY ur.user_id
+         ) r ON r.user_id = u.id
+
+         ${condition}
+         ORDER BY u.created_at DESC, u.id DESC
+         LIMIT ? OFFSET ?`,
+        [...values, limit, offset]
+    );
+
+    return {
+        members: rows,
+        pagination: {
+            page,
+            limit,
+            total: Number(count.total),
+            totalPages: Math.ceil(Number(count.total) / limit)
+        }
+    };
+}
+
+async function getMemberDetail(userId) {
+    const id = positiveId(userId);
+
+    const [rows] = await db.execute(
+        `SELECT
+            u.id AS user_id,
+            u.email,
+            u.plan,
+            u.expire_at,
+            u.created_at,
+            COALESCE(w.balance, 0) AS credits_balance,
+            COALESCE(w.lifetime_earned, 0) AS lifetime_earned,
+            COALESCE(w.lifetime_spent, 0) AS lifetime_spent,
+            COALESCE(w.status, 'none') AS wallet_status
+         FROM users u
+         LEFT JOIN reward_wallets w ON w.user_id = u.id
+         WHERE u.id = ?
+         LIMIT 1`,
+        [id]
+    );
+
+    if (!rows.length) throw new Error("MEMBER_NOT_FOUND");
+
+    const access = await getUserAccess(id);
+
+    const [[assignments]] = await db.execute(
+        `SELECT
+            COUNT(*) AS total,
+            SUM(status = 'accepted') AS accepted,
+            SUM(status = 'submitted') AS submitted,
+            SUM(status = 'completed') AS completed,
+            SUM(status = 'rejected') AS rejected,
+            SUM(status = 'cancelled') AS cancelled
+         FROM contributor_task_assignments
+         WHERE user_id = ?`,
+        [id]
+    );
+
+    const [[submissions]] = await db.execute(
+        `SELECT
+            COUNT(*) AS total,
+            SUM(status = 'submitted') AS submitted,
+            SUM(status = 'under_review') AS under_review,
+            SUM(status = 'approved') AS approved,
+            SUM(status = 'rejected') AS rejected,
+            SUM(status = 'revision_requested') AS revision_requested
+         FROM contributor_submissions s
+         INNER JOIN contributor_task_assignments a
+            ON a.id = s.assignment_id
+         WHERE a.user_id = ?`,
+        [id]
+    );
+
+    return {
+        member: rows[0],
+        access,
+        assignments,
+        submissions
+    };
+}
+
+
 module.exports = {
     getRoles,
     getPermissions,
@@ -337,5 +554,7 @@ module.exports = {
     revokeRole,
     setUserPermission,
     removeUserPermission,
-    getUserAccess
+    getUserAccess,
+    getMembers,
+    getMemberDetail
 };

@@ -572,7 +572,7 @@ async function getTaskAssignments(taskId, page = 1, limit = 20) {
     };
 }
 
-async function acceptTask(userId, taskId) {
+async function acceptTask(userId, taskId, audit = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
     taskId = positiveId(taskId, "INVALID_TASK_ID");
 
@@ -645,13 +645,17 @@ async function acceptTask(userId, taskId) {
             [taskId, userId]
         );
 
-        await writeAudit(conn, auditData(
+       await writeAudit(conn, auditData(
             userId,
             "assignment.accepted",
-            "contributor_assignment",
+            "contributor_task_assignment",
             result.insertId,
             null,
-            { taskId, status: "accepted" }
+            {
+                taskId,
+                status: "accepted"
+            },
+            audit
         ));
 
         await conn.commit();
@@ -1191,10 +1195,11 @@ async function reviewSubmission(reviewerId, submissionId, data = {}, audit = {})
 
             if (credits > 0n) {
                 rewardResult = await rewardsLedger.creditWalletWithConnection(
-                    conn,
-                    {
-                        userId: Number(submission.contributor_user_id),
-                        amount: credits.toString(),
+                conn,
+                {
+                    actorUserId: reviewerId,
+                    userId: Number(submission.contributor_user_id),
+                    amount: credits.toString(),
                         source: "contributor_task",
                         idempotencyKey: `contributor_submission:${submissionId}:approved`,
                         referenceType: "contributor_submission",
