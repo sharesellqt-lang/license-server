@@ -1,3 +1,4 @@
+
 "use strict";
 
 const express = require("express");
@@ -9,6 +10,7 @@ if (!process.env.BANK_ID || !process.env.BANK_ACCOUNT) {
 
 const auth = require("../middleware/auth");
 const db = require("../db");
+const planService = require("../services/planService");
 const { getPlan, getPlanPrice } = require("./plans");
 
 function buildPaymentNote(userId, paymentId) {
@@ -33,9 +35,12 @@ function parseSnapshot(value) {
   }
 }
 
-// Tìm toàn bộ chuỗi thanh toán PRO liên tiếp tạo nên hạn hiện tại.
-// Chỉ tính các giao dịch đã thanh toán và đã được duyệt.
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
 
+// Lấy chuỗi giao dịch PRO liên tiếp tạo nên hạn hiện tại.
+// Mỗi giao dịch được tính phần tiền chưa sử dụng riêng biệt.
 async function getProSubscriptionBasis(connection, user) {
   const currentExpiryMs = Number(user.expire_ms);
   const nowMs = Number(user.now_ms);
@@ -61,11 +66,13 @@ async function getProSubscriptionBasis(connection, user) {
   );
 
   let cursorMs = currentExpiryMs;
-  let totalDurationMs = 0;
   let totalPaid = 0;
+  let totalCredit = 0;
+  let totalDurationMs = 0;
+  let paymentCount = 0;
   let oldestStartMs = null;
-  let count = 0;
   const usedIds = new Set();
+  const details = [];
 
   while (true) {
     const candidates = payments.filter(payment =>
@@ -95,39 +102,51 @@ async function getProSubscriptionBasis(connection, user) {
       throw new Error("INVALID_PRO_PAYMENT_HISTORY");
     }
 
-    usedIds.add(Number(payment.id));
+    const durationMs = endMs - startMs;
+    const remainingMs = clamp(endMs - nowMs, 0, durationMs);
+    const remainingRatio = remainingMs / durationMs;
+    const credit = paid * remainingRatio;
 
-    totalDurationMs += endMs - startMs;
+    usedIds.add(Number(payment.id));
     totalPaid += paid;
+    totalCredit += credit;
+    totalDurationMs += durationMs;
     oldestStartMs = startMs;
     cursorMs = startMs;
-    count++;
+    paymentCount++;
+
+    details.push({
+      paymentId: Number(payment.id),
+      paid,
+      startMs,
+      endMs,
+      durationMs,
+      remainingMs,
+      remainingRatio,
+      credit: Math.round(credit)
+    });
   }
 
-  if (!count || !totalDurationMs || !totalPaid) {
+  if (!paymentCount || !totalDurationMs || !totalPaid) {
     throw new Error("PRO_PAYMENT_HISTORY_NOT_FOUND");
   }
-
-  const remainingMs = Math.max(0, currentExpiryMs - nowMs);
-  const remainingRatio = Math.min(1, remainingMs / totalDurationMs);
 
   return {
     cycle: user.cycle,
     planStartMs: oldestStartMs,
     expireMs: currentExpiryMs,
+    nowMs,
     totalDurationMs,
-    remainingMs,
-    remainingRatio,
     totalPaid,
-    paymentCount: count
+    totalCredit: Math.round(totalCredit),
+    paymentCount,
+    details
   };
 }
-
 
 async function createPaymentRecord(connection, {
   userId, plan, cycle, amount, snapshot
 }) {
-  // content là NOT NULL nên cần giá trị tạm trước khi có paymentId.
   const [result] = await connection.execute(
     `INSERT INTO payments
       (user_id, plan, amount, method, status, approved_by_admin,
@@ -175,9 +194,11 @@ router.post("/create-payment", auth, async (req, res) => {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    if (!["month", "year"].includes(cycle) ||
-        !Array.isArray(planData.cycles) ||
-        !planData.cycles.includes(cycle)) {
+    if (
+      !["month", "year"].includes(cycle) ||
+      !Array.isArray(planData.cycles) ||
+      !planData.cycles.includes(cycle)
+    ) {
       return res.status(400).json({ error: "Invalid payment cycle" });
     }
 
@@ -186,9 +207,9 @@ router.post("/create-payment", auth, async (req, res) => {
 
     const [users] = await connection.execute(
       `SELECT id, plan, cycle, expire_at,
-        UNIX_TIMESTAMP(expire_at) * 1000 AS expire_ms,
-        UNIX_TIMESTAMP(NOW(3)) * 1000 AS now_ms,
-        (expire_at > NOW()) AS is_active
+              UNIX_TIMESTAMP(expire_at) * 1000 AS expire_ms,
+              UNIX_TIMESTAMP(NOW(3)) * 1000 AS now_ms,
+              (expire_at > NOW()) AS is_active
        FROM users
        WHERE id = ?
        LIMIT 1
@@ -201,6 +222,7 @@ router.post("/create-payment", auth, async (req, res) => {
     const user = users[0];
     const currentPlan = String(user.plan || "free").toLowerCase();
     const isActive = Boolean(user.is_active);
+
     let paymentType = "purchase";
     let amount = getPlanPrice(planKey, cycle);
     let snapshot = {
@@ -228,14 +250,11 @@ router.post("/create-payment", auth, async (req, res) => {
       }
 
       const basis = await getProSubscriptionBasis(connection, user);
-      const vipValue = getPlanPrice("vip", cycle) * basis.remainingRatio;
-      const proCredit = basis.totalPaid * basis.remainingRatio;
+      const vipPrice = getPlanPrice("vip", cycle);
 
-      amount = Math.max(0, Math.round(vipValue - proCredit));
-
-      if (amount <= 0) {
-        throw new Error("UPGRADE_AMOUNT_NOT_PAYABLE");
-      }
+      // Không cho phép số dư PRO vượt quá giá trị gói VIP được khấu trừ.
+      const proCredit = Math.min(vipPrice, basis.totalCredit);
+      amount = Math.max(0, Math.round(vipPrice - proCredit));
 
       paymentType = "upgrade";
       snapshot = {
@@ -244,95 +263,154 @@ router.post("/create-payment", auth, async (req, res) => {
         toPlan: "vip",
         cycle,
         amount,
+        vipPrice,
         originalProPaid: basis.totalPaid,
+        originalProCredit: basis.totalCredit,
+        appliedProCredit: proCredit,
+        unusedProCredit: Math.max(0, basis.totalCredit - vipPrice),
         originalProDurationMs: basis.totalDurationMs,
-        remainingDurationMs: basis.remainingMs,
-        remainingRatio: basis.remainingRatio,
         originalPlanStartMs: basis.planStartMs,
         originalExpireMs: basis.expireMs,
-        calculatedVipValue: Math.round(vipValue),
-        calculatedProCredit: Math.round(proCredit),
-        paymentCount: basis.paymentCount
+        quoteCreatedAtMs: basis.nowMs,
+        paymentCount: basis.paymentCount,
+        paymentDetails: basis.details
       };
     } else if (isActive && currentPlan !== "free") {
       throw new Error("UNSUPPORTED_PLAN_CHANGE");
     }
 
-
-// Chỉ tái sử dụng đơn còn hiệu lực và có báo giá phù hợp.
-const [pendingRows] = await connection.execute(
-  `SELECT id, amount, content, plan, cycle, plan_snapshot
-   FROM payments
-   WHERE user_id = ?
-     AND plan = ?
-     AND cycle = ?
-     AND status IN ('pending', 'pending_review')
-     AND created_at >= NOW() - INTERVAL 15 MINUTE
-   ORDER BY id DESC
-   FOR UPDATE`,
-  [userId, planKey, cycle]
-);
-
-const matchingRows = pendingRows.filter(row => {
-  const oldSnapshot = parseSnapshot(row.plan_snapshot);
-  const oldType = oldSnapshot.type || "purchase";
-
-  if (oldType !== paymentType) return false;
-  if (Number(row.amount) !== Number(amount)) return false;
-
-  if (paymentType === "upgrade") {
-    return (
-      Number(oldSnapshot.originalExpireMs) ===
-      Number(snapshot.originalExpireMs)
+    // Tìm đơn cũ có cùng loại và cùng báo giá.
+    const [pendingRows] = await connection.execute(
+      `SELECT id, amount, content, plan, cycle, plan_snapshot
+       FROM payments
+       WHERE user_id = ?
+         AND plan = ?
+         AND cycle = ?
+         AND status IN ('pending', 'pending_review')
+         AND created_at >= NOW() - INTERVAL 15 MINUTE
+       ORDER BY id DESC
+       FOR UPDATE`,
+      [userId, planKey, cycle]
     );
-  }
 
-  return true;
-});
+    const matchingRows = pendingRows.filter(row => {
+      const oldSnapshot = parseSnapshot(row.plan_snapshot);
+      const oldType = oldSnapshot.type || "purchase";
 
-const existing = matchingRows[0] || null;
+      if (oldType !== paymentType) return false;
+      if (Number(row.amount) !== Number(amount)) return false;
 
-// Hủy các đơn cùng loại đã có báo giá cũ.
-const staleRows = pendingRows.filter(row => {
-  const oldSnapshot = parseSnapshot(row.plan_snapshot);
-  const oldType = oldSnapshot.type || "purchase";
+      if (paymentType === "upgrade") {
+        return (
+          Number(oldSnapshot.originalExpireMs) ===
+            Number(snapshot.originalExpireMs) &&
+          Number(oldSnapshot.appliedProCredit) ===
+            Number(snapshot.appliedProCredit)
+        );
+      }
 
-  return oldType === paymentType &&
-    (!existing || Number(row.id) !== Number(existing.id));
-});
+      return true;
+    });
 
-for (const row of staleRows) {
-  await connection.execute(
-    `UPDATE payments
-     SET status = 'cancelled'
-     WHERE id = ?
-       AND status IN ('pending', 'pending_review')`,
-    [row.id]
-  );
-}
+    const existing = matchingRows[0] || null;
 
-const bank = getBankInfo();
-let paymentId;
-let content;
-let paymentAmount = amount;
+    // Hủy các đơn cùng loại có báo giá cũ.
+    for (const row of pendingRows) {
+      const oldSnapshot = parseSnapshot(row.plan_snapshot);
+      const oldType = oldSnapshot.type || "purchase";
 
-if (existing) {
-  paymentId = existing.id;
-  content = existing.content;
-  paymentAmount = Number(existing.amount);
-} else {
-  const created = await createPaymentRecord(connection, {
-    userId,
-    plan: planKey,
-    cycle,
-    amount,
-    snapshot
-  });
+      if (
+        oldType === paymentType &&
+        (!existing || Number(row.id) !== Number(existing.id))
+      ) {
+        await connection.execute(
+          `UPDATE payments
+           SET status = 'cancelled'
+           WHERE id = ?
+             AND status IN ('pending', 'pending_review')`,
+          [row.id]
+        );
+      }
+    }
 
-  paymentId = created.paymentId;
-  content = created.content;
-}
+    // PRO credit đủ trả VIP: nâng cấp trực tiếp, không tạo QR 0 đồng.
+    if (paymentType === "upgrade" && amount === 0) {
+      const created = await createPaymentRecord(connection, {
+        userId,
+        plan: "vip",
+        cycle,
+        amount: 0,
+        snapshot: {
+          ...snapshot,
+          type: "upgrade",
+          paidByProCredit: true
+        }
+      });
 
+      const upgradeResult = await planService.upgradePlan(connection, {
+        userId,
+        cycle,
+        expectedExpireMs: snapshot.originalExpireMs
+      });
+
+      await connection.execute(
+        `UPDATE payments
+         SET status = 'paid',
+             approved_by_admin = 1,
+             paid_at = NOW(),
+             plan_start_date = ?,
+             expire_at = ?,
+             plan_snapshot = ?
+         WHERE id = ?`,
+        [
+          upgradeResult.planStartDate,
+          upgradeResult.expireAt,
+          JSON.stringify({
+            ...snapshot,
+            paidByProCredit: true,
+            planStartDate: upgradeResult.planStartDate,
+            expireAt: upgradeResult.expireAt
+          }),
+          created.paymentId
+        ]
+      );
+
+      await connection.commit();
+
+      return res.json({
+        success: true,
+        upgraded: true,
+        paidByProCredit: true,
+        paymentId: created.paymentId,
+        amount: 0,
+        plan: "vip",
+        cycle,
+        planStartDate: upgradeResult.planStartDate,
+        expireAt: upgradeResult.expireAt
+      });
+    }
+
+    const bank = getBankInfo();
+    let paymentId;
+    let content;
+    let paymentAmount = amount;
+
+    if (existing) {
+      paymentId = existing.id;
+      content = existing.content;
+      paymentAmount = Number(existing.amount);
+    } else {
+      const created = await createPaymentRecord(connection, {
+        userId,
+        plan: planKey,
+        cycle,
+        amount,
+        snapshot
+      });
+
+      paymentId = created.paymentId;
+      content = created.content;
+    }
 
     await connection.commit();
 
@@ -367,15 +445,18 @@ if (existing) {
       PRO_SUBSCRIPTION_EXPIRED: [400, "PRO subscription has expired"],
       PRO_PAYMENT_HISTORY_NOT_FOUND: [400, "Cannot calculate upgrade without PRO payment history"],
       INVALID_PRO_PAYMENT_HISTORY: [400, "Invalid PRO payment history"],
-      UPGRADE_AMOUNT_NOT_PAYABLE: [400, "Upgrade amount is not payable"],
       UNSUPPORTED_PLAN_CHANGE: [400, "Unsupported plan change"],
-      AMBIGUOUS_PRO_PAYMENT_HISTORY: [400,"PRO payment history is ambiguous. Please contact support."],
+      AMBIGUOUS_PRO_PAYMENT_HISTORY: [400, "PRO payment history is ambiguous. Please contact support."]
     };
 
-    const [status, message] = messages[err.message] || [500, err.message || "Payment creation failed"];
+    const [status, message] = messages[err.message] ||
+      [500, err.message || "Payment creation failed"];
 
     console.error("CREATE PAYMENT ERROR:", err);
-    return res.status(status).json({ error: message, code: err.message });
+    return res.status(status).json({
+      error: message,
+      code: err.message
+    });
 
   } finally {
     if (connection) connection.release();

@@ -74,8 +74,21 @@ function addMonths(date, months) {
   )).getUTCDate();
 
   result.setUTCDate(Math.min(day, lastDay));
-
   return result;
+}
+
+async function getDatabaseNow(connection) {
+  const [[row]] = await connection.query(
+    `SELECT NOW() AS db_now`
+  );
+
+  const now = parseDbDate(row?.db_now);
+
+  if (!now || Number.isNaN(now.getTime())) {
+    throw new Error("INVALID_DATABASE_TIME");
+  }
+
+  return now;
 }
 
 // =====================================================
@@ -105,7 +118,6 @@ async function applyPlan(connection, {
     throw new Error("INVALID_PLAN");
   }
 
-  // FREE: ghi đè trực tiếp.
   if (targetPlan === "free") {
     const [result] = await connection.execute(
       `UPDATE users
@@ -138,15 +150,7 @@ async function applyPlan(connection, {
     throw new Error("INVALID_DURATION");
   }
 
-  const [[nowRow]] = await connection.query(
-    `SELECT NOW() AS db_now`
-  );
-
-  const now = parseDbDate(nowRow.db_now);
-
-  if (!now || Number.isNaN(now.getTime())) {
-    throw new Error("INVALID_DATABASE_TIME");
-  }
+  const now = await getDatabaseNow(connection);
 
   const [users] = await connection.execute(
     `SELECT id, plan, expire_at, cycle
@@ -170,7 +174,6 @@ async function applyPlan(connection, {
     currentExpiry &&
     currentExpiry.getTime() > now.getTime();
 
-  // PRO -> VIP phải dùng nghiệp vụ nâng cấp riêng.
   if (
     isActive &&
     currentPlan === "pro" &&
@@ -179,7 +182,6 @@ async function applyPlan(connection, {
     throw new Error("UPGRADE_REQUIRES_PRORATED_PAYMENT");
   }
 
-  // Không cho phép hạ cấp thông thường.
   if (
     isActive &&
     (PLAN_RANK[targetPlan] < (PLAN_RANK[currentPlan] ?? 0)) &&
@@ -188,8 +190,6 @@ async function applyPlan(connection, {
     throw new Error("PLAN_DOWNGRADE_NOT_ALLOWED");
   }
 
-  // Gói còn hạn thì nối tiếp từ ngày hết hạn.
-  // Gói hết hạn hoặc FREE thì bắt đầu từ hiện tại.
   const startBase = isActive ? currentExpiry : now;
 
   let expireAt = addDays(startBase, days);
@@ -221,7 +221,7 @@ async function applyPlan(connection, {
 
 // =====================================================
 // UPGRADE PRO -> VIP
-// Giữ nguyên ngày hết hạn hiện tại.
+// Khấu trừ PRO credit và bắt đầu chu kỳ VIP mới.
 // Phải chạy bên trong transaction.
 // =====================================================
 async function upgradePlan(connection, {
@@ -246,18 +246,8 @@ async function upgradePlan(connection, {
     throw new Error("INVALID_UPGRADE_SNAPSHOT");
   }
 
-  // Lấy thời gian DB để tránh lệch timezone giữa server và MySQL.
-  const [[nowRow]] = await connection.query(
-    `SELECT NOW() AS db_now`
-  );
+  const now = await getDatabaseNow(connection);
 
-  const now = parseDbDate(nowRow.db_now);
-
-  if (!now || Number.isNaN(now.getTime())) {
-    throw new Error("INVALID_DATABASE_TIME");
-  }
-
-  // Khóa user trước khi chuyển gói.
   const [rows] = await connection.execute(
     `SELECT id, plan, cycle, expire_at
      FROM users
@@ -291,19 +281,29 @@ async function upgradePlan(connection, {
     throw new Error("UPGRADE_CYCLE_MISMATCH");
   }
 
-  // Báo giá phải khớp chính xác thời hạn PRO tại lúc tạo đơn.
   if (
     Math.abs(currentExpiry.getTime() - expectedExpiry) > 2000
   ) {
     throw new Error("UPGRADE_QUOTE_EXPIRED");
   }
 
-  // Chỉ đổi plan, không thay expire_at.
+  // Chu kỳ VIP mới bắt đầu từ thời điểm nâng cấp.
+  // Tháng = 31 ngày; năm = 12 tháng.
+  const planStart = now;
+  const expireAt = normalizedCycle === "month"
+    ? addDays(planStart, 30)
+    : addMonths(planStart, 12);
+
+  const startSql = formatDbDate(planStart);
+  const expireAtSql = formatDbDate(expireAt);
+
   await connection.execute(
     `UPDATE users
-     SET plan = 'vip'
+     SET plan = 'vip',
+         expire_at = ?,
+         cycle = ?
      WHERE id = ?`,
-    [uid]
+    [expireAtSql, normalizedCycle, uid]
   );
 
   return {
@@ -312,8 +312,8 @@ async function upgradePlan(connection, {
     planAfter: "vip",
     wasActive: true,
     previousExpireAt: user.expire_at,
-    planStartDate: null,
-    expireAt: user.expire_at,
+    planStartDate: startSql,
+    expireAt: expireAtSql,
     cycle: normalizedCycle
   };
 }
