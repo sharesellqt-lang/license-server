@@ -333,62 +333,42 @@ router.post("/create-payment", auth, async (req, res) => {
       }
     }
 
-    // PRO credit đủ trả VIP: nâng cấp trực tiếp, không tạo QR 0 đồng.
-    if (paymentType === "upgrade" && amount === 0) {
-      const created = await createPaymentRecord(connection, {
+
+    // PRO credit đủ trả VIP: tạo yêu cầu 0 đồng,
+// nhưng vẫn phải chờ Admin xác nhận.
+if (paymentType === "upgrade" && amount === 0) {
+  const created = existing
+    ? {
+        paymentId: existing.id,
+        content: existing.content
+      }
+    : await createPaymentRecord(connection, {
         userId,
         plan: "vip",
         cycle,
         amount: 0,
         snapshot: {
           ...snapshot,
-          type: "upgrade",
-          paidByProCredit: true
+          paidByProCredit: true,
+          requiresAdminApproval: true
         }
       });
 
-      const upgradeResult = await planService.upgradePlan(connection, {
-        userId,
-        cycle,
-        expectedExpireMs: snapshot.originalExpireMs
-      });
+  await connection.commit();
 
-      await connection.execute(
-        `UPDATE payments
-         SET status = 'paid',
-             approved_by_admin = 1,
-             paid_at = NOW(),
-             plan_start_date = ?,
-             expire_at = ?,
-             plan_snapshot = ?
-         WHERE id = ?`,
-        [
-          upgradeResult.planStartDate,
-          upgradeResult.expireAt,
-          JSON.stringify({
-            ...snapshot,
-            paidByProCredit: true,
-            planStartDate: upgradeResult.planStartDate,
-            expireAt: upgradeResult.expireAt
-          }),
-          created.paymentId
-        ]
-      );
-
-      await connection.commit();
-
-      return res.json({
-        success: true,
-        upgraded: true,
-        paidByProCredit: true,
-        paymentId: created.paymentId,
-        amount: 0,
-        plan: "vip",
-        cycle,
-        planStartDate: upgradeResult.planStartDate,
-        expireAt: upgradeResult.expireAt
-      });
-    }
+  return res.json({
+    success: true,
+    paymentId: created.paymentId,
+    amount: 0,
+    content: created.content,
+    plan: "vip",
+    cycle,
+    paymentType: "upgrade",
+    paidByProCredit: true,
+    requiresAdminApproval: true,
+    message: "Your upgrade request is waiting for admin approval."
+  });
+}
 
     const bank = getBankInfo();
     let paymentId;

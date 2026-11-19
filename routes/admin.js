@@ -290,14 +290,14 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     const cycle = String(payment.cycle || "month").trim().toLowerCase();
 
     if (
-      !payment.user_id ||
-      !["pro", "vip"].includes(plan) ||
-      !["month", "year"].includes(cycle) ||
-      !Number.isFinite(Number(payment.amount)) ||
-      Number(payment.amount) <= 0
-    ) {
-      throw new Error("INVALID_PAYMENT_DATA");
-    }
+  !payment.user_id ||
+  !["pro", "vip"].includes(plan) ||
+  !["month", "year"].includes(cycle) ||
+  !Number.isFinite(Number(payment.amount)) ||
+  Number(payment.amount) < 0
+) {
+  throw new Error("INVALID_PAYMENT_DATA");
+}
 
     // 4. Read payment snapshot
     let paymentSnapshot = {};
@@ -313,7 +313,26 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
     }
 
     const paymentType = paymentSnapshot.type || "purchase";
-    let planResult;
+const paymentAmount = Number(payment.amount);
+
+let planResult;
+
+// Chỉ cho phép payment 0 đồng nếu PRO Credit đủ thanh toán VIP.
+if (paymentAmount === 0) {
+  const validCreditUpgrade =
+    paymentType === "upgrade" &&
+    paymentSnapshot.fromPlan === "pro" &&
+    paymentSnapshot.toPlan === "vip" &&
+    paymentSnapshot.paidByProCredit === true &&
+    paymentSnapshot.requiresAdminApproval === true &&
+    Number.isFinite(Number(paymentSnapshot.vipPrice)) &&
+    Number.isFinite(Number(paymentSnapshot.appliedProCredit)) &&
+    Number(paymentSnapshot.appliedProCredit) >= Number(paymentSnapshot.vipPrice);
+
+  if (!validCreditUpgrade) {
+    throw new Error("INVALID_ZERO_AMOUNT_PAYMENT");
+  }
+}
 
     // 5. Apply correct plan operation
     if (paymentType === "upgrade") {
@@ -431,7 +450,8 @@ router.post("/payments/:id/approve", adminAuth, async (req, res) => {
       "PLAN_EXPIRED",
       "UPGRADE_CYCLE_MISMATCH",
       "UPGRADE_QUOTE_EXPIRED",
-      "USER_NOT_FOUND"
+      "USER_NOT_FOUND",
+      "INVALID_ZERO_AMOUNT_PAYMENT",
     ];
 
     return res.status(clientErrors.includes(err.message) ? 400 : 500).json({
