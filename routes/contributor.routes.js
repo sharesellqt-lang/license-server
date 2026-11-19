@@ -125,7 +125,8 @@ router.post(
         try {
             const result = await taskService.acceptTask(
                 req.user.id,
-                req.params.id
+                req.params.id,
+                getAuditInfo(req)
             );
 
             return res.status(201).json({

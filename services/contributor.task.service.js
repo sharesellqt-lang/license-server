@@ -437,9 +437,11 @@ async function getTasks(page = 1, limit = 20) {
     };
 }
 
-async function getAdminTasks(page = 1, limit = 20, status = null) {
-    page = Math.max(1, parseInt(page, 10) || 1);
-    limit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+
+async function getAdminTasks(query = {}) {
+    let page = Math.max(1, parseInt(query.page, 10) || 1);
+    let limit = Math.min(100, Math.max(1, parseInt(query.limit, 10) || 20));
+    const status = query.status ? String(query.status).trim() : null;
 
     const allowedStatuses = ["draft", "published", "paused", "closed"];
 
@@ -449,7 +451,6 @@ async function getAdminTasks(page = 1, limit = 20, status = null) {
 
     const offset = (page - 1) * limit;
     const params = status ? [status] : [];
-
     const condition = status ? "WHERE t.status = ?" : "";
 
     const [[count]] = await db.execute(
@@ -493,6 +494,7 @@ async function getAdminTasks(page = 1, limit = 20, status = null) {
         }
     };
 }
+
 
 async function getTaskById(taskId) {
     const id = positiveId(taskId, "INVALID_TASK_ID");
@@ -745,6 +747,7 @@ async function cancelAssignment(userId, assignmentId, reason = null, audit = {})
     }
 }
 
+
 async function submitWork(userId, assignmentId, data, audit = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
     assignmentId = positiveId(assignmentId, "INVALID_ASSIGNMENT_ID");
@@ -872,12 +875,10 @@ async function submitWork(userId, assignmentId, data, audit = {}) {
                 assignmentId,
                 attemptNo,
                 status: "submitted"
-                    },
-            {
-                ...audit,
-                targetUserId: Number(submission.contributor_user_id)
-            }
+            },
+            audit
         ));
+
         await conn.commit();
 
         return {
