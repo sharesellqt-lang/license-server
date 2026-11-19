@@ -1,10 +1,12 @@
-const express = require("express");
 
+"use strict";
+
+const express = require("express");
 const router = express.Router();
 
 const db = require("../db");
+const planService = require("../services/planService");
 
-const { getExpireDate } = require("../services/planService");
 function normalizeContent(str) {
   return String(str || "")
     .trim()
@@ -17,123 +19,171 @@ function normalizeContent(str) {
 // PAYMENT WEBHOOK
 // =====================================================
 router.post("/payment-webhook", async (req, res) => {
-console.log("WEBHOOK BODY:", req.body);
+  let connection;
+
   try {
-console.log("WEBHOOK BODY:", JSON.stringify(req.body, null, 2));
+    console.log("WEBHOOK BODY:", JSON.stringify(req.body, null, 2));
 
-const { content, transactionId, amount } = req.body;
+    const { content, transactionId, amount } = req.body || {};
 
-console.log("CONTENT RECEIVED:", content);
-
-    if (!content || !transactionId) {
-      return res.status(400).json({
-        error: "Missing data"
-      });
+    if (!content || !transactionId || amount === undefined) {
+      return res.status(400).json({ success: false, error: "Missing data" });
     }
 
-    // =========================
-    // FIND PAYMENT
-    // =========================
-    const normalizedIncoming = normalizeContent(content);
+    const incomingContent = normalizeContent(content);
+    const incomingTransactionId = String(transactionId).trim();
+    const incomingAmount = Number(amount);
 
-const [rows] = await db.query(`
-  SELECT *
-  FROM payments
-  WHERE status = 'pending'
-`);
-
-const payment = rows.find(p =>
-  normalizeContent(p.content) === normalizedIncoming
-);
-
-if (!payment) {
-
-  console.log("❌ PAYMENT NOT FOUND");
-  console.log("Incoming:", content);
-  console.log("Normalized:", normalizedIncoming);
-
-  return res.json({
-    success: false,
-    message: "Payment not found"
-  });
-}
-
-    if (!rows.length) {
-      return res.json({
-        success: false,
-        message: "Payment not found"
-      });
+    if (!incomingContent || !incomingTransactionId ||
+        !Number.isFinite(incomingAmount) || incomingAmount <= 0) {
+      return res.status(400).json({ success: false, error: "Invalid payment data" });
     }
 
+    connection = await db.getConnection();
+    await connection.beginTransaction();
 
-    // =========================
-    // DUPLICATE TRANSACTION
-    // =========================
-    const [dup] = await db.query(
-      `
-      SELECT id
-      FROM payments
-      WHERE transaction_id = ?
-      `,
-      [transactionId]
+    // Kiểm tra giao dịch đã được xử lý trước đó.
+    const [duplicates] = await connection.execute(
+      `SELECT id, status
+       FROM payments
+       WHERE transaction_id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [incomingTransactionId]
     );
 
-    if (dup.length) {
+    if (duplicates.length) {
+      await connection.commit();
       return res.json({
         success: true,
         message: "Duplicate transaction"
       });
     }
 
-    // =========================
-    // CHECK AMOUNT
-    // =========================
-    if (Number(amount) < Number(payment.amount)) {
+    // Khóa các thanh toán đang chờ để tránh hai webhook xử lý cùng một khoản.
+    const [pendingPayments] = await connection.query(
+      `SELECT *
+       FROM payments
+       WHERE status IN ('pending', 'pending_review')
+       ORDER BY id DESC
+       FOR UPDATE`
+    );
+
+    const payment = pendingPayments.find(
+      item => normalizeContent(item.content) === incomingContent
+    );
+
+    if (!payment) {
+      await connection.rollback();
+      return res.json({
+        success: false,
+        message: "Payment not found"
+      });
+    }
+
+    if (incomingAmount < Number(payment.amount)) {
+      await connection.rollback();
       return res.status(400).json({
+        success: false,
         error: "Insufficient payment"
       });
     }
 
-    // =========================
-    // EXPIRE DATE
-    // =========================
-    const expireAt = getExpireDate(30);
+    const plan = String(payment.plan || "").trim().toLowerCase();
+    const cycle = String(payment.cycle || "month").trim().toLowerCase();
 
-    // =========================
-    // UPDATE USER
-    // =========================
-    await db.query(
-      `
-      UPDATE users
-      SET plan = ?, expire_at = ?
-      WHERE id = ?
-      `,
-      [payment.plan, expireAt, payment.user_id]
+    if (!["pro", "vip"].includes(plan)) {
+      throw new Error("INVALID_PAYMENT_PLAN");
+    }
+
+    if (!["month", "year"].includes(cycle)) {
+      throw new Error("INVALID_PAYMENT_CYCLE");
+    }
+
+    // Thanh toán tháng = 1 tháng; thanh toán năm = 12 tháng.
+    const planResult = await planService.applyPlan(connection, {
+      userId: payment.user_id,
+      plan,
+      durationMonths: cycle === "year" ? 12 : 1,
+      durationDays: 0,
+      cycle,
+      allowDowngrade: false
+    });
+
+    const planSnapshot = JSON.stringify({
+      plan,
+      cycle,
+      paymentId: payment.id,
+      transactionId: incomingTransactionId,
+      amount: incomingAmount,
+      planBefore: planResult.planBefore,
+      planAfter: planResult.planAfter,
+      previousExpireAt: planResult.previousExpireAt,
+      planStartDate: planResult.planStartDate,
+      expireAt: planResult.expireAt
+    });
+
+    const [updateResult] = await connection.execute(
+      `UPDATE payments
+       SET status = 'paid',
+           approved_by_admin = 1,
+           transaction_id = ?,
+           paid_at = NOW(),
+           plan_start_date = ?,
+           expire_at = ?,
+           plan_snapshot = ?
+       WHERE id = ?
+         AND status IN ('pending', 'pending_review')`,
+      [
+        incomingTransactionId,
+        planResult.planStartDate,
+        planResult.expireAt,
+        planSnapshot,
+        payment.id
+      ]
     );
 
-    // =========================
-    // UPDATE PAYMENT
-    // =========================
-    await db.query(
-      `
-      UPDATE payments
-      SET status = 'paid',
-          transaction_id = ?,
-          paid_at = NOW()
-      WHERE id = ?
-      `,
-      [transactionId, payment.id]
-    );
+    if (!updateResult.affectedRows) {
+      throw new Error("PAYMENT_UPDATE_FAILED");
+    }
 
-    console.log("✅ Payment success:", payment.id);
+    await connection.commit();
 
-    return res.json({ success: true });
+    console.log("PAYMENT SUCCESS:", {
+      paymentId: payment.id,
+      userId: payment.user_id,
+      plan,
+      cycle,
+      expireAt: planResult.expireAt
+    });
+
+    return res.json({
+      success: true,
+      message: "Payment processed",
+      paymentId: payment.id,
+      plan: planResult.planAfter,
+      expireAt: planResult.expireAt
+    });
 
   } catch (err) {
-    console.error(err);
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("PAYMENT ROLLBACK ERROR:", rollbackError.message);
+      }
+    }
+
+    console.error("PAYMENT WEBHOOK ERROR:", err);
+
     return res.status(500).json({
-      error: "Webhook failed"
+      success: false,
+      error: "Webhook failed",
+      code: err.message || "UNKNOWN_ERROR"
     });
+
+  } finally {
+    if (connection) connection.release();
   }
 });
 
