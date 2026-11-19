@@ -13,7 +13,7 @@ const db = require("../db");
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID
 );
-
+const loginRewardService = require("../services/rewards.login.service");
 // =========================
 // GOOGLE LOGIN
 // =========================
@@ -103,6 +103,22 @@ router.post(
 
       }
 
+      // =========================
+// LOGIN REWARD
+// =========================
+try {
+    const rewardResult = await loginRewardService.recordLogin(user.id);
+
+    console.log("[LOGIN REWARD]", {
+        userId: user.id,
+        ...rewardResult
+    });
+} catch (rewardError) {
+    console.error("[LOGIN REWARD ERROR]", {
+        userId: user.id,
+        error: rewardError.message
+    });
+}
       // =========================
       // JWT
       // =========================
