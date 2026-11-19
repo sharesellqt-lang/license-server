@@ -469,22 +469,46 @@ if (paymentAmount === 0) {
 // REJECT PAYMENT
 router.post("/payments/:id/reject", adminAuth, async (req, res) => {
   try {
-    const paymentId = req.params.id;
+    const paymentId = Number(req.params.id);
 
-    await db.query(`
-  UPDATE payments
-  SET status = 'rejected'
-  WHERE id = ?
-`, [paymentId]);
+    if (!Number.isInteger(paymentId) || paymentId <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "INVALID_PAYMENT_ID"
+      });
+    }
 
-    res.json({ success: true });
+    const [result] = await db.execute(
+      `UPDATE payments
+       SET status = 'rejected'
+       WHERE id = ?
+         AND status IN ('pending', 'pending_review')
+         AND approved_by_admin = 0`,
+      [paymentId]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(409).json({
+        success: false,
+        error: "PAYMENT_NOT_PENDING"
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Payment rejected",
+      paymentId
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Reject failed" });
+    console.error("REJECT PAYMENT ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "REJECT_PAYMENT_FAILED"
+    });
   }
 });
-
 // =====================================
 // SET PLAN
 // =====================================
