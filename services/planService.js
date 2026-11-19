@@ -7,6 +7,9 @@ const PLAN_RANK = {
   vip: 2
 };
 
+// =====================================================
+// DATE HELPERS
+// =====================================================
 function getExpireDate(days) {
   const expire = new Date();
   expire.setDate(expire.getDate() + Number(days || 0));
@@ -15,13 +18,21 @@ function getExpireDate(days) {
 
 function parseDbDate(value) {
   if (!value) return null;
-  if (value instanceof Date) return new Date(value.getTime());
+
+  if (value instanceof Date) {
+    return new Date(value.getTime());
+  }
 
   const str = String(value).trim();
-  const normalized = str.includes("T") ? str : str.replace(" ", "T");
-  return new Date(/[zZ]|[+-]\d{2}:\d{2}$/.test(normalized)
-    ? normalized
-    : `${normalized}+07:00`);
+  const normalized = str.includes("T")
+    ? str
+    : str.replace(" ", "T");
+
+  return new Date(
+    /[zZ]|[+-]\d{2}:\d{2}$/.test(normalized)
+      ? normalized
+      : `${normalized}+07:00`
+  );
 }
 
 function formatDbDate(date) {
@@ -36,7 +47,9 @@ function formatDbDate(date) {
     hourCycle: "h23"
   }).formatToParts(date);
 
-  const values = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  const values = Object.fromEntries(
+    parts.map(part => [part.type, part.value])
+  );
 
   return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
@@ -61,17 +74,15 @@ function addMonths(date, months) {
   )).getUTCDate();
 
   result.setUTCDate(Math.min(day, lastDay));
+
   return result;
 }
 
-/**
- * Phải được gọi bên trong transaction của caller.
- *
- * PRO đang hoạt động -> VIP: VIP có hiệu lực ngay,
- * thời gian còn lại của PRO được cộng vào thời hạn VIP.
- *
- * VIP đang hoạt động -> PRO: mặc định không cho phép.
- */
+// =====================================================
+// APPLY PLAN
+// Dùng cho mua mới và gia hạn thông thường.
+// Phải chạy bên trong transaction.
+// =====================================================
 async function applyPlan(connection, {
   userId,
   plan,
@@ -84,6 +95,7 @@ async function applyPlan(connection, {
   const uid = Number(userId);
   const days = Number(durationDays);
   const months = Number(durationMonths);
+  const normalizedCycle = cycle === "year" ? "year" : "month";
 
   if (!Number.isInteger(uid) || uid <= 0) {
     throw new Error("INVALID_USER_ID");
@@ -93,13 +105,20 @@ async function applyPlan(connection, {
     throw new Error("INVALID_PLAN");
   }
 
+  // FREE: ghi đè trực tiếp.
   if (targetPlan === "free") {
     const [result] = await connection.execute(
-      `UPDATE users SET plan = 'free', expire_at = NULL, cycle = 'month' WHERE id = ?`,
+      `UPDATE users
+       SET plan = 'free',
+           expire_at = NULL,
+           cycle = 'month'
+       WHERE id = ?`,
       [uid]
     );
 
-    if (!result.affectedRows) throw new Error("USER_NOT_FOUND");
+    if (!result.affectedRows) {
+      throw new Error("USER_NOT_FOUND");
+    }
 
     return {
       userId: uid,
@@ -109,9 +128,13 @@ async function applyPlan(connection, {
     };
   }
 
-  if ((!Number.isInteger(days) || days < 0) ||
-      (!Number.isInteger(months) || months < 0) ||
-      (days === 0 && months === 0)) {
+  if (
+    !Number.isInteger(days) ||
+    days < 0 ||
+    !Number.isInteger(months) ||
+    months < 0 ||
+    (days === 0 && months === 0)
+  ) {
     throw new Error("INVALID_DURATION");
   }
 
@@ -120,6 +143,10 @@ async function applyPlan(connection, {
   );
 
   const now = parseDbDate(nowRow.current_time);
+
+  if (!now || Number.isNaN(now.getTime())) {
+    throw new Error("INVALID_DATABASE_TIME");
+  }
 
   const [users] = await connection.execute(
     `SELECT id, plan, expire_at, cycle
@@ -130,35 +157,54 @@ async function applyPlan(connection, {
     [uid]
   );
 
-  if (!users.length) throw new Error("USER_NOT_FOUND");
+  if (!users.length) {
+    throw new Error("USER_NOT_FOUND");
+  }
 
   const user = users[0];
   const currentPlan = String(user.plan || "free").toLowerCase();
   const currentExpiry = parseDbDate(user.expire_at);
-  const isActive = currentPlan !== "free" &&
+
+  const isActive =
+    currentPlan !== "free" &&
     currentExpiry &&
     currentExpiry.getTime() > now.getTime();
 
-  if (isActive &&
-      (PLAN_RANK[targetPlan] < (PLAN_RANK[currentPlan] ?? 0)) &&
-      !allowDowngrade) {
+  // PRO -> VIP phải dùng nghiệp vụ nâng cấp riêng.
+  if (
+    isActive &&
+    currentPlan === "pro" &&
+    targetPlan === "vip"
+  ) {
+    throw new Error("UPGRADE_REQUIRES_PRORATED_PAYMENT");
+  }
+
+  // Không cho phép hạ cấp thông thường.
+  if (
+    isActive &&
+    (PLAN_RANK[targetPlan] < (PLAN_RANK[currentPlan] ?? 0)) &&
+    !allowDowngrade
+  ) {
     throw new Error("PLAN_DOWNGRADE_NOT_ALLOWED");
   }
 
-  // Nếu gói hiện tại còn hạn, nối thời gian mới vào ngày hết hạn.
-  // Nếu đã hết hạn hoặc đang FREE, tính từ thời điểm hiện tại.
+  // Gói còn hạn thì nối tiếp từ ngày hết hạn.
+  // Gói hết hạn hoặc FREE thì bắt đầu từ hiện tại.
   const startBase = isActive ? currentExpiry : now;
 
   let expireAt = addDays(startBase, days);
   expireAt = addMonths(expireAt, months);
 
+  const startSql = formatDbDate(startBase);
   const expireAtSql = formatDbDate(expireAt);
 
   await connection.execute(
     `UPDATE users
-     SET plan = ?, expire_at = ?, cycle = ?
+     SET plan = ?,
+         expire_at = ?,
+         cycle = ?
      WHERE id = ?`,
-    [targetPlan, expireAtSql, cycle === "year" ? "year" : "month", uid]
+    [targetPlan, expireAtSql, normalizedCycle, uid]
   );
 
   return {
@@ -167,14 +213,117 @@ async function applyPlan(connection, {
     planAfter: targetPlan,
     wasActive: Boolean(isActive),
     previousExpireAt: user.expire_at || null,
-    planStartDate: formatDbDate(now),
+    planStartDate: startSql,
     expireAt: expireAtSql,
-    cycle: cycle === "year" ? "year" : "month"
+    cycle: normalizedCycle
   };
 }
 
+// =====================================================
+// UPGRADE PRO -> VIP
+// Giữ nguyên ngày hết hạn hiện tại.
+// Phải chạy bên trong transaction.
+// =====================================================
+async function upgradePlan(connection, {
+  userId,
+  cycle,
+  expectedExpireMs
+}) {
+  const uid = Number(userId);
+  const normalizedCycle = String(cycle || "").toLowerCase();
+
+  if (!Number.isInteger(uid) || uid <= 0) {
+    throw new Error("INVALID_USER_ID");
+  }
+
+  if (!["month", "year"].includes(normalizedCycle)) {
+    throw new Error("INVALID_PAYMENT_CYCLE");
+  }
+
+  const expectedExpiry = Number(expectedExpireMs);
+
+  if (!Number.isFinite(expectedExpiry) || expectedExpiry <= 0) {
+    throw new Error("INVALID_UPGRADE_SNAPSHOT");
+  }
+
+  // Lấy thời gian DB để tránh lệch timezone giữa server và MySQL.
+  const [[nowRow]] = await connection.query(
+    `SELECT NOW() AS current_time`
+  );
+
+  const now = parseDbDate(nowRow.current_time);
+
+  if (!now || Number.isNaN(now.getTime())) {
+    throw new Error("INVALID_DATABASE_TIME");
+  }
+
+  // Khóa user trước khi chuyển gói.
+  const [rows] = await connection.execute(
+    `SELECT id, plan, cycle, expire_at
+     FROM users
+     WHERE id = ?
+     LIMIT 1
+     FOR UPDATE`,
+    [uid]
+  );
+
+  if (!rows.length) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  const user = rows[0];
+  const currentPlan = String(user.plan || "free").toLowerCase();
+  const currentCycle = String(user.cycle || "month").toLowerCase();
+  const currentExpiry = parseDbDate(user.expire_at);
+
+  if (currentPlan !== "pro") {
+    throw new Error("UPGRADE_SOURCE_PLAN_INVALID");
+  }
+
+  if (
+    !currentExpiry ||
+    currentExpiry.getTime() <= now.getTime()
+  ) {
+    throw new Error("PLAN_EXPIRED");
+  }
+
+  if (currentCycle !== normalizedCycle) {
+    throw new Error("UPGRADE_CYCLE_MISMATCH");
+  }
+
+  // Báo giá phải khớp chính xác thời hạn PRO tại lúc tạo đơn.
+  if (
+    Math.abs(currentExpiry.getTime() - expectedExpiry) > 2000
+  ) {
+    throw new Error("UPGRADE_QUOTE_EXPIRED");
+  }
+
+  // Chỉ đổi plan, không thay expire_at.
+  await connection.execute(
+    `UPDATE users
+     SET plan = 'vip'
+     WHERE id = ?`,
+    [uid]
+  );
+
+  return {
+    userId: uid,
+    planBefore: "pro",
+    planAfter: "vip",
+    wasActive: true,
+    previousExpireAt: user.expire_at,
+    planStartDate: null,
+    expireAt: user.expire_at,
+    cycle: normalizedCycle
+  };
+}
+
+// =====================================================
+// EXPORTS
+// =====================================================
 module.exports = {
   getExpireDate,
   applyPlan,
+  upgradePlan,
   PLAN_RANK
 };

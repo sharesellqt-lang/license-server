@@ -6,6 +6,7 @@ const jwt = require("jsonwebtoken");
 const auth = require("../middleware/auth");
 const requireAdmin = require("../middleware/requireAdmin");
 const requirePermission = require("../middleware/requirePermission");
+const planService = require("../services/planService");
 
 // JWT TOKEN GENERATOR
 const SECRET = process.env.JWT_SECRET;
@@ -226,63 +227,224 @@ router.get(
   }
 );
 
-// APPROVE PAYMENT
-router.post("/payments/:id/approve", adminAuth, async (req, res) => {
-  try {
-    const paymentId = req.params.id;
 
-    // Lấy payment
-    const [rows] = await db.query(
-      "SELECT * FROM payments WHERE id = ?",
+
+// =====================================================
+// APPROVE PAYMENT
+// =====================================================
+router.post("/payments/:id/approve", adminAuth, async (req, res) => {
+  let connection;
+
+  try {
+    const paymentId = Number(req.params.id);
+
+    if (!Number.isInteger(paymentId) || paymentId <= 0) {
+      return res.status(400).json({ error: "Invalid payment ID" });
+    }
+
+    connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // 1. Lock payment
+    const [rows] = await connection.execute(
+      `SELECT *
+       FROM payments
+       WHERE id = ?
+       LIMIT 1
+       FOR UPDATE`,
       [paymentId]
     );
 
+    if (!rows.length) {
+      await connection.rollback();
+      return res.status(404).json({ error: "Payment not found" });
+    }
+
     const payment = rows[0];
-    if (!payment) return res.status(404).json({ error: "Not found" });
 
-    // 1. Cập nhật trạng thái payment
-await db.query(
-  `UPDATE payments
-   SET status = 'paid',
-       approved_by_admin = 1,
-       paid_at = NOW()
-   WHERE id = ?`,
-  [paymentId]
-);
+    // 2. Prevent duplicate approval
+    if (
+      payment.status === "paid" &&
+      Number(payment.approved_by_admin) === 1
+    ) {
+      await connection.commit();
 
-    // 2. Update user plan
-const cycle = payment.cycle || "month";
+      return res.json({
+        success: true,
+        message: "Payment already processed",
+        duplicate: true
+      });
+    }
 
-let expireAt = new Date();
-if (cycle === "year") {
+    if (!["pending", "pending_review"].includes(payment.status)) {
+      await connection.rollback();
 
-  expireAt.setFullYear(
-    expireAt.getFullYear() + 1
-  );
+      return res.status(409).json({
+        success: false,
+        error: "PAYMENT_NOT_PENDING"
+      });
+    }
 
-} else {
+    // 3. Validate payment
+    const plan = String(payment.plan || "").trim().toLowerCase();
+    const cycle = String(payment.cycle || "month").trim().toLowerCase();
 
-  expireAt.setMonth(
-    expireAt.getMonth() + 1
-  );
+    if (
+      !payment.user_id ||
+      !["pro", "vip"].includes(plan) ||
+      !["month", "year"].includes(cycle) ||
+      !Number.isFinite(Number(payment.amount)) ||
+      Number(payment.amount) <= 0
+    ) {
+      throw new Error("INVALID_PAYMENT_DATA");
+    }
 
-}
+    // 4. Read payment snapshot
+    let paymentSnapshot = {};
 
-await db.query(
-  `UPDATE users
-   SET plan = ?,
-       expire_at = ?
-   WHERE id = ?`,
-  [payment.plan, expireAt, payment.user_id]
-);
+    if (payment.plan_snapshot) {
+      try {
+        paymentSnapshot = typeof payment.plan_snapshot === "object"
+          ? payment.plan_snapshot
+          : JSON.parse(payment.plan_snapshot);
+      } catch {
+        throw new Error("INVALID_PAYMENT_SNAPSHOT");
+      }
+    }
 
-    res.json({ success: true });
+    const paymentType = paymentSnapshot.type || "purchase";
+    let planResult;
+
+    // 5. Apply correct plan operation
+    if (paymentType === "upgrade") {
+      if (
+        paymentSnapshot.fromPlan !== "pro" ||
+        paymentSnapshot.toPlan !== "vip" ||
+        plan !== "vip" ||
+        !Number.isFinite(Number(paymentSnapshot.originalExpireMs))
+      ) {
+        throw new Error("INVALID_UPGRADE_PAYMENT");
+      }
+
+      planResult = await planService.upgradePlan(connection, {
+        userId: payment.user_id,
+        cycle,
+        expectedExpireMs: paymentSnapshot.originalExpireMs
+      });
+
+    } else if (
+      paymentType === "purchase" ||
+      paymentType === "renewal"
+    ) {
+      planResult = await planService.applyPlan(connection, {
+        userId: payment.user_id,
+        plan,
+        durationMonths: cycle === "year" ? 12 : 1,
+        durationDays: 0,
+        cycle,
+        allowDowngrade: false
+      });
+
+    } else {
+      throw new Error("INVALID_PAYMENT_TYPE");
+    }
+
+    // 6. Preserve original calculation snapshot
+    const planSnapshot = JSON.stringify({
+      ...paymentSnapshot,
+      type: paymentType,
+      plan,
+      cycle,
+      paymentId: payment.id,
+      amount: Number(payment.amount),
+      source: "admin_approval",
+      approvedBy: req.adminId,
+      planBefore: planResult.planBefore,
+      planAfter: planResult.planAfter,
+      previousExpireAt: planResult.previousExpireAt || null,
+      planStartDate: planResult.planStartDate || null,
+      expireAt: planResult.expireAt
+    });
+
+    // 7. Update payment
+    const [updateResult] = await connection.execute(
+      `UPDATE payments
+       SET status = 'paid',
+           approved_by_admin = 1,
+           paid_at = NOW(),
+           plan_start_date = ?,
+           expire_at = ?,
+           plan_snapshot = ?
+       WHERE id = ?
+         AND status IN ('pending', 'pending_review')`,
+      [
+        planResult.planStartDate || null,
+        planResult.expireAt,
+        planSnapshot,
+        paymentId
+      ]
+    );
+
+    if (!updateResult.affectedRows) {
+      throw new Error("PAYMENT_UPDATE_FAILED");
+    }
+
+    await connection.commit();
+
+    console.log("ADMIN PAYMENT APPROVED:", {
+      paymentId,
+      userId: payment.user_id,
+      adminId: req.adminId,
+      paymentType,
+      plan: planResult.planAfter,
+      cycle,
+      expireAt: planResult.expireAt
+    });
+
+    return res.json({
+      success: true,
+      message: "Payment approved",
+      paymentId,
+      paymentType,
+      plan: planResult.planAfter,
+      expireAt: planResult.expireAt
+    });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Approve failed" });
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (rollbackError) {
+        console.error("APPROVE ROLLBACK ERROR:", rollbackError.message);
+      }
+    }
+
+    console.error("APPROVE PAYMENT ERROR:", err);
+
+    const clientErrors = [
+      "INVALID_PAYMENT_DATA",
+      "INVALID_PAYMENT_SNAPSHOT",
+      "INVALID_UPGRADE_PAYMENT",
+      "INVALID_PAYMENT_TYPE",
+      "PLAN_DOWNGRADE_NOT_ALLOWED",
+      "UPGRADE_SOURCE_PLAN_INVALID",
+      "PLAN_EXPIRED",
+      "UPGRADE_CYCLE_MISMATCH",
+      "UPGRADE_QUOTE_EXPIRED",
+      "USER_NOT_FOUND"
+    ];
+
+    return res.status(clientErrors.includes(err.message) ? 400 : 500).json({
+      success: false,
+      error: "Approve failed",
+      code: err.message || "UNKNOWN_ERROR"
+    });
+
+  } finally {
+    if (connection) connection.release();
   }
 });
+
 
 // REJECT PAYMENT
 router.post("/payments/:id/reject", adminAuth, async (req, res) => {
