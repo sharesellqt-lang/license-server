@@ -14,6 +14,7 @@ const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID
 );
 const loginRewardService = require("../services/rewards.login.service");
+const referralService = require("../services/rewards.referral.service");
 // =========================
 // GOOGLE LOGIN
 // =========================
@@ -23,8 +24,7 @@ router.post(
 
     try {
 
-      const { credential } =
-        req.body;
+      const { credential, referralCode } = req.body;
 
       if (!credential) {
         return res.status(400).json({
@@ -67,6 +67,7 @@ router.post(
         );
 
       let user;
+      let isNewUser = false;
 
       // =========================
       // CREATE USER
@@ -92,10 +93,12 @@ router.post(
           );
 
         user = {
-          id: result.insertId,
-          email,
-          plan: "free"
+            id: result.insertId,
+            email,
+            plan: "free"
         };
+
+        isNewUser = true;
 
       } else {
 
@@ -117,6 +120,28 @@ try {
     console.error("[LOGIN REWARD ERROR]", {
         userId: user.id,
         error: rewardError.message
+    });
+}
+
+// =========================
+// REFERRAL
+// =========================
+try {
+    const referralResult = await referralService.processGoogleLogin({
+        userId: user.id,
+        isNewUser,
+        referralCode
+    });
+
+    console.log("[REFERRAL]", {
+        userId: user.id,
+        isNewUser,
+        ...referralResult
+    });
+} catch (referralError) {
+    console.error("[REFERRAL ERROR]", {
+        userId: user.id,
+        error: referralError.message
     });
 }
       // =========================

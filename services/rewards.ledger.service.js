@@ -176,7 +176,9 @@ async function applyTransactionWithConnection(conn, input) {
             duplicate: true,
             transaction: existing,
             transactionId: existing.id,
-            balance: outputNumber(wallet.balance)
+            balanceBefore: outputNumber(existing.balance_before),
+            balanceAfter: outputNumber(existing.balance_after),
+            currentBalance: outputNumber(wallet.balance)
         };
     }
 
