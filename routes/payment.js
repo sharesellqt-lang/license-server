@@ -443,4 +443,59 @@ if (paymentType === "upgrade" && amount === 0) {
   }
 });
 
+
+// =====================================================
+// PAYMENT STATUS - ĐỌC TRẠNG THÁI THẬT TỪ DATABASE
+// =====================================================
+router.get("/payment-status/:paymentId", auth, async (req, res) => {
+  try {
+    const userId = Number(req.user?.id);
+    const paymentId = Number(req.params.paymentId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(401).json({ error: "Invalid user" });
+    }
+
+    if (!Number.isInteger(paymentId) || paymentId <= 0) {
+      return res.status(400).json({ error: "Invalid payment ID" });
+    }
+
+    const [rows] = await db.execute(
+      `SELECT id, user_id, plan, cycle, amount, status,
+              approved_by_admin, paid_at, created_at
+       FROM payments
+       WHERE id = ? AND user_id = ?
+       LIMIT 1`,
+      [paymentId, userId]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({
+        error: "Payment not found"
+      });
+    }
+
+    const payment = rows[0];
+
+    return res.json({
+      success: true,
+      paymentId: Number(payment.id),
+      plan: payment.plan,
+      cycle: payment.cycle,
+      amount: Number(payment.amount),
+      status: payment.status,
+      approvedByAdmin: Number(payment.approved_by_admin),
+      paidAt: payment.paid_at,
+      createdAt: payment.created_at
+    });
+
+  } catch (err) {
+    console.error("PAYMENT STATUS ERROR:", err);
+
+    return res.status(500).json({
+      error: "Unable to retrieve payment status"
+    });
+  }
+});
+
 module.exports = router;
