@@ -1,41 +1,41 @@
+
+"use strict";
+
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
-// =========================
-// STORAGE CONFIG
-// =========================
+const uploadDir = path.join(__dirname, "../uploads");
+
+// Tạo thư mục nếu chưa tồn tại
+fs.mkdirSync(uploadDir, { recursive: true });
+
 const storage = multer.diskStorage({
-
   destination: function (req, file, cb) {
-    cb(null, "uploads/");
+    cb(null, uploadDir);
   },
 
   filename: function (req, file, cb) {
-    const uniqueName = Date.now() + "-" + file.originalname;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const uniqueName = `${Date.now()}-${require("crypto").randomUUID()}${ext}`;
     cb(null, uniqueName);
   }
-
 });
 
-// =========================
-// FILTER (OPTIONAL)
-// =========================
 const fileFilter = (req, file, cb) => {
-
-  if (
-    file.mimetype === "image/jpeg" ||
-    file.mimetype === "image/png"
-  ) {
-    cb(null, true);
-  } else {
-    cb(new Error("Only images allowed"), false);
+  if (["image/jpeg", "image/png"].includes(file.mimetype)) {
+    return cb(null, true);
   }
 
+  cb(new Error("Only JPEG and PNG images allowed"));
 };
 
 const upload = multer({
   storage,
-  fileFilter
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  }
 });
 
 module.exports = upload;
