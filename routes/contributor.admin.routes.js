@@ -24,36 +24,60 @@ function handleError(res, err, label = "ADMIN") {
     console.error(`[CONTRIBUTOR ${label}]`, err);
 
     const errors = {
+        // 400 – Bad Request
         INVALID_USER_ID: 400,
         INVALID_ROLE_KEY: 400,
         INVALID_PERMISSION_KEY: 400,
         INVALID_EFFECT: 400,
         INVALID_TASK_ID: 400,
+        INVALID_ASSIGNMENT_ID: 400,
         INVALID_TITLE: 400,
         INVALID_DESCRIPTION: 400,
         INVALID_CATEGORY: 400,
         INVALID_REWARD: 400,
         INVALID_MAX_PARTICIPANTS: 400,
         INVALID_DEADLINE: 400,
+        INVALID_INSTRUCTIONS: 400,
         INVALID_DATA: 400,
+        INVALID_TASK_STATUS: 400,
+        INVALID_SUBMISSION_ID: 400,
+        INVALID_PAGE: 400,
+        INVALID_LIMIT: 400,
+        INVALID_DATE_RANGE: 400,
+        SUBMISSION_CONTENT_REQUIRED: 400,
+        INVALID_ATTACHMENTS: 400,
+        INVALID_ATTACHMENT_URL: 400,
+        INVALID_REVIEWER_ID: 400,
+        INVALID_REVIEW_DECISION: 400,
+        INVALID_FEEDBACK: 400,
 
+        // 403 – Forbidden
+        SELF_REVIEW_NOT_ALLOWED: 403,
+        
+
+        // 404 – Not Found
         TARGET_USER_NOT_FOUND: 404,
         ROLE_NOT_FOUND: 404,
         PERMISSION_NOT_FOUND: 404,
         TASK_NOT_FOUND: 404,
+        ASSIGNMENT_NOT_FOUND: 404,
+        SUBMISSION_NOT_FOUND: 404,
 
+        // 409 – Conflict
         TASK_CANNOT_BE_PUBLISHED: 409,
         TASK_CANNOT_BE_PAUSED: 409,
         TASK_CANNOT_BE_RESUMED: 409,
         TASK_CANNOT_BE_CLOSED: 409,
-        INVALID_SUBMISSION_ID: 400,
-        INVALID_PAGE: 400,
-        INVALID_LIMIT: 400,
-
-        SUBMISSION_NOT_FOUND: 404,
-        INVALID_PAGE: 400,
-        INVALID_LIMIT: 400,
-        INVALID_DATE_RANGE: 400,
+        TASK_CANNOT_BE_EDITED: 409,
+        TASK_INVALID_STATUS: 409,
+        TASK_DEADLINE_PASSED: 409,
+        TASK_CLOSED: 409,
+        MAX_PARTICIPANTS_BELOW_CURRENT: 409,
+        ASSIGNMENT_NOT_SUBMITTABLE: 409,
+        REVISION_NOT_REQUESTED: 409,
+        ASSIGNMENT_NOT_REVIEWABLE: 409,
+        SUBMISSION_ALREADY_REVIEWED: 409,
+        REWARD_ALREADY_GRANTED: 409,
     };
 
     const status = errors[err.message] || 500;
@@ -61,7 +85,7 @@ function handleError(res, err, label = "ADMIN") {
     return res.status(status).json({
         success: false,
         error: status === 500
-            ? "CONTRIBUTOR_ADMIN_OPERATION_FAILED"
+           ? "CONTRIBUTOR_OPERATION_FAILED"
             : err.message
     });
 }
