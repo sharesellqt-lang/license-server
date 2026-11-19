@@ -139,10 +139,10 @@ async function applyPlan(connection, {
   }
 
   const [[nowRow]] = await connection.query(
-    `SELECT NOW() AS current_time`
+    `SELECT NOW() AS db_now`
   );
 
-  const now = parseDbDate(nowRow.current_time);
+  const now = parseDbDate(nowRow.db_now);
 
   if (!now || Number.isNaN(now.getTime())) {
     throw new Error("INVALID_DATABASE_TIME");
@@ -248,10 +248,10 @@ async function upgradePlan(connection, {
 
   // Lấy thời gian DB để tránh lệch timezone giữa server và MySQL.
   const [[nowRow]] = await connection.query(
-    `SELECT NOW() AS current_time`
+    `SELECT NOW() AS db_now`
   );
 
-  const now = parseDbDate(nowRow.current_time);
+  const now = parseDbDate(nowRow.db_now);
 
   if (!now || Number.isNaN(now.getTime())) {
     throw new Error("INVALID_DATABASE_TIME");
