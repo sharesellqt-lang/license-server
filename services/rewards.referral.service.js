@@ -123,4 +123,112 @@ async function processGoogleLogin({ userId, isNewUser, referralCode }) {
     }
 }
 
-module.exports = { processGoogleLogin };
+async function getMyReferral(userId) {
+    const normalizedUserId = Number(userId);
+
+    if (!Number.isSafeInteger(normalizedUserId) || normalizedUserId <= 0) {
+        throw new Error("INVALID_USER_ID");
+    }
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const referralCode = await ensureReferralCode(
+            conn,
+            normalizedUserId
+        );
+
+        const [codes] = await conn.execute(
+            `SELECT id, referral_code, status
+             FROM reward_referral_codes
+             WHERE user_id = ?
+             LIMIT 1`,
+            [normalizedUserId]
+        );
+
+        const [summaryRows] = await conn.execute(
+            `SELECT
+                COUNT(*) AS total,
+                SUM(status = 'pending') AS pending,
+                SUM(status = 'qualified') AS qualified,
+                SUM(status = 'rewarded') AS rewarded,
+                SUM(status = 'rejected') AS rejected
+             FROM reward_referrals
+             WHERE referrer_user_id = ?`,
+            [normalizedUserId]
+        );
+
+        const [walletRows] = await conn.execute(
+            `SELECT
+                COALESCE(SUM(amount), 0) AS total_credits,
+                COUNT(*) AS total_transactions
+             FROM reward_transactions
+             WHERE user_id = ?
+               AND source = 'referral'
+               AND type = 'credit'`,
+            [normalizedUserId]
+        );
+
+        const [referrals] = await conn.execute(
+            `SELECT
+                rr.id,
+                rr.status,
+                rr.created_at,
+                rr.qualified_at,
+                rr.rewarded_at,
+                rr.rejection_reason,
+                u.email AS referred_email,
+                rt.amount AS reward_credits,
+                p.plan AS purchased_plan,
+                p.amount AS payment_amount,
+                p.status AS payment_status
+             FROM reward_referrals rr
+             LEFT JOIN users u
+                ON u.id = rr.referred_user_id
+             LEFT JOIN reward_transactions rt
+                ON rt.id = rr.reward_transaction_id
+             LEFT JOIN payments p
+                ON p.id = rr.first_purchase_payment_id
+             WHERE rr.referrer_user_id = ?
+             ORDER BY rr.created_at DESC
+             LIMIT 100`,
+            [normalizedUserId]
+        );
+
+        await conn.commit();
+
+        const code = codes[0] || {
+            referral_code: referralCode,
+            status: "active"
+        };
+
+        return {
+            referralCode: code.referral_code,
+            codeStatus: code.status,
+            referralLink: code.status === "active"
+                ? `https://sharesell.net/?ref=${encodeURIComponent(code.referral_code)}`
+                : null,
+            summary: {
+                total: Number(summaryRows[0]?.total || 0),
+                pending: Number(summaryRows[0]?.pending || 0),
+                qualified: Number(summaryRows[0]?.qualified || 0),
+                rewarded: Number(summaryRows[0]?.rewarded || 0),
+                rejected: Number(summaryRows[0]?.rejected || 0),
+                totalCredits: Number(walletRows[0]?.total_credits || 0),
+                totalTransactions: Number(walletRows[0]?.total_transactions || 0)
+            },
+            referrals
+        };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+module.exports = {
+    processGoogleLogin,
+    getMyReferral
+};
