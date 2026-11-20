@@ -9,7 +9,8 @@ const requireContributorPermission =
     require("../middleware/requireContributorPermission");
 
 const taskService = require("../services/contributor.task.service");
-const referralService = require("../services/contributor.referral.service");
+const referralService = require("../services/rewards.referral.service");
+const rbacService = require("../services/contributor.rbac.admin.service");
 
 function handleError(res, err, label) {
     console.error(`[CONTRIBUTOR ${label}]`, err);
@@ -66,23 +67,19 @@ function getAuditInfo(req) {
 }
 
 // GET /api/contributor/me/access
-router.get(
-    "/me/access",
-    auth,
-    async (req, res) => {
-        try {
-            const access = await require("../services/contributor.rbac.admin.service")
-                .getUserAccess(req.user.id);
+router.get("/me/access", auth, async (req, res) => {
+    try {
+        const access = await rbacService.getUserAccess(req.user.id);
 
-            return res.json({
-                success: true,
-                access
-            });
-        } catch (err) {
-            return handleError(res, err, "MY ACCESS");
-        }
+        return res.json({
+            success: true,
+            access
+        });
+    } catch (err) {
+        return handleError(res, err, "MY ACCESS");
     }
-);
+});
+
 // GET /api/contributor/tasks
 router.get(
     "/tasks",
@@ -255,24 +252,17 @@ router.get(
 );
 
 // GET /api/contributor/my-referral
-router.get(
-    "/my-referral",
-    auth,
-    async (req, res) => {
-        try {
-            const referral = await referralService.getMyReferral(
-                req.user.id
-            );
+router.get("/my-referral", auth, async (req, res) => {
+    try {
+        const referral = await referralService.getMyReferral(req.user.id);
 
-            return res.json({
-                success: true,
-                referral
-            });
-        } catch (err) {
-            return handleError(res, err, "MY REFERRAL");
-        }
+        return res.json({
+            success: true,
+            referral
+        });
+    } catch (err) {
+        return handleError(res, err, "MY REFERRAL");
     }
-);
-
+});
 
 module.exports = router;

@@ -4,6 +4,8 @@
 const crypto = require("crypto");
 const db = require("../db");
 
+const REFERRAL_BASE_URL = "https://sharesell.net/tools/index.html";
+
 function generateReferralCode() {
     return crypto.randomBytes(5).toString("hex").toUpperCase();
 }
@@ -34,7 +36,6 @@ async function ensureReferralCode(conn, userId) {
         } catch (error) {
             if (error.code !== "ER_DUP_ENTRY") throw error;
 
-            // Có thể tài khoản đã được tạo mã ở một request đồng thời.
             const [rows] = await conn.execute(
                 `SELECT referral_code
                  FROM reward_referral_codes
@@ -53,7 +54,7 @@ async function ensureReferralCode(conn, userId) {
 async function processGoogleLogin({ userId, isNewUser, referralCode }) {
     const normalizedUserId = Number(userId);
 
-    if (!Number.isInteger(normalizedUserId) || normalizedUserId <= 0) {
+    if (!Number.isSafeInteger(normalizedUserId) || normalizedUserId <= 0) {
         throw new Error("INVALID_USER_ID");
     }
 
@@ -62,15 +63,12 @@ async function processGoogleLogin({ userId, isNewUser, referralCode }) {
     try {
         await conn.beginTransaction();
 
-        // Mỗi tài khoản đều có mã giới thiệu riêng.
         const ownReferralCode = await ensureReferralCode(
             conn,
             normalizedUserId
         );
 
         let referralRecorded = false;
-
-        // Chỉ tài khoản vừa đăng ký mới được ghi nhận người giới thiệu.
         const incomingCode = String(referralCode || "").trim();
 
         if (
@@ -135,13 +133,11 @@ async function getMyReferral(userId) {
     try {
         await conn.beginTransaction();
 
-        const referralCode = await ensureReferralCode(
-            conn,
-            normalizedUserId
-        );
+        // Đảm bảo tài khoản luôn có mã Referral riêng.
+        await ensureReferralCode(conn, normalizedUserId);
 
         const [codes] = await conn.execute(
-            `SELECT id, referral_code, status
+            `SELECT referral_code, status
              FROM reward_referral_codes
              WHERE user_id = ?
              LIMIT 1`,
@@ -151,10 +147,10 @@ async function getMyReferral(userId) {
         const [summaryRows] = await conn.execute(
             `SELECT
                 COUNT(*) AS total,
-                SUM(status = 'pending') AS pending,
-                SUM(status = 'qualified') AS qualified,
-                SUM(status = 'rewarded') AS rewarded,
-                SUM(status = 'rejected') AS rejected
+                COALESCE(SUM(status = 'pending'), 0) AS pending,
+                COALESCE(SUM(status = 'qualified'), 0) AS qualified,
+                COALESCE(SUM(status = 'rewarded'), 0) AS rewarded,
+                COALESCE(SUM(status = 'rejected'), 0) AS rejected
              FROM reward_referrals
              WHERE referrer_user_id = ?`,
             [normalizedUserId]
@@ -174,43 +170,44 @@ async function getMyReferral(userId) {
         const [referrals] = await conn.execute(
             `SELECT
                 rr.id,
-                rr.status,
-                rr.created_at,
-                rr.qualified_at,
-                rr.rewarded_at,
-                rr.rejection_reason,
-                u.email AS referred_email,
-                rt.amount AS reward_credits,
-                p.plan AS purchased_plan,
-                p.amount AS payment_amount,
-                p.status AS payment_status
+                rr.referred_user_id AS userId,
+                u.email AS email,
+                rr.status AS status,
+                rr.created_at AS createdAt,
+                rr.qualified_at AS qualifiedAt,
+                rr.rewarded_at AS rewardedAt,
+                rr.rejection_reason AS rejectionReason,
+                COALESCE(rt.amount, 0) AS creditsEarned,
+                p.plan AS purchasedPlan,
+                p.amount AS paymentAmount,
+                p.status AS paymentStatus
              FROM reward_referrals rr
              LEFT JOIN users u
                 ON u.id = rr.referred_user_id
              LEFT JOIN reward_transactions rt
                 ON rt.id = rr.reward_transaction_id
+               AND rt.type = 'credit'
              LEFT JOIN payments p
                 ON p.id = rr.first_purchase_payment_id
              WHERE rr.referrer_user_id = ?
-             ORDER BY rr.created_at DESC
+             ORDER BY rr.created_at DESC, rr.id DESC
              LIMIT 100`,
             [normalizedUserId]
         );
 
         await conn.commit();
 
-        const code = codes[0] || {
-            referral_code: referralCode,
-            status: "active"
-        };
+        const code = codes[0] || null;
+        const codeStatus = code?.status || null;
+        const referralCode = code?.referral_code || null;
 
         return {
-            referralCode: code.referral_code,
-            codeStatus: code.status,
-            referralLink: code.status === "active"
-                ? `https://sharesell.net/?ref=${encodeURIComponent(code.referral_code)}`
+            referralCode,
+            referralCodeStatus: codeStatus,
+            referralLink: codeStatus === "active" && referralCode
+                ? `${REFERRAL_BASE_URL}?ref=${encodeURIComponent(referralCode)}`
                 : null,
-            summary: {
+            stats: {
                 total: Number(summaryRows[0]?.total || 0),
                 pending: Number(summaryRows[0]?.pending || 0),
                 qualified: Number(summaryRows[0]?.qualified || 0),
@@ -219,7 +216,20 @@ async function getMyReferral(userId) {
                 totalCredits: Number(walletRows[0]?.total_credits || 0),
                 totalTransactions: Number(walletRows[0]?.total_transactions || 0)
             },
-            referrals
+            referrals: referrals.map(item => ({
+                id: Number(item.id),
+                userId: Number(item.userId),
+                email: item.email || null,
+                status: item.status,
+                createdAt: item.createdAt,
+                qualifiedAt: item.qualifiedAt,
+                rewardedAt: item.rewardedAt,
+                rejectionReason: item.rejectionReason || null,
+                creditsEarned: Number(item.creditsEarned || 0),
+                purchasedPlan: item.purchasedPlan || null,
+                paymentAmount: Number(item.paymentAmount || 0),
+                paymentStatus: item.paymentStatus || null
+            }))
         };
     } catch (error) {
         await conn.rollback();
@@ -228,6 +238,7 @@ async function getMyReferral(userId) {
         conn.release();
     }
 }
+
 module.exports = {
     processGoogleLogin,
     getMyReferral
