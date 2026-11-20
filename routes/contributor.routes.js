@@ -10,6 +10,7 @@ const requireContributorPermission =
 
 const taskService = require("../services/contributor.task.service");
 const referralService = require("../services/rewards.referral.service");
+const referralService = require("../services/contributor.referral.service");
 
 function handleError(res, err, label) {
     console.error(`[CONTRIBUTOR ${label}]`, err);
@@ -273,4 +274,17 @@ router.get(
         }
     }
 );
+
+router.get("/my-referral", auth, async (req, res) => {
+    try {
+        const referral = await referralService.getMyReferral(req.user.id);
+
+        return res.json({
+            success: true,
+            referral
+        });
+    } catch (error) {
+        return handleError(res, error, "GET /my-referral");
+    }
+});
 module.exports = router;
