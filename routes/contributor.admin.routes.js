@@ -82,6 +82,10 @@ function handleError(res, err, label = "ADMIN") {
         INVALID_REFERRAL_ID: 400,
         INVALID_REFERRAL_STATUS: 400,
         REFERRAL_NOT_FOUND: 404,
+        INVALID_REFERRAL_CODE_ID: 400,
+        INVALID_REFERRAL_CODE_STATUS: 400,
+        REFERRAL_CODE_NOT_FOUND: 404,
+        REFERRAL_CODE_STATUS_UNCHANGED: 409,
     };
 
     const status = errors[err.message] || 500;
@@ -535,6 +539,36 @@ router.get(
             return handleError(res, err, "GET REFERRAL DETAIL");
         }
     }
+);
+
+
+async function handleReferralCodeStatus(req, res, status) {
+    try {
+        const result = await referralAdminService.changeReferralCodeStatus(
+            req.params.id,
+            req.user.id,
+            status,
+            getAuditInfo(req)
+        );
+
+        return res.json({ success: true, referralCode: result });
+    } catch (err) {
+        return handleError(res, err, "CHANGE REFERRAL CODE STATUS");
+    }
+}
+
+// PUT /api/contributor/admin/referral-codes/:id/disable
+router.put(
+    "/referral-codes/:id/disable",
+    requireContributorPermission("referral.manage"),
+    (req, res) => handleReferralCodeStatus(req, res, "disabled")
+);
+
+// PUT /api/contributor/admin/referral-codes/:id/enable
+router.put(
+    "/referral-codes/:id/enable",
+    requireContributorPermission("referral.manage"),
+    (req, res) => handleReferralCodeStatus(req, res, "active")
 );
 
 module.exports = router;

@@ -2,6 +2,7 @@
 "use strict";
 
 const db = require("../db");
+const { writeAudit } = require("./contributor.audit.service");
 
 function positiveId(value, error = "INVALID_REFERRAL_ID") {
     const id = Number(value);
@@ -229,8 +230,84 @@ async function getReferralDetail(referralId) {
     return { referral, transactions };
 }
 
+async function changeReferralCodeStatus(codeId, actorUserId, newStatus, audit = {}) {
+    const id = positiveId(codeId, "INVALID_REFERRAL_CODE_ID");
+    const actorId = positiveId(actorUserId, "INVALID_USER_ID");
+
+    if (!["active", "disabled"].includes(newStatus)) {
+        throw new Error("INVALID_REFERRAL_CODE_STATUS");
+    }
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.execute(
+            `SELECT id, user_id, referral_code, status
+             FROM reward_referral_codes
+             WHERE id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [id]
+        );
+
+        if (!rows.length) {
+            throw new Error("REFERRAL_CODE_NOT_FOUND");
+        }
+
+        const code = rows[0];
+
+        if (code.status === newStatus) {
+            throw new Error("REFERRAL_CODE_STATUS_UNCHANGED");
+        }
+
+        await conn.execute(
+            `UPDATE reward_referral_codes
+             SET status = ?
+             WHERE id = ?`,
+            [newStatus, id]
+        );
+
+        await writeAudit(conn, {
+            actorUserId: actorId,
+            targetUserId: Number(code.user_id),
+            action: newStatus === "disabled"
+                ? "referral_code.disabled"
+                : "referral_code.enabled",
+            entityType: "reward_referral_code",
+            entityId: id,
+            oldData: {
+                status: code.status,
+                referralCode: code.referral_code
+            },
+            newData: {
+                status: newStatus,
+                referralCode: code.referral_code
+            },
+            ipAddress: audit.ipAddress || null,
+            userAgent: audit.userAgent || null
+        });
+
+        await conn.commit();
+
+        return {
+            id,
+            userId: Number(code.user_id),
+            referralCode: code.referral_code,
+            status: newStatus
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
 module.exports = {
     getSummary,
     getReferrals,
-    getReferralDetail
+    getReferralDetail,
+    changeReferralCodeStatus
 };
