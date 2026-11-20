@@ -381,6 +381,8 @@ function authMiddleware(req, res, next) {
 
 // chạy cron bank
 require("./jobs/bankScan");
+// REWARDS SCHEDULER - EVERY 5 MINUTES
+require("./jobs/rewards.scheduler");
 // AUTO SYNC AIRDROP METRICS - EVERY 6 HOURS
 require("./services/airdrop.metrics.auto");
 

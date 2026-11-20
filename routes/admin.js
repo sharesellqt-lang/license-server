@@ -411,128 +411,153 @@ if (paymentAmount === 0) {
 
 // 8. Record first-purchase referral attribution
 if (paymentType === "purchase" && paymentAmount > 0) {
-  // Lock referral relation of the buyer
-  const [referralRows] = await connection.execute(
-    `SELECT *
-     FROM reward_referrals
-     WHERE referred_user_id = ?
-       AND status = 'pending'
-       AND first_purchase_payment_id IS NULL
-     LIMIT 1
-     FOR UPDATE`,
-    [payment.user_id]
-  );
-
-  if (referralRows.length) {
-    const referral = referralRows[0];
-
-    // Read referral reward rule
-    const [ruleRows] = await connection.execute(
-      `SELECT enabled, credits, config
-       FROM reward_rules
-       WHERE rule_key = 'referral_first_purchase'
-       LIMIT 1
-       FOR UPDATE`
+    // Lock referral relation of the buyer
+    const [referralRows] = await connection.execute(
+        `SELECT *
+         FROM reward_referrals
+         WHERE referred_user_id = ?
+           AND status = 'pending'
+           AND first_purchase_payment_id IS NULL
+         LIMIT 1
+         FOR UPDATE`,
+        [payment.user_id]
     );
 
-    if (!ruleRows.length) {
-      throw new Error("REFERRAL_REWARD_RULE_NOT_FOUND");
+    if (referralRows.length) {
+        const referral = referralRows[0];
+
+        // Read referral reward rule
+        const [ruleRows] = await connection.execute(
+            `SELECT enabled, credits, config
+             FROM reward_rules
+             WHERE rule_key = 'referral_first_purchase'
+             LIMIT 1
+             FOR UPDATE`
+        );
+
+        if (!ruleRows.length) {
+            throw new Error("REFERRAL_REWARD_RULE_NOT_FOUND");
+        }
+
+        const rule = ruleRows[0];
+
+        let ruleConfig = {};
+
+        try {
+            ruleConfig = typeof rule.config === "object"
+                ? rule.config
+                : JSON.parse(rule.config || "{}");
+        } catch {
+            throw new Error("INVALID_REFERRAL_REWARD_CONFIG");
+        }
+
+        // Get reward credits according to purchased plan
+        const planCredits = ruleConfig.plan_credits || {};
+
+        const configuredCredits = Number(planCredits[plan] || 0);
+
+        const credits = Number.isSafeInteger(configuredCredits) &&
+            configuredCredits > 0
+                ? configuredCredits
+                : 0;
+
+        const enabled = Number(rule.enabled) === 1;
+
+        const waitDays = Math.max(
+            0,
+            Math.min(365, Math.floor(Number(ruleConfig.wait_days) || 0))
+        );
+
+        const rewardActive = enabled && credits > 0;
+
+        const attributionStatus = !rewardActive
+            ? "cancelled"
+            : waitDays > 0
+                ? "waiting"
+                : "eligible";
+
+        const eligibleAt = rewardActive
+            ? "DATE_ADD(NOW(), INTERVAL ? DAY)"
+            : "NULL";
+
+        // Create attribution record
+        await connection.execute(
+            `INSERT INTO reward_attributions (
+                payment_id,
+                source_type,
+                referral_id,
+                referrer_user_id,
+                referred_user_id,
+                status,
+                reward_credits,
+                wait_days,
+                eligible_at,
+                metadata
+            ) VALUES (
+                ?, 'referral', ?, ?, ?, ?, ?, ?, ${eligibleAt}, ?
+            )`,
+            [
+                paymentId,
+                referral.id,
+                referral.referrer_user_id,
+                referral.referred_user_id,
+                attributionStatus,
+                rewardActive ? credits : 0,
+                waitDays,
+                ...(rewardActive ? [waitDays] : []),
+                JSON.stringify({
+                    rule_key: "referral_first_purchase",
+                    rule_enabled: enabled,
+                    purchase_policy: ruleConfig.purchase_policy || null,
+                    payment_type: paymentType,
+                    payment_plan: plan,
+                    payment_cycle: cycle,
+                    payment_amount: paymentAmount,
+                    reward_credits: rewardActive ? credits : 0,
+                    wait_days: waitDays,
+                    reason: rewardActive
+                        ? null
+                        : "reward_rule_disabled_or_zero_plan_credits"
+                })
+            ]
+        );
+
+        // Mark the referred user's first purchase
+        const [referralUpdate] = await connection.execute(
+            `UPDATE reward_referrals
+             SET first_purchase_payment_id = ?,
+                 status = ?,
+                 qualified_at = NOW(),
+                 rejection_reason = ?
+             WHERE id = ?
+               AND first_purchase_payment_id IS NULL`,
+            [
+                paymentId,
+                rewardActive ? "qualified" : "rejected",
+                rewardActive
+                    ? null
+                    : "Reward rule disabled or plan credits not configured",
+                referral.id
+            ]
+        );
+
+        if (!referralUpdate.affectedRows) {
+            throw new Error("REFERRAL_FIRST_PURCHASE_UPDATE_FAILED");
+        }
+
+        console.log("REFERRAL ATTRIBUTION RECORDED:", {
+            paymentId,
+            referralId: referral.id,
+            referrerUserId: referral.referrer_user_id,
+            referredUserId: referral.referred_user_id,
+            plan,
+            status: attributionStatus,
+            credits: rewardActive ? credits : 0,
+            waitDays
+        });
     }
-
-    const rule = ruleRows[0];
-
-    let ruleConfig = {};
-    try {
-      ruleConfig = typeof rule.config === "object"
-        ? rule.config
-        : JSON.parse(rule.config || "{}");
-    } catch {
-      throw new Error("INVALID_REFERRAL_REWARD_CONFIG");
-    }
-
-    const enabled = Number(rule.enabled) === 1;
-    const credits = Math.max(0, Math.floor(Number(rule.credits) || 0));
-    const waitDays = Math.max(
-      0,
-      Math.floor(Number(ruleConfig.wait_days) || 0)
-    );
-
-    const rewardActive = enabled && credits > 0;
-    const attributionStatus = !rewardActive
-      ? "cancelled"
-      : waitDays > 0
-        ? "waiting"
-        : "eligible";
-
-    const eligibleAt = rewardActive
-      ? `DATE_ADD(NOW(), INTERVAL ${waitDays} DAY)`
-      : "NULL";
-
-    // Create attribution record
-    await connection.execute(
-      `INSERT INTO reward_attributions (
-         payment_id,
-         source_type,
-         referral_id,
-         referrer_user_id,
-         referred_user_id,
-         status,
-         reward_credits,
-         wait_days,
-         eligible_at,
-         metadata
-       ) VALUES (?, 'referral', ?, ?, ?, ?, ?, ?, ${eligibleAt}, ?)`,
-      [
-        paymentId,
-        referral.id,
-        referral.referrer_user_id,
-        referral.referred_user_id,
-        attributionStatus,
-        rewardActive ? credits : 0,
-        waitDays,
-        JSON.stringify({
-          rule_key: "referral_first_purchase",
-          rule_enabled: enabled,
-          purchase_policy: ruleConfig.purchase_policy || null,
-          payment_type: paymentType,
-          payment_amount: paymentAmount,
-          reason: rewardActive ? null : "reward_rule_disabled_or_zero_credits"
-        })
-      ]
-    );
-
-    // Mark the referred user's first purchase
-   const [referralUpdate] = await connection.execute(
-  `UPDATE reward_referrals
-   SET first_purchase_payment_id = ?,
-       status = ?,
-       qualified_at = NOW(),
-       rejection_reason = ?
-   WHERE id = ?
-     AND first_purchase_payment_id IS NULL`,
-  [
-    paymentId,
-    rewardActive ? "qualified" : "rejected",
-    rewardActive ? null : "Reward rule disabled or credits not configured",
-    referral.id
-  ]
-);
-
-if (!referralUpdate.affectedRows) {
-  throw new Error("REFERRAL_FIRST_PURCHASE_UPDATE_FAILED");
 }
 
-    console.log("REFERRAL ATTRIBUTION RECORDED:", {
-      paymentId,
-      referralId: referral.id,
-      referrerUserId: referral.referrer_user_id,
-      referredUserId: referral.referred_user_id,
-      status: attributionStatus,
-      credits: rewardActive ? credits : 0,
-      waitDays
-    });
-  }
-}
 
     await connection.commit();
 
