@@ -12,6 +12,7 @@ const rbacService = require("../services/contributor.rbac.admin.service");
 const taskService = require("../services/contributor.task.service");
 const memberService = require("../services/contributor.member.admin.service");
 const auditService = require("../services/contributor.audit.admin.service");
+const referralAdminService = require("../services/rewards.referral.admin.service");
 router.use((req, res, next) => {
     console.log("[ADMIN ROUTER ENTER]", req.method, req.originalUrl);
     next();
@@ -78,6 +79,9 @@ function handleError(res, err, label = "ADMIN") {
         ASSIGNMENT_NOT_REVIEWABLE: 409,
         SUBMISSION_ALREADY_REVIEWED: 409,
         REWARD_ALREADY_GRANTED: 409,
+        INVALID_REFERRAL_ID: 400,
+        INVALID_REFERRAL_STATUS: 400,
+        REFERRAL_NOT_FOUND: 404,
     };
 
     const status = errors[err.message] || 500;
@@ -480,6 +484,55 @@ router.get(
             });
         } catch (err) {
             return handleError(res, err, "GET AUDIT LOGS");
+        }
+    }
+);
+
+
+// =========================
+// REFERRAL MANAGEMENT
+// =========================
+
+// GET /api/contributor/admin/referrals/summary
+router.get(
+    "/referrals/summary",
+    requireContributorPermission("referral.view"),
+    async (req, res) => {
+        try {
+            const summary = await referralAdminService.getSummary();
+            return res.json({ success: true, summary });
+        } catch (err) {
+            return handleError(res, err, "GET REFERRAL SUMMARY");
+        }
+    }
+);
+
+// GET /api/contributor/admin/referrals
+router.get(
+    "/referrals",
+    requireContributorPermission("referral.view"),
+    async (req, res) => {
+        try {
+            const result = await referralAdminService.getReferrals(req.query);
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET REFERRALS");
+        }
+    }
+);
+
+// GET /api/contributor/admin/referrals/:id
+router.get(
+    "/referrals/:id",
+    requireContributorPermission("referral.view"),
+    async (req, res) => {
+        try {
+            const result = await referralAdminService.getReferralDetail(
+                req.params.id
+            );
+            return res.json({ success: true, ...result });
+        } catch (err) {
+            return handleError(res, err, "GET REFERRAL DETAIL");
         }
     }
 );
