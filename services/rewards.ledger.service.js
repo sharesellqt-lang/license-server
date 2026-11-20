@@ -340,8 +340,169 @@ async function creditWalletWithConnection(conn, data) {
     });
 }
 
+
+async function reverseCreditWithConnection(conn, data) {
+    if (!conn || typeof conn.execute !== "function") {
+        throw new Error("INVALID_DATABASE_CONNECTION");
+    }
+
+    const userId = Number(data.userId);
+
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+        throw new Error("INVALID_USER_ID");
+    }
+
+    const amount = parseCredits(data.amount);
+
+    if (
+        typeof data.idempotencyKey !== "string" ||
+        !data.idempotencyKey.trim() ||
+        data.idempotencyKey.length > 120
+    ) {
+        throw new Error("INVALID_IDEMPOTENCY_KEY");
+    }
+
+    await conn.execute(
+        `INSERT IGNORE INTO reward_wallets (user_id)
+         VALUES (?)`,
+        [userId]
+    );
+
+    const [walletRows] = await conn.execute(
+        `SELECT id, user_id, balance, lifetime_earned,
+                lifetime_spent, status
+         FROM reward_wallets
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [userId]
+    );
+
+    if (!walletRows.length) {
+        throw new Error("WALLET_NOT_FOUND");
+    }
+
+    const wallet = walletRows[0];
+
+    if (wallet.status !== "active") {
+        throw new Error("WALLET_LOCKED");
+    }
+
+    const [existingRows] = await conn.execute(
+        `SELECT id, user_id, type, source, amount,
+                balance_before, balance_after
+         FROM reward_transactions
+         WHERE idempotency_key = ?
+         LIMIT 1`,
+        [data.idempotencyKey]
+    );
+
+    if (existingRows.length) {
+        const existing = existingRows[0];
+
+        if (
+            Number(existing.user_id) !== userId ||
+            existing.type !== "reversal" ||
+            existing.source !== "affiliate" ||
+            BigInt(existing.amount) !== amount
+        ) {
+            throw new Error("IDEMPOTENCY_KEY_REUSED");
+        }
+
+        return {
+            success: true,
+            duplicate: true,
+            transactionId: existing.id,
+            balanceBefore: outputNumber(existing.balance_before),
+            balanceAfter: outputNumber(existing.balance_after),
+            currentBalance: outputNumber(wallet.balance)
+        };
+    }
+
+    const balanceBefore = BigInt(wallet.balance);
+
+    if (balanceBefore < amount) {
+        throw new Error("INSUFFICIENT_CREDITS_FOR_REVERSAL");
+    }
+
+    const balanceAfter = balanceBefore - amount;
+
+    await conn.execute(
+        `UPDATE reward_wallets
+        SET balance = ?
+        WHERE id = ?`,
+        [
+            balanceAfter.toString(),
+            wallet.id
+        ]
+    );
+
+    const [result] = await conn.execute(
+        `INSERT INTO reward_transactions (
+            wallet_id,
+            user_id,
+            type,
+            source,
+            amount,
+            balance_before,
+            balance_after,
+            reference_type,
+            reference_id,
+            idempotency_key,
+            description,
+            metadata,
+            created_by_admin_id
+        ) VALUES (?, ?, 'reversal', 'affiliate', ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+        [
+            wallet.id,
+            userId,
+            amount.toString(),
+            balanceBefore.toString(),
+            balanceAfter.toString(),
+            data.referenceType || "affiliate_commission",
+            data.referenceId || null,
+            data.idempotencyKey,
+            data.description || "Đảo Credits hoa hồng Affiliate",
+            data.metadata == null
+                ? null
+                : JSON.stringify(data.metadata)
+        ]
+    );
+
+    await writeAudit(conn, {
+        actorUserId: data.actorUserId || null,
+        targetUserId: userId,
+        action: "credits.reversed",
+        entityType: "reward_transaction",
+        entityId: result.insertId,
+        oldData: {
+            balance: outputNumber(balanceBefore)
+        },
+        newData: {
+            balance: outputNumber(balanceAfter),
+            type: "reversal",
+            amount: outputNumber(amount),
+            source: "affiliate",
+            referenceType: data.referenceType || "affiliate_commission",
+            referenceId: data.referenceId || null
+        }
+    });
+
+    return {
+        success: true,
+        duplicate: false,
+        transactionId: result.insertId,
+        type: "reversal",
+        amount: outputNumber(amount),
+        balanceBefore: outputNumber(balanceBefore),
+        balanceAfter: outputNumber(balanceAfter)
+    };
+}
+
+
 module.exports = {
     creditWallet,
     debitWallet,
-    creditWalletWithConnection
+    creditWalletWithConnection,
+    reverseCreditWithConnection
 };

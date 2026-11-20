@@ -68,11 +68,9 @@ app.use((req, res, next) => {
 app.use("/api/airdrop", airdropRoutes);
 app.use("/api/rewards", require("./routes/rewards.routes"));
 app.use("/api/contributor", require("./routes/contributor.routes"));
-app.use(
-    "/api/contributor/admin",
-    require("./routes/contributor.admin.routes")
-);
-
+app.use("/api/contributor/admin",require("./routes/contributor.admin.routes"));
+app.use("/api/affiliate", require("./routes/affiliate.routes"));
+app.use("/api/affiliate/admin", require("./routes/affiliate.admin.routes"));
 app.use("/api/stock-data", require("./routes/stock-data.routes"));
 
 app.get("/api/airdrop-test", (req, res) => {
