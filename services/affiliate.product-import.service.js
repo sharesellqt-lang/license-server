@@ -69,6 +69,174 @@ function cleanText(value, maxLength = 500, field = "unknown") {
     return result;
 }
 
+
+function decodeHtmlEntities(value) {
+    return String(value)
+        .replace(/&nbsp;|&#160;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&#(\d+);/g, (match, code) => {
+            const number = Number(code);
+            return number > 0 && number <= 0x10FFFF
+                ? String.fromCodePoint(number)
+                : " ";
+        })
+        .replace(/&#x([0-9a-f]+);/gi, (match, code) => {
+            const number = parseInt(code, 16);
+            return number > 0 && number <= 0x10FFFF
+                ? String.fromCodePoint(number)
+                : " ";
+        });
+}
+
+function cleanDescription(value) {
+    if (value === undefined || value === null) return null;
+
+    let text = decodeHtmlEntities(value);
+
+    text = text
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+        .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section)>/gi, "\n")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/https?:\/\/\S+/gi, " ")
+        .replace(/#[\p{L}\p{N}_]+/gu, " ")
+        .replace(/[✔️⭐️🌿💎👉🔰📩]/gu, " ")
+        .replace(/\r\n?/g, "\n")
+        .replace(/[ \t]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{2,}/g, "\n")
+        .trim();
+
+    return text || null;
+}
+
+function createShortDescription(value, maxLength = 500, title = "") {
+    const cleaned = cleanDescription(value);
+    if (!cleaned) return null;
+
+    const ignoredPatterns = [
+        /chào mừng.*gian hàng/i,
+        /nhấn theo dõi shop/i,
+        /săn voucher/i,
+        /inbox|comment.*shop/i,
+        /nhắn tin.*shop/i,
+        /quay video.*mở hàng/i,
+        /quy định.*đổi trả/i,
+        /chính sách.*đổi trả/i,
+        /lưu ý sử dụng/i,
+        /cam kết của shop/i,
+        /shop hy vọng/i,
+        /chúc quý khách/i,
+        /cảm ơn quý khách/i,
+        /khuyến khích.*giặt/i,
+        /tránh phơi.*trực tiếp/i,
+        /theo dõi shop/i,
+        /liên hệ shop/i,
+        /đánh giá.*sản phẩm/i,
+        /100%.*(giống hình|không lỗi|không có lỗi)/i,
+        /sản phẩm tốt nhất cho khách hàng/i,
+        /chất lượng tốt nhất/i,
+        /không phải hàng chợ/i
+    ];
+
+    const titleKey = String(title || "")
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]/gu, "");
+
+    const seen = new Set();
+
+    const sentences = cleaned
+        .split(/(?<=[.!?])\s+|[\n]+/)
+        .map(sentence => sentence.trim())
+        .filter(sentence => {
+            if (sentence.length < 10) return false;
+
+            if (ignoredPatterns.some(pattern => pattern.test(sentence))) {
+                return false;
+            }
+
+            const key = sentence
+                .toLowerCase()
+                .replace(/[^\p{L}\p{N}]/gu, "");
+
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+
+            // Không lặp lại tiêu đề sản phẩm
+            if (titleKey && key === titleKey) return false;
+
+            return true;
+        });
+
+    if (!sentences.length) return null;
+
+    const keywords = [
+        "chất liệu", "lụa", "cotton", "vải", "da ",
+        "màu sắc", "màu ", "thiết kế", "kiểu dáng",
+        "form ", "kích thước", "size ", "trọng lượng",
+        "thêu", "đính", "chống nước", "dung lượng",
+        "công suất", "tính năng", "phù hợp",
+        "sử dụng", "chất liệu", "đường may"
+    ];
+
+    const scored = sentences.map((sentence, index) => {
+        const lower = sentence.toLowerCase();
+        let score = 0;
+
+        for (const keyword of keywords) {
+            if (lower.includes(keyword)) score += 2;
+        }
+
+        if (/\b\d+\s?(cm|mm|kg|g|ml|l|inch|w|v|mah)\b/i.test(sentence)) {
+            score += 2;
+        }
+
+        if (/\b(size|s|m|l|xl|xxl)\b/i.test(sentence)) {
+            score += 1;
+        }
+
+        return { sentence, index, score };
+    });
+
+    // Ưu tiên thông tin thực tế, nhưng giữ thứ tự câu ban đầu
+    const useful = scored.filter(item => item.score > 0);
+    const candidates = useful.length ? useful : scored.slice(0, 2);
+
+    candidates.sort((a, b) => b.score - a.score || a.index - b.index);
+
+    const selected = [];
+    let length = 0;
+
+    for (const item of candidates) {
+        const extraLength = item.sentence.length + (selected.length ? 1 : 0);
+
+        if (length + extraLength > maxLength) continue;
+
+        selected.push(item);
+        length += extraLength;
+    }
+
+    selected.sort((a, b) => a.index - b.index);
+
+    let result = selected.map(item => item.sentence).join(" ");
+
+    // Trường hợp không có câu nào vừa giới hạn
+    if (!result) {
+        result = sentences[0].slice(0, maxLength);
+        const lastSpace = result.lastIndexOf(" ");
+
+        if (lastSpace > 0) result = result.slice(0, lastSpace);
+    }
+
+    return result.trim();
+}
+
+
 // =====================================================
 // PRICE NORMALIZATION
 // =====================================================
@@ -192,11 +360,22 @@ function normalizeProductRow(row = {}) {
         "title"
     );
 
-    const shortDescription = cleanText(
-        pick(data, "shortDescription", "short_description"),
-        5000,
-        "shortDescription"
-    );
+  
+const rawDescription = pick(
+    data,
+    "shortDescription",
+    "short_description",
+    "description",
+    "productDescription",
+    "product_description"
+);
+
+const shortDescription = createShortDescription(
+    rawDescription,
+    500,
+    title
+);
+
 
     const rawCurrency = cleanText(
         pick(data, "currency"),
@@ -439,6 +618,7 @@ async function previewProductsImport(rows, options = {}) {
                 productId: product.productId,
                 skuId: product.skuId,
                 title: product.title,
+                shortDescription: product.shortDescription || "",
                 existingId: existing ? existing.id : null,
                 price: product.price ?? existing?.price ?? null,
                 currency: product.currency || existing?.currency || "VND",
@@ -684,24 +864,23 @@ async function commitProductsImport(rows, options = {}) {
         });
 
         return result;
-            } catch (error) {
-            try {
-                await finishSyncLog(syncId, {
-                    status: "failed",
-                    successRows: 0,
-                    failedRows: rows.length,
-                    errorMessage: String(
-                        error.message || error
-                    ).slice(0, 5000)
-                });
-            } catch (logError) {
-                error.syncLogError = logError.message || String(logError);
-            }
-
-            throw error;
+        } catch (error) {
+        try {
+            await finishSyncLog(syncId, {
+                status: "failed",
+                successRows: 0,
+                failedRows: rows.length,
+                errorMessage: String(
+                    error.message || error
+                ).slice(0, 5000)
+            });
+        } catch (logError) {
+            error.syncLogError = logError.message || String(logError);
         }
-}
 
+        throw error;
+    }
+}
 
 module.exports = {
     normalizeProductRow,
