@@ -451,7 +451,10 @@ async function previewProductsImport(rows, options = {}) {
                 row: index + 1,
                 valid: false,
                 action: "failed",
-                code: error.message || "AFFILIATE_IMPORT_ROW_FAILED"
+                code: error.message || "AFFILIATE_IMPORT_ROW_FAILED",
+                field: error.field || null,
+                actualLength: error.actualLength || null,
+                maxLength: error.maxLength || null
             });
         }
     }
