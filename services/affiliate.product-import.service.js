@@ -194,7 +194,7 @@ function normalizeProductRow(row = {}) {
 
     const shortDescription = cleanText(
         pick(data, "shortDescription", "short_description"),
-        2000,
+        5000,
         "shortDescription"
     );
 
