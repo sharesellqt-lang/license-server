@@ -306,6 +306,49 @@ router.put(
 );
 
 // =====================================================
+// PRODUCT IMPORT
+// =====================================================
+
+router.post(
+    "/products/import/preview",
+    requireContributorPermission("affiliate.sync"),
+    async (req, res) => {
+        try {
+            const result = await productImportService.previewImport(
+                req.body,
+                {
+                    createdBy: req.user.id,
+                    audit: auditInfo(req)
+                }
+            );
+
+            return res.json(result);
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+router.post(
+    "/products/import/commit",
+    requireContributorPermission("affiliate.sync"),
+    async (req, res) => {
+        try {
+            const result = await productImportService.commitImport(
+                req.body,
+                {
+                    createdBy: req.user.id,
+                    audit: auditInfo(req)
+                }
+            );
+
+            return res.json(result);
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+// =====================================================
 // CATEGORIES
 // =====================================================
 
