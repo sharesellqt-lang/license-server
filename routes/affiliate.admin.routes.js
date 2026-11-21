@@ -12,6 +12,7 @@ const productService = require("../services/affiliate.product.service");
 const reportService = require("../services/affiliate.report.service");
 const attributionService = require("../services/affiliate.attribution.service");
 const productImportService = require("../services/affiliate.product-import.service");
+const carouselService = require("../services/affiliate.carousel.service");
 
 router.use(auth);
 
@@ -170,6 +171,17 @@ function sendError(res, error) {
         "AFFILIATE_CLICK_NOT_ELIGIBLE",
         "AFFILIATE_PRODUCT_DELETE_IDS_REQUIRED",
         "AFFILIATE_PRODUCT_DELETE_TOO_MANY",
+        "INVALID_CAROUSEL_ID",
+        "INVALID_CAROUSEL_NAME",
+        "INVALID_CAROUSEL_SLUG",
+        "INVALID_CAROUSEL_DESCRIPTION",
+        "INVALID_CAROUSEL_DISPLAY_MODE",
+        "INVALID_CAROUSEL_SORT_MODE",
+        "INVALID_CAROUSEL_PRODUCT_LIMIT",
+        "INVALID_MANUAL_PRODUCT_IDS",
+        "INVALID_MANUAL_PRODUCT_ID",
+        "INVALID_CATEGORY_ID",
+        "INVALID_NETWORK_ID",
     ];
 
     const notFoundErrors = [
@@ -177,13 +189,18 @@ function sendError(res, error) {
         "AFFILIATE_PRODUCT_NOT_FOUND",
         "AFFILIATE_CATEGORY_NOT_FOUND",
         "AFFILIATE_ORDER_NOT_FOUND",
-        "AFFILIATE_CLICK_NOT_FOUND"
+        "AFFILIATE_CLICK_NOT_FOUND",
+        "CAROUSEL_NOT_FOUND",
+        "CATEGORY_NOT_FOUND",
+        "NETWORK_NOT_FOUND",
+        "CAROUSEL_PRODUCT_NOT_FOUND",
     ];
 
     const conflictErrors = [
         "AFFILIATE_PRODUCT_ALREADY_EXISTS",
         "AFFILIATE_PRODUCT_HAS_CLICKS",
-        "AFFILIATE_PRODUCT_HAS_ORDERS"
+        "AFFILIATE_PRODUCT_HAS_ORDERS",
+        "CAROUSEL_SLUG_EXISTS",
     ];
 
     const status = badRequestErrors.includes(code)
@@ -998,6 +1015,154 @@ router.post(
                 req.body.clickCode,
                 req.user.id,
                 auditInfo(req)
+            );
+
+            return res.json(result);
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+
+// =====================================================
+// AFFILIATE CAROUSELS
+// =====================================================
+
+// GET /carousels
+router.get(
+    "/carousels",
+    requireContributorPermission("affiliate.view"),
+    async (req, res) => {
+        try {
+            const result = await carouselService.getCarousels({
+                status: req.query.status,
+                search: req.query.search
+            });
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// GET /carousels/:id
+router.get(
+    "/carousels/:id",
+    requireContributorPermission("affiliate.view"),
+    async (req, res) => {
+        try {
+            const carousel = await carouselService.getCarouselDetail(
+                req.params.id
+            );
+
+            return res.json({
+                success: true,
+                carousel
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// GET /carousels/:id/products
+// Dùng để xem trước danh sách sản phẩm theo cấu hình Carousel
+router.get(
+    "/carousels/:id/products",
+    requireContributorPermission("affiliate.view"),
+    async (req, res) => {
+        try {
+            const carousel = await carouselService.getCarouselDetail(
+                req.params.id
+            );
+
+            const products = await carouselService.getCarouselProducts(
+                carousel
+            );
+
+            return res.json({
+                success: true,
+                carousel: {
+                    id: carousel.id,
+                    name: carousel.name,
+                    slug: carousel.slug,
+                    display_mode: carousel.display_mode
+                },
+                products,
+                total: products.length
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// POST /carousels
+router.post(
+    "/carousels",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const carousel = await carouselService.createCarousel(
+                req.body || {},
+                {
+                    ...auditInfo(req),
+                    actorUserId: req.user.id
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                carousel
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// PUT /carousels/:id
+router.put(
+    "/carousels/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const carousel = await carouselService.updateCarousel(
+                req.params.id,
+                req.body || {},
+                {
+                    ...auditInfo(req),
+                    actorUserId: req.user.id
+                }
+            );
+
+            return res.json({
+                success: true,
+                carousel
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// DELETE /carousels/:id
+router.delete(
+    "/carousels/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await carouselService.deleteCarousel(
+                req.params.id,
+                {
+                    ...auditInfo(req),
+                    actorUserId: req.user.id
+                }
             );
 
             return res.json(result);
