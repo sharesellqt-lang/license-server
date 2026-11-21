@@ -628,6 +628,171 @@ async function changeProductStatus(productId, actorUserId, newStatus, audit = {}
     }
 }
 
+
+// =========================
+// ADMIN: BULK APPROVE
+// =========================
+
+async function bulkApproveProducts(productIds, actorUserId, audit = {}) {
+    if (!Array.isArray(productIds) || !productIds.length || productIds.length > 100) {
+        throw new Error("INVALID_BULK_PRODUCT_IDS");
+    }
+
+    const ids = [...new Set(productIds.map(id => positiveId(id)))];
+    const actor = auditInfo(actorUserId, audit);
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const placeholders = ids.map(() => "?").join(",");
+
+        const [rows] = await conn.execute(
+            `SELECT id, title, status, product_id, sku_id
+             FROM affiliate_products
+             WHERE id IN (${placeholders})
+               AND status = 'draft'
+             ORDER BY id ASC
+             FOR UPDATE`,
+            ids
+        );
+
+        if (rows.length) {
+            const approvedIds = rows.map(product => product.id);
+            const updatePlaceholders = approvedIds.map(() => "?").join(",");
+
+            await conn.execute(
+                `UPDATE affiliate_products
+                 SET status = 'active'
+                 WHERE id IN (${updatePlaceholders})
+                   AND status = 'draft'`,
+                approvedIds
+            );
+
+            for (const product of rows) {
+                await writeAudit(conn, {
+                    ...actor,
+                    action: "affiliate_product.status_changed",
+                    entityType: "affiliate_product",
+                    entityId: product.id,
+                    oldData: { status: "draft" },
+                    newData: { status: "active" }
+                });
+            }
+        }
+
+        await conn.commit();
+
+        return {
+            approvedCount: rows.length,
+            skippedCount: ids.length - rows.length,
+            products: rows.map(product => ({
+                id: product.id,
+                productId: product.product_id,
+                skuId: product.sku_id,
+                title: product.title,
+                status: "active"
+            }))
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
+async function bulkApproveAllDraftProducts(query = {}, actorUserId, audit = {}) {
+    const actor = auditInfo(actorUserId, audit);
+    const conditions = ["p.status = 'draft'"];
+    const params = [];
+
+    if (query.network_id) {
+        conditions.push("p.network_id = ?");
+        params.push(
+            positiveId(query.network_id, "INVALID_AFFILIATE_NETWORK_ID")
+        );
+    }
+
+    if (query.category_id) {
+        conditions.push("p.category_id = ?");
+        params.push(positiveId(query.category_id, "INVALID_CATEGORY_ID"));
+    }
+
+    if (query.search) {
+        const search = validText(query.search, 255, "INVALID_SEARCH");
+
+        if (search) {
+            conditions.push(`(
+                p.title LIKE ?
+                OR p.product_id LIKE ?
+                OR p.sku_id LIKE ?
+            )`);
+
+            const keyword = `%${search}%`;
+            params.push(keyword, keyword, keyword);
+        }
+    }
+
+    const where = conditions.join(" AND ");
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.execute(
+            `SELECT
+                p.id,
+                p.title,
+                p.product_id,
+                p.sku_id
+             FROM affiliate_products p
+             WHERE ${where}
+             ORDER BY p.id ASC
+             FOR UPDATE`,
+            params
+        );
+
+        if (rows.length) {
+            await conn.execute(
+                `UPDATE affiliate_products p
+                 SET p.status = 'active'
+                 WHERE ${where}`,
+                params
+            );
+
+            for (const product of rows) {
+                await writeAudit(conn, {
+                    ...actor,
+                    action: "affiliate_product.status_changed",
+                    entityType: "affiliate_product",
+                    entityId: product.id,
+                    oldData: { status: "draft" },
+                    newData: { status: "active" }
+                });
+            }
+        }
+
+        await conn.commit();
+
+        return {
+            approvedCount: rows.length,
+            products: rows.map(product => ({
+                id: product.id,
+                productId: product.product_id,
+                skuId: product.sku_id,
+                title: product.title,
+                status: "active"
+            }))
+        };
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+}
+
 module.exports = {
     getProducts,
     getAdminProducts,
@@ -635,5 +800,7 @@ module.exports = {
     getCategories,
     createProduct,
     updateProduct,
-    changeProductStatus
+    changeProductStatus,
+    bulkApproveProducts,
+    bulkApproveAllDraftProducts
 };

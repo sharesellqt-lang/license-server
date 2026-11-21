@@ -261,6 +261,53 @@ router.post(
     }
 );
 
+
+// =====================================================
+// BULK APPROVE PRODUCTS
+// =====================================================
+
+router.put(
+    "/products/bulk-approve",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await productService.bulkApproveProducts(
+                req.body.ids,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+router.put(
+    "/products/approve-all",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await productService.bulkApproveAllDraftProducts(
+                req.body || {},
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
 router.put(
     "/products/:id",
     requireContributorPermission("affiliate.manage"),
