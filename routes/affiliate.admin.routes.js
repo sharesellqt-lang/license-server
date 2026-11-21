@@ -486,6 +486,71 @@ router.get(
     }
 );
 
+
+router.post(
+    "/categories",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const category = await productService.createCategory(
+                req.body,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.status(201).json({
+                success: true,
+                category
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+router.put(
+    "/categories/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const category = await productService.updateCategory(
+                req.params.id,
+                req.body,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                category
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+router.delete(
+    "/categories/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await productService.deleteCategory(
+                req.params.id,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
 // =====================================================
 // CONVERSION REPORT IMPORT
 // =====================================================

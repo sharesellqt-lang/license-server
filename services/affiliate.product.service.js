@@ -968,6 +968,294 @@ async function bulkDeleteProducts(productIds, actorUserId, audit = {}) {
     }
 }
 
+
+function categoryError(message, code, status = 400) {
+    const error = new Error(message);
+    error.code = code;
+    error.status = status;
+    return error;
+}
+
+function categorySlug(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 180);
+}
+
+function categoryId(value) {
+    const id = Number(value);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        throw categoryError("ID danh mục không hợp lệ.", "INVALID_CATEGORY_ID");
+    }
+    return id;
+}
+
+async function ensureCategorySlug(conn, slug, excludeId = null) {
+    const [rows] = await conn.execute(
+        `SELECT id FROM affiliate_categories
+         WHERE slug = ? AND (? IS NULL OR id <> ?)
+         LIMIT 1`,
+        [slug, excludeId, excludeId]
+    );
+
+    if (rows.length) {
+        throw categoryError("Slug danh mục đã tồn tại.", "CATEGORY_SLUG_EXISTS", 409);
+    }
+}
+
+async function ensureCategoryParent(conn, parentId, currentId = null) {
+    if (!parentId) return null;
+
+    let cursor = Number(parentId);
+    const visited = new Set();
+
+    while (cursor) {
+        if (cursor === currentId) {
+            throw categoryError(
+                "Không thể tạo danh mục cha gây vòng lặp phân cấp.",
+                "CATEGORY_PARENT_CYCLE"
+            );
+        }
+
+        if (visited.has(cursor)) {
+            throw categoryError(
+                "Cấu trúc danh mục hiện tại có vòng lặp.",
+                "CATEGORY_PARENT_CYCLE"
+            );
+        }
+
+        visited.add(cursor);
+
+        const [rows] = await conn.execute(
+            "SELECT id, parent_id FROM affiliate_categories WHERE id = ? LIMIT 1",
+            [cursor]
+        );
+
+        if (!rows.length) {
+            throw categoryError("Danh mục cha không tồn tại.", "CATEGORY_PARENT_NOT_FOUND", 404);
+        }
+
+        cursor = rows[0].parent_id ? Number(rows[0].parent_id) : null;
+    }
+
+    return Number(parentId);
+}
+
+async function createCategory(data = {}, actorUserId, audit = {}) {
+    const name = String(data.name || "").trim();
+    const slug = categorySlug(data.slug || name);
+    const parentId = data.parent_id ? categoryId(data.parent_id) : null;
+    const status = data.status || "active";
+    const sortOrder = Number.isInteger(Number(data.sort_order))
+        ? Number(data.sort_order)
+        : 0;
+
+    if (!name || name.length > 150) {
+        throw categoryError("Tên danh mục phải từ 1 đến 150 ký tự.", "INVALID_CATEGORY_NAME");
+    }
+
+    if (!slug) {
+        throw categoryError("Slug danh mục không hợp lệ.", "INVALID_CATEGORY_SLUG");
+    }
+
+    if (!["active", "inactive"].includes(status)) {
+        throw categoryError("Trạng thái danh mục không hợp lệ.", "INVALID_CATEGORY_STATUS");
+    }
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        await ensureCategoryParent(conn, parentId);
+        await ensureCategorySlug(conn, slug);
+
+        const [result] = await conn.execute(
+            `INSERT INTO affiliate_categories
+                (name, slug, parent_id, status, sort_order)
+             VALUES (?, ?, ?, ?, ?)`,
+            [name, slug, parentId, status, sortOrder]
+        );
+
+        const [rows] = await conn.execute(
+            "SELECT id, name, slug, parent_id, status, sort_order, created_at FROM affiliate_categories WHERE id = ?",
+            [result.insertId]
+        );
+
+        await writeAudit(conn, {
+            ...auditInfo(actorUserId, audit),
+            action: "affiliate_category.created",
+            entityType: "affiliate_category",
+            entityId: String(result.insertId),
+            oldData: null,
+            newData: rows[0]
+        });
+
+        await conn.commit();
+        return rows[0];
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
+async function updateCategory(id, data = {}, actorUserId, audit = {}) {
+    id = categoryId(id);
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [currentRows] = await conn.execute(
+            "SELECT * FROM affiliate_categories WHERE id = ? FOR UPDATE",
+            [id]
+        );
+
+        if (!currentRows.length) {
+            throw categoryError("Không tìm thấy danh mục.", "CATEGORY_NOT_FOUND", 404);
+        }
+
+        const oldData = currentRows[0];
+        const name = data.name !== undefined
+            ? String(data.name).trim()
+            : oldData.name;
+        const slug = data.slug !== undefined
+            ? categorySlug(data.slug)
+            : oldData.slug;
+        const parentId = data.parent_id !== undefined
+            ? (data.parent_id ? categoryId(data.parent_id) : null)
+            : oldData.parent_id;
+        const status = data.status !== undefined ? data.status : oldData.status;
+        const sortOrder = data.sort_order !== undefined
+            ? Number(data.sort_order)
+            : oldData.sort_order;
+
+        if (!name || name.length > 150) {
+            throw categoryError("Tên danh mục phải từ 1 đến 150 ký tự.", "INVALID_CATEGORY_NAME");
+        }
+
+        if (!slug) {
+            throw categoryError("Slug danh mục không hợp lệ.", "INVALID_CATEGORY_SLUG");
+        }
+
+        if (!["active", "inactive"].includes(status)) {
+            throw categoryError("Trạng thái danh mục không hợp lệ.", "INVALID_CATEGORY_STATUS");
+        }
+
+        if (!Number.isInteger(sortOrder)) {
+            throw categoryError("Thứ tự hiển thị phải là số nguyên.", "INVALID_CATEGORY_SORT_ORDER");
+        }
+
+        await ensureCategoryParent(conn, parentId, id);
+        await ensureCategorySlug(conn, slug, id);
+
+        await conn.execute(
+            `UPDATE affiliate_categories
+             SET name = ?, slug = ?, parent_id = ?, status = ?, sort_order = ?
+             WHERE id = ?`,
+            [name, slug, parentId, status, sortOrder, id]
+        );
+
+        const [rows] = await conn.execute(
+            "SELECT id, name, slug, parent_id, status, sort_order, created_at FROM affiliate_categories WHERE id = ?",
+            [id]
+        );
+
+        await writeAudit(conn, {
+            ...auditInfo(actorUserId, audit),
+            action: "affiliate_category.updated",
+            entityType: "affiliate_category",
+            entityId: String(id),
+            oldData,
+            newData: rows[0]
+        });
+
+        await conn.commit();
+        return rows[0];
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
+async function deleteCategory(id, actorUserId, audit = {}) {
+    id = categoryId(id);
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.execute(
+            "SELECT * FROM affiliate_categories WHERE id = ? FOR UPDATE",
+            [id]
+        );
+
+        if (!rows.length) {
+            throw categoryError("Không tìm thấy danh mục.", "CATEGORY_NOT_FOUND", 404);
+        }
+
+        const [products] = await conn.execute(
+            "SELECT COUNT(*) AS total FROM affiliate_products WHERE category_id = ?",
+            [id]
+        );
+
+        if (Number(products[0].total) > 0) {
+            throw categoryError(
+                "Không thể xóa danh mục đang được sản phẩm sử dụng.",
+                "CATEGORY_HAS_PRODUCTS",
+                409
+            );
+        }
+
+        const [children] = await conn.execute(
+            "SELECT COUNT(*) AS total FROM affiliate_categories WHERE parent_id = ?",
+            [id]
+        );
+
+        if (Number(children[0].total) > 0) {
+            throw categoryError(
+                "Không thể xóa danh mục đang có danh mục con.",
+                "CATEGORY_HAS_CHILDREN",
+                409
+            );
+        }
+
+        await conn.execute(
+            "DELETE FROM affiliate_categories WHERE id = ?",
+            [id]
+        );
+
+        await writeAudit(conn, {
+            ...auditInfo(actorUserId, audit),
+            action: "affiliate_category.deleted",
+            entityType: "affiliate_category",
+            entityId: String(id),
+            oldData: rows[0],
+            newData: null
+        });
+
+        await conn.commit();
+        return { id };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
 module.exports = {
     getProducts,
     getAdminProducts,
@@ -979,5 +1267,9 @@ module.exports = {
     bulkApproveProducts,
     bulkApproveAllDraftProducts,
     deleteProduct,
-    bulkDeleteProducts
+    bulkDeleteProducts,
+     // Categories
+    createCategory,
+    updateCategory,
+    deleteCategory
 };
