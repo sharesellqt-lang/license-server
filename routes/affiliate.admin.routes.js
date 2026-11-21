@@ -77,7 +77,7 @@ function pagination(query = {}) {
         query.limit,
         20,
         1,
-        100,
+        1000,
         "INVALID_PAGINATION_LIMIT"
     );
 
