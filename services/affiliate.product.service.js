@@ -86,7 +86,7 @@ function normalizeProductInput(data = {}) {
         title: validText(data.title, 500, "INVALID_PRODUCT_TITLE", true),
         shortDescription: validText(
             data.shortDescription,
-            2000,
+            5000,
             "INVALID_PRODUCT_DESCRIPTION"
         ),
         price: validPrice(data.price),
@@ -496,7 +496,7 @@ async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
             } else if (column === "title") {
                 value = validText(value, 500, "INVALID_PRODUCT_TITLE", true);
             } else if (column === "short_description") {
-                value = validText(value, 2000, "INVALID_PRODUCT_DESCRIPTION") || null;
+                value = validText(value, 5000, "INVALID_PRODUCT_DESCRIPTION") || null;
             } else if (column === "price") {
                 value = validPrice(value);
             } else if (column === "currency") {
