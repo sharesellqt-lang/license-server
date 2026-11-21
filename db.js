@@ -11,6 +11,7 @@ console.log("DB_USER:", process.env.DB_USER ? "SET" : "MISSING");
 console.log("DB_NAME:", process.env.DB_NAME ? "SET" : "MISSING");
 console.log("DB_PORT:", process.env.DB_PORT || "3306");
 console.log("=====================================");
+
 const db = mysql.createPool({
     host: dbHost,
     user: process.env.DB_USER,
@@ -27,48 +28,30 @@ const db = mysql.createPool({
     dateStrings: true
 });
 
-/*
-=================================
- TEST CONNECTION
-=================================
-*/
-
-async function testDB() {
+// Chỉ kiểm tra khi được gọi chủ động
+db.testConnection = async function () {
     let conn;
 
     try {
         conn = await db.getConnection();
+
         const [rows] = await conn.query(`
-    SELECT
-        DATABASE() AS database_name,
-        USER() AS db_user,
-        CONNECTION_ID() AS connection_id
-`);
+            SELECT
+                DATABASE() AS database_name,
+                USER() AS db_user,
+                CONNECTION_ID() AS connection_id
+        `);
 
-console.log("MYSQL ACTIVE CONNECTION:", rows[0]);
+        console.log("MYSQL ACTIVE CONNECTION:", rows[0]);
+        console.log("✅ MYSQL CONNECTED:", conn.threadId);
 
-        console.log(
-            "✅ MYSQL CONNECTED:",
-            conn.threadId
-        );
-
+        return true;
     } catch (err) {
-        console.error(
-            "❌ MYSQL CONNECTION ERROR:",
-            err.message
-        );
-
+        console.error("❌ MYSQL CONNECTION ERROR:", err.message);
+        return false;
     } finally {
         if (conn) conn.release();
     }
-}
-
-testDB();
-
-/*
-=================================
- EXPORT
-=================================
-*/
+};
 
 module.exports = db;

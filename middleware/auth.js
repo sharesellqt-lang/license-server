@@ -70,12 +70,19 @@ module.exports = async (req, res, next) => {
         [userId]
       );
     } catch (err) {
-      console.error("❌ DB ERROR in auth:", err.message);
+    console.error("❌ DB ERROR in auth:", {
+        message: err.message,
+        code: err.code,
+        errno: err.errno,
+        syscall: err.syscall,
+        fatal: err.fatal,
+        userId
+    });
 
-      return res.status(500).json({
+    return res.status(500).json({
         error: "Database connection failed"
-      });
-    }
+    });
+}
 
     // =========================
     // USER NOT FOUND

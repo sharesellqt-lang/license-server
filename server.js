@@ -480,26 +480,6 @@ async function createUser(email, googleId) {
   };
 }
 
-// 🔥 INIT ADMIN KEY (bọc async)
-(async () => {
-  try {
-    let [rows] = await db.execute(
-      "SELECT * FROM admin_keys WHERE `key`=?",
-      ["vip500"]
-    );
-
-    if (rows.length === 0) {
-      await db.execute(
-        "INSERT INTO admin_keys (`key`, maxLength) VALUES (?, ?)",
-        ["vip500", 500]
-      );
-      console.log("🔥 Đã tạo key admin");
-    }
-  } catch (err) {
-    console.log("❌ INIT ERROR:", err);
-  }
-})();
-
 // =========================
 // HELPER
 // =========================
@@ -894,16 +874,18 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
 // =========================
 // START SERVER
 // =========================
-const http = require("http");
 
+const http = require("http");
 const server = http.createServer(app);
 
-initDB().then(() => {
+server.listen(PORT, "0.0.0.0", () => {
+    console.log("🚀 Server chạy port", PORT);
 
-    server.listen(PORT, "0.0.0.0", () => {
-
-        console.log("🚀 Server chạy port", PORT);
-
+    initDB().catch(error => {
+        console.error("❌ DB INIT FAILED:", error);
     });
+});
 
+server.on("error", error => {
+    console.error("❌ SERVER START ERROR:", error);
 });
