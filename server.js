@@ -15,7 +15,11 @@ const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({
+    extended: true,
+    limit: "10mb"
+}));
 app.use((req,res,next)=>{
 
   console.log(
