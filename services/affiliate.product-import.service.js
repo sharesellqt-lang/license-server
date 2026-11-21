@@ -52,15 +52,18 @@ function pick(row, ...keys) {
     return null;
 }
 
-function cleanText(value, maxLength = 500) {
+function cleanText(value, maxLength = 500, field = "unknown") {
     if (value === undefined || value === null) return null;
 
     const result = String(value).trim();
-
     if (!result) return null;
 
     if (result.length > maxLength) {
-        throw new Error("INVALID_PRODUCT_TEXT_LENGTH");
+        const error = new Error("INVALID_PRODUCT_TEXT_LENGTH");
+        error.field = field;
+        error.actualLength = result.length;
+        error.maxLength = maxLength;
+        throw error;
     }
 
     return result;
@@ -172,28 +175,33 @@ function normalizeProductRow(row = {}) {
     const data = normalizeRow(row);
 
     const productId = cleanText(
-        pick(data, "productId", "product_id"),
-        100
+    pick(data, "productId", "product_id"),
+    100,
+    "productId"
     );
 
     const skuId = cleanText(
         pick(data, "skuId", "sku_id"),
-        100
+        100,
+        "skuId"
     );
 
     const title = cleanText(
         pick(data, "title", "productName", "product_name"),
-        500
+        500,
+        "title"
     );
 
     const shortDescription = cleanText(
         pick(data, "shortDescription", "short_description"),
-        2000
+        2000,
+        "shortDescription"
     );
 
     const rawCurrency = cleanText(
         pick(data, "currency"),
-        10
+        10,
+        "currency"
     );
 
     const currency = rawCurrency
