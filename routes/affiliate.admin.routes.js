@@ -11,6 +11,7 @@ const requireContributorPermission = require("../middleware/requireContributorPe
 const productService = require("../services/affiliate.product.service");
 const reportService = require("../services/affiliate.report.service");
 const attributionService = require("../services/affiliate.attribution.service");
+const productImportService = require("../services/affiliate.product-import.service");
 
 router.use(auth);
 
@@ -115,6 +116,8 @@ function optionalText(value, maxLength, error) {
     return result;
 }
 
+
+
 function sendError(res, error) {
     const code = error.message || "AFFILIATE_OPERATION_FAILED";
 
@@ -140,6 +143,8 @@ function sendError(res, error) {
         "AFFILIATE_REPORT_EMPTY",
         "AFFILIATE_NETWORK_REQUIRED",
         "AFFILIATE_IMPORT_DATA_REQUIRED",
+        "AFFILIATE_IMPORT_TOO_MANY_ROWS",
+        "AFFILIATE_IMPORT_DUPLICATE_ROW",
         "AFFILIATE_ORDER_IDENTIFIER_REQUIRED",
         "INVALID_PRODUCT_TITLE",
         "INVALID_PRODUCT_PRICE",
@@ -147,7 +152,16 @@ function sendError(res, error) {
         "INVALID_PRODUCT_URL",
         "INVALID_PRODUCT_STATUS",
         "INVALID_PRODUCT_SOURCE_TYPE",
+        "INVALID_PRODUCT_TEXT_LENGTH",
+        "INVALID_PRODUCT_IMPORT_ROW",
+        "INVALID_PRODUCT_IMAGE_URL",
+        "INVALID_AFFILIATE_LINK",
+        "INVALID_FINAL_URL",
+        "INVALID_EXTERNAL_PRODUCT_ID",
+        "INVALID_EXTERNAL_SKU_ID",
+        "INVALID_PRODUCT_IMPORT_ROW",
         "INVALID_CATEGORY_ID",
+        "INVALID_AFFILIATE_SYNC_TYPE",
         "AFFILIATE_NETWORK_MISMATCH",
         "AFFILIATE_PRODUCT_MISMATCH",
         "AFFILIATE_SKU_MISMATCH",
