@@ -314,11 +314,19 @@ router.post(
     requireContributorPermission("affiliate.sync"),
     async (req, res) => {
         try {
-            const result = await productImportService.previewImport(
-                req.body,
+            if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+                throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
+            }
+  // KIỂM TRA ROWS TẠI ĐÂY
+            if (!Array.isArray(req.body.rows) || !req.body.rows.length) {
+                throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
+            }
+
+            const result = await productImportService.previewProductsImport(
+                req.body.rows,
                 {
-                    createdBy: req.user.id,
-                    audit: auditInfo(req)
+                    networkCode: req.body.networkCode,
+                    networkId: req.body.networkId
                 }
             );
 
@@ -334,9 +342,22 @@ router.post(
     requireContributorPermission("affiliate.sync"),
     async (req, res) => {
         try {
-            const result = await productImportService.commitImport(
-                req.body,
+            if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+                throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
+            }
+ // KIỂM TRA ROWS TẠI ĐÂY
+            if (!Array.isArray(req.body.rows) || !req.body.rows.length) {
+                throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
+            }
+
+            const result = await productImportService.commitProductsImport(
+                req.body.rows,
                 {
+                    networkCode: req.body.networkCode,
+                    networkId: req.body.networkId,
+                    syncType: req.body.syncType || "csv_import",
+                    categoryId: req.body.categoryId,
+                    defaultStatus: req.body.status || "draft",
                     createdBy: req.user.id,
                     audit: auditInfo(req)
                 }
@@ -348,6 +369,8 @@ router.post(
         }
     }
 );
+
+
 // =====================================================
 // CATEGORIES
 // =====================================================

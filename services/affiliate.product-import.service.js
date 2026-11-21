@@ -70,13 +70,18 @@ function cleanText(value, maxLength = 500) {
 // PRICE NORMALIZATION
 // =====================================================
 
+
 function parsePrice(value, currency = "VND") {
     if (value === undefined || value === null || value === "") {
         return null;
     }
 
     if (typeof value === "number") {
-        if (!Number.isFinite(value) || value < 0) {
+        if (
+            !Number.isFinite(value) ||
+            value < 0 ||
+            value > 9999999999999.99
+        ) {
             throw new Error("INVALID_PRODUCT_PRICE");
         }
 
@@ -87,7 +92,7 @@ function parsePrice(value, currency = "VND") {
         .trim()
         .replace(/[^\d,.-]/g, "");
 
-    if (!raw) {
+    if (!raw || !/\d/.test(raw)) {
         throw new Error("INVALID_PRODUCT_PRICE");
     }
 
@@ -96,29 +101,22 @@ function parsePrice(value, currency = "VND") {
         .toUpperCase();
 
     if (normalizedCurrency === "VND") {
-        // 128.639 -> 128639
         if (/^\d{1,3}(\.\d{3})+$/.test(raw)) {
             raw = raw.replace(/\./g, "");
-        }
-
-        // 128,639 -> 128639
-        else if (/^\d{1,3}(,\d{3})+$/.test(raw)) {
+        } else if (/^\d{1,3}(,\d{3})+$/.test(raw)) {
             raw = raw.replace(/,/g, "");
-        }
-
-        // 128639.00 -> 128639
-        else if (/^\d+\.0+$/.test(raw)) {
+        } else if (/^\d+\.0+$/.test(raw)) {
             raw = raw.split(".")[0];
+        } else if (!/^\d+$/.test(raw)) {
+            throw new Error("INVALID_PRODUCT_PRICE");
         }
     } else {
-        // Hỗ trợ dạng 1,234.56
-        if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
+        if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(raw)) {
             raw = raw.replace(/,/g, "");
-        }
-
-        // Hỗ trợ dạng 1234,56
-        else if (/^\d+,\d+$/.test(raw)) {
+        } else if (/^\d+,\d+$/.test(raw)) {
             raw = raw.replace(",", ".");
+        } else if (!/^\d+(\.\d+)?$/.test(raw)) {
+            throw new Error("INVALID_PRODUCT_PRICE");
         }
     }
 
@@ -134,6 +132,7 @@ function parsePrice(value, currency = "VND") {
 
     return price;
 }
+
 
 // =====================================================
 // URL VALIDATION
@@ -164,6 +163,7 @@ function validHttpUrl(value, errorCode, required = false) {
 // PRODUCT NORMALIZATION
 // =====================================================
 
+
 function normalizeProductRow(row = {}) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
         throw new Error("INVALID_PRODUCT_IMPORT_ROW");
@@ -191,9 +191,14 @@ function normalizeProductRow(row = {}) {
         2000
     );
 
-    const currency = (
-        cleanText(pick(data, "currency"), 10) || "VND"
-    ).toUpperCase();
+    const rawCurrency = cleanText(
+        pick(data, "currency"),
+        10
+    );
+
+    const currency = rawCurrency
+        ? rawCurrency.toUpperCase()
+        : "VND";
 
     const rawPrice = pick(data, "price");
 
@@ -231,33 +236,36 @@ function normalizeProductRow(row = {}) {
     const result = {
         productId,
         skuId: skuId || "",
-        title,
-        currency
+        title
     };
+
+    if (rawCurrency) {
+        result.currency = currency;
+    }
 
     if (shortDescription !== null) {
         result.shortDescription = shortDescription;
     }
 
-    if (rawPrice !== null) {
+    if (rawPrice !== null && rawPrice !== "") {
         result.price = parsePrice(rawPrice, currency);
     }
 
-    if (rawImage !== null) {
+    if (rawImage !== null && rawImage !== "") {
         result.imageUrl = validHttpUrl(
             rawImage,
             "INVALID_PRODUCT_IMAGE_URL"
         );
     }
 
-    if (rawAffiliateLink !== null) {
+    if (rawAffiliateLink !== null && rawAffiliateLink !== "") {
         result.affiliateLink = validHttpUrl(
             rawAffiliateLink,
             "INVALID_AFFILIATE_LINK"
         );
     }
 
-    if (rawFinalUrl !== null) {
+    if (rawFinalUrl !== null && rawFinalUrl !== "") {
         result.finalUrl = validHttpUrl(
             rawFinalUrl,
             "INVALID_FINAL_URL"
@@ -266,6 +274,7 @@ function normalizeProductRow(row = {}) {
 
     return result;
 }
+
 
 // =====================================================
 // NETWORK
@@ -339,6 +348,7 @@ function validateProductData(product, isExisting) {
 // PREVIEW
 // =====================================================
 
+
 async function previewProductsImport(rows, options = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
@@ -385,14 +395,14 @@ async function previewProductsImport(rows, options = {}) {
                 throw new Error("AFFILIATE_IMPORT_DUPLICATE_ROW");
             }
 
-            seen.add(identity);
-
             const existing = await findExistingProduct(
                 network.id,
                 product
             );
 
             validateProductData(product, Boolean(existing));
+
+            seen.add(identity);
 
             const action = existing ? "update" : "create";
 
@@ -423,7 +433,7 @@ async function previewProductsImport(rows, options = {}) {
                 title: product.title,
                 existingId: existing ? existing.id : null,
                 price: product.price ?? existing?.price ?? null,
-                currency: product.currency,
+                currency: product.currency || existing?.currency || "VND",
                 valid: true
             });
         } catch (error) {
@@ -490,6 +500,7 @@ async function finishSyncLog(syncId, data) {
 // COMMIT
 // =====================================================
 
+
 async function commitProductsImport(rows, options = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
@@ -529,6 +540,7 @@ async function commitProductsImport(rows, options = {}) {
             newProducts: 0,
             newSkus: 0,
             updated: 0,
+            skipped: 0,
             failed: 0
         },
         errors: []
@@ -551,8 +563,6 @@ async function commitProductsImport(rows, options = {}) {
                     throw new Error("AFFILIATE_IMPORT_DUPLICATE_ROW");
                 }
 
-                seen.add(identity);
-
                 const existing = await findExistingProduct(
                     network.id,
                     product
@@ -560,24 +570,44 @@ async function commitProductsImport(rows, options = {}) {
 
                 validateProductData(product, Boolean(existing));
 
+                seen.add(identity);
+
                 if (existing) {
-                    const updateData = {
-                        ...product
-                    };
+                    const updateData = {};
 
-                    // Không cập nhật các trường nội bộ.
-                    delete updateData.status;
-                    delete updateData.categoryId;
-                    delete updateData.sourceType;
+                    const updateFields = [
+                        "title",
+                        "shortDescription",
+                        "price",
+                        "currency",
+                        "imageUrl",
+                        "affiliateLink",
+                        "finalUrl"
+                    ];
 
-                    await productService.updateProduct(
-                        existing.id,
-                        updateData,
-                        options.createdBy,
-                        options.audit || {}
-                    );
+                    for (const field of updateFields) {
+                        if (
+                            Object.prototype.hasOwnProperty.call(product, field) &&
+                            product[field] !== null &&
+                            product[field] !== undefined &&
+                            product[field] !== ""
+                        ) {
+                            updateData[field] = product[field];
+                        }
+                    }
 
-                    result.summary.updated++;
+                    if (Object.keys(updateData).length) {
+                        await productService.updateProduct(
+                            existing.id,
+                            updateData,
+                            options.createdBy,
+                            options.audit || {}
+                        );
+
+                        result.summary.updated++;
+                    } else {
+                        result.summary.skipped++;
+                    }
                 } else {
                     const [productRows] = await db.execute(
                         `SELECT id
@@ -591,6 +621,7 @@ async function commitProductsImport(rows, options = {}) {
                     await productService.createProduct(
                         {
                             ...product,
+                            currency: product.currency || "VND",
                             networkId: network.id,
                             sourceType: "import",
                             status: options.defaultStatus || "draft",
@@ -611,7 +642,9 @@ async function commitProductsImport(rows, options = {}) {
 
                 result.errors.push({
                     row: index + 1,
-                    code: error.message || "AFFILIATE_IMPORT_ROW_FAILED"
+                    code: error.message === "AFFILIATE_PRODUCT_ALREADY_EXISTS"
+                        ? "AFFILIATE_IMPORT_DUPLICATE_PRODUCT"
+                        : error.message || "AFFILIATE_IMPORT_ROW_FAILED"
                 });
             }
         }
@@ -619,7 +652,8 @@ async function commitProductsImport(rows, options = {}) {
         const successful =
             result.summary.newProducts +
             result.summary.newSkus +
-            result.summary.updated;
+            result.summary.updated +
+            result.summary.skipped;
 
         const failed = result.summary.failed;
 
@@ -639,19 +673,24 @@ async function commitProductsImport(rows, options = {}) {
         });
 
         return result;
-    } catch (error) {
-        await finishSyncLog(syncId, {
-            status: "failed",
-            successRows: 0,
-            failedRows: rows.length,
-            errorMessage: String(
-                error.message || error
-            ).slice(0, 5000)
-        });
+            } catch (error) {
+            try {
+                await finishSyncLog(syncId, {
+                    status: "failed",
+                    successRows: 0,
+                    failedRows: rows.length,
+                    errorMessage: String(
+                        error.message || error
+                    ).slice(0, 5000)
+                });
+            } catch (logError) {
+                error.syncLogError = logError.message || String(logError);
+            }
 
-        throw error;
-    }
+            throw error;
+        }
 }
+
 
 module.exports = {
     normalizeProductRow,
