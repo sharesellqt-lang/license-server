@@ -793,6 +793,181 @@ async function bulkApproveAllDraftProducts(query = {}, actorUserId, audit = {}) 
     }
 }
 
+
+async function assertProductCanBeDeleted(conn, product) {
+    const [clickRows] = await conn.execute(
+        `SELECT id
+         FROM affiliate_clicks
+         WHERE product_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [product.id]
+    );
+
+    if (clickRows.length) {
+        throw new Error("AFFILIATE_PRODUCT_HAS_CLICKS");
+    }
+
+    const [orderRows] = await conn.execute(
+        `SELECT id
+         FROM affiliate_orders
+         WHERE network_id = ?
+           AND (
+               (? <> '' AND product_external_id = ?)
+               OR (? <> '' AND sku_external_id = ?)
+           )
+         LIMIT 1
+         FOR UPDATE`,
+        [
+            product.network_id,
+            product.product_id,
+            product.product_id,
+            product.sku_id,
+            product.sku_id
+        ]
+    );
+
+    if (orderRows.length) {
+        throw new Error("AFFILIATE_PRODUCT_HAS_ORDERS");
+    }
+}
+
+async function deleteProduct(productId, actorUserId, audit = {}) {
+    const id = positiveId(productId, "INVALID_AFFILIATE_PRODUCT_ID");
+    const actor = auditInfo(actorUserId, audit);
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.execute(
+            `SELECT id, network_id, product_id, sku_id, title, status
+             FROM affiliate_products
+             WHERE id = ?
+             FOR UPDATE`,
+            [id]
+        );
+
+        if (!rows.length) {
+            throw new Error("AFFILIATE_PRODUCT_NOT_FOUND");
+        }
+
+        const product = rows[0];
+
+        await assertProductCanBeDeleted(conn, product);
+
+        await conn.execute(
+            `DELETE FROM affiliate_products WHERE id = ?`,
+            [id]
+        );
+
+        await writeAudit(conn, {
+            ...actor,
+            action: "affiliate_product.deleted",
+            entityType: "affiliate_product",
+            entityId: id,
+            oldData: {
+                networkId: product.network_id,
+                productId: product.product_id,
+                skuId: product.sku_id,
+                title: product.title,
+                status: product.status
+            },
+            newData: null
+        });
+
+        await conn.commit();
+
+        return {
+            success: true,
+            deletedId: id
+        };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
+async function bulkDeleteProducts(productIds, actorUserId, audit = {}) {
+    if (!Array.isArray(productIds) || !productIds.length) {
+        throw new Error("AFFILIATE_PRODUCT_DELETE_IDS_REQUIRED");
+    }
+
+    if (productIds.length > 100) {
+        throw new Error("AFFILIATE_PRODUCT_DELETE_TOO_MANY");
+    }
+
+    const ids = [...new Set(
+        productIds.map(id =>
+            positiveId(id, "INVALID_AFFILIATE_PRODUCT_ID")
+        )
+    )];
+
+    const actor = auditInfo(actorUserId, audit);
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const placeholders = ids.map(() => "?").join(",");
+
+        const [products] = await conn.execute(
+            `SELECT id, network_id, product_id, sku_id, title, status
+             FROM affiliate_products
+             WHERE id IN (${placeholders})
+             ORDER BY id
+             FOR UPDATE`,
+            ids
+        );
+
+        if (products.length !== ids.length) {
+            throw new Error("AFFILIATE_PRODUCT_NOT_FOUND");
+        }
+
+        for (const product of products) {
+            await assertProductCanBeDeleted(conn, product);
+        }
+
+        await conn.execute(
+            `DELETE FROM affiliate_products
+             WHERE id IN (${placeholders})`,
+            ids
+        );
+
+        for (const product of products) {
+            await writeAudit(conn, {
+                ...actor,
+                action: "affiliate_product.deleted",
+                entityType: "affiliate_product",
+                entityId: product.id,
+                oldData: {
+                    networkId: product.network_id,
+                    productId: product.product_id,
+                    skuId: product.sku_id,
+                    title: product.title,
+                    status: product.status
+                },
+                newData: null
+            });
+        }
+
+        await conn.commit();
+
+        return {
+            success: true,
+            deletedCount: products.length,
+            deletedIds: products.map(product => product.id)
+        };
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    } finally {
+        conn.release();
+    }
+}
+
 module.exports = {
     getProducts,
     getAdminProducts,
@@ -802,5 +977,7 @@ module.exports = {
     updateProduct,
     changeProductStatus,
     bulkApproveProducts,
-    bulkApproveAllDraftProducts
+    bulkApproveAllDraftProducts,
+    deleteProduct,
+    bulkDeleteProducts
 };
