@@ -167,7 +167,9 @@ function sendError(res, error) {
         "AFFILIATE_SKU_MISMATCH",
         "AFFILIATE_CLICK_TIME_INVALID",
         "AFFILIATE_ORDER_ALREADY_ATTRIBUTED",
-        "AFFILIATE_CLICK_NOT_ELIGIBLE"
+        "AFFILIATE_CLICK_NOT_ELIGIBLE",
+        "AFFILIATE_PRODUCT_DELETE_IDS_REQUIRED",
+        "AFFILIATE_PRODUCT_DELETE_TOO_MANY",
     ];
 
     const notFoundErrors = [
@@ -179,7 +181,9 @@ function sendError(res, error) {
     ];
 
     const conflictErrors = [
-        "AFFILIATE_PRODUCT_ALREADY_EXISTS"
+        "AFFILIATE_PRODUCT_ALREADY_EXISTS",
+        "AFFILIATE_PRODUCT_HAS_CLICKS",
+        "AFFILIATE_PRODUCT_HAS_ORDERS"
     ];
 
     const status = badRequestErrors.includes(code)
@@ -324,6 +328,47 @@ router.put(
                 success: true,
                 product
             });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+
+// =====================================================
+// DELETE PRODUCTS
+// =====================================================
+
+router.delete(
+    "/products/bulk",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await productService.bulkDeleteProducts(
+                req.body?.ids,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json(result);
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+router.delete(
+    "/products/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await productService.deleteProduct(
+                req.params.id,
+                req.user.id,
+                auditInfo(req)
+            );
+
+            return res.json(result);
         } catch (error) {
             return sendError(res, error);
         }
