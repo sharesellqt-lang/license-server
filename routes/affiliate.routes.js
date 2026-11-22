@@ -569,7 +569,7 @@ router.get("/commissions", async (req, res) => {
                     SELECT SUM(rt.amount)
                     FROM reward_transactions rt
                     WHERE rt.reference_type = 'affiliate_commission'
-                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND CAST(rt.reference_id AS UNSIGNED) = c.id
                       AND rt.type = 'credit'
                       AND rt.source = 'affiliate'
                 ), 0) AS credited_amount,
@@ -599,7 +599,7 @@ router.get("/commissions", async (req, res) => {
                     SELECT COUNT(*)
                     FROM reward_transactions rt
                     WHERE rt.reference_type = 'affiliate_commission'
-                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND CAST(rt.reference_id AS UNSIGNED) = c.id
                       AND rt.type = 'credit'
                       AND rt.source = 'affiliate'
                 ) AS credited_transactions,
@@ -608,7 +608,7 @@ router.get("/commissions", async (req, res) => {
                     SELECT COUNT(*)
                     FROM reward_transactions rt
                     WHERE rt.reference_type = 'affiliate_commission'
-                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND CAST(rt.reference_id AS UNSIGNED) = c.id
                       AND rt.type = 'reversal'
                       AND rt.source = 'affiliate'
                 ) AS recovery_transactions
@@ -675,7 +675,7 @@ router.get("/commissions", async (req, res) => {
                AND (
                     (
                         rt.reference_type = 'affiliate_commission'
-                        AND rt.reference_id = CAST(c.id AS CHAR)
+                        AND CAST(rt.reference_id AS UNSIGNED) = c.id
                         AND rt.type IN ('credit', 'reversal')
                     )
                     OR
@@ -719,7 +719,6 @@ router.get("/commissions", async (req, res) => {
 
             stats: {
                 totalRecords: Number(stats.total_records || 0),
-
                 creditedAmount: creditedAmount.toString(),
                 recoveredAmount: recoveredAmount.toString(),
                 netCredits: (creditedAmount - recoveredAmount).toString(),
@@ -739,5 +738,5 @@ router.get("/commissions", async (req, res) => {
     }
 });
 
-
 module.exports = router;
+
