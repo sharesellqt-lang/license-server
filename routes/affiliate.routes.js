@@ -48,14 +48,22 @@ function handleError(res, error) {
     });
 }
 
-// Public redirect endpoint.
+/* =====================================================
+   PUBLIC REDIRECT + CLICK TRACKING
+===================================================== */
+
 router.get("/go/:clickCode", async (req, res) => {
     try {
         const destination = await trackingService.getClickDestination(
-            req.params.clickCode
+            req.params.clickCode,
+            {
+                ip: req.ip,
+                userAgent: req.get("user-agent")
+            }
         );
 
         return res.redirect(302, destination);
+
     } catch (error) {
         const status = getErrorStatus(error);
 
@@ -71,10 +79,14 @@ router.get("/go/:clickCode", async (req, res) => {
     }
 });
 
-// All endpoints below require authentication.
+/* =====================================================
+   AUTHENTICATED ROUTES
+===================================================== */
+
 router.use(auth);
 
-// Get active categories.
+/* GET CATEGORIES */
+
 router.get("/categories", async (req, res) => {
     try {
         const categories = await productService.getCategories();
@@ -88,7 +100,8 @@ router.get("/categories", async (req, res) => {
     }
 });
 
-// Get active products.
+/* GET PRODUCTS */
+
 router.get("/products", async (req, res) => {
     try {
         const result = await productService.getProducts(req.query);
@@ -102,7 +115,8 @@ router.get("/products", async (req, res) => {
     }
 });
 
-// Get product detail.
+/* GET PRODUCT DETAIL */
+
 router.get("/products/:id", async (req, res) => {
     try {
         const product = await productService.getProductDetail(
@@ -118,16 +132,49 @@ router.get("/products/:id", async (req, res) => {
     }
 });
 
-// Create click and return internal redirect URL.
+/* CREATE SHARE LINK */
+
+router.post("/links", async (req, res) => {
+    try {
+        const result = await trackingService.createLink(
+            req.user.id,
+            req.body.productId
+        );
+
+        return res.status(201).json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+/* GET MY LINKS */
+
+router.get("/links", async (req, res) => {
+    try {
+        const result = await trackingService.getLinks(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            ...result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+/* LEGACY CLICK API - KEEP COMPATIBILITY */
+
 router.post("/click", async (req, res) => {
     try {
         const result = await trackingService.createClick(
             req.user.id,
-            req.body.productId,
-            {
-                ip: req.ip,
-                userAgent: req.get("user-agent")
-            }
+            req.body.productId
         );
 
         return res.json({

@@ -6,9 +6,11 @@ const db = require("../db");
 
 function positiveId(value, error = "INVALID_AFFILIATE_ID") {
     const id = Number(value);
-    if (!Number.isInteger(id) || id <= 0) {
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
         throw new Error(error);
     }
+
     return id;
 }
 
@@ -57,11 +59,15 @@ function validateLazadaUrl(value) {
     return url.toString();
 }
 
+/* =====================================================
+   PRODUCT
+===================================================== */
 
-
-async function createClick(userId, productId, requestInfo = {}) {
-    userId = positiveId(userId, "INVALID_USER_ID");
-    productId = positiveId(productId, "INVALID_AFFILIATE_PRODUCT_ID");
+async function getActiveProduct(productId) {
+    productId = positiveId(
+        productId,
+        "INVALID_AFFILIATE_PRODUCT_ID"
+    );
 
     const [rows] = await db.execute(
         `SELECT
@@ -98,10 +104,28 @@ async function createClick(userId, productId, requestInfo = {}) {
         throw new Error("UNSUPPORTED_AFFILIATE_NETWORK");
     }
 
-    const destinationUrl = validateLazadaUrl(product.affiliate_link);
+    return product;
+}
+
+/* =====================================================
+   CREATE SHARE LINK
+   Không ghi nhận lượt click tại đây.
+===================================================== */
+
+async function createLink(userId, productId) {
+    userId = positiveId(userId, "INVALID_USER_ID");
+    productId = positiveId(
+        productId,
+        "INVALID_AFFILIATE_PRODUCT_ID"
+    );
+
+    const product = await getActiveProduct(productId);
+    const destinationUrl = validateLazadaUrl(
+        product.affiliate_link
+    );
+
     const clickCode = generateClickCode();
 
-    // Sub ID 1 là mã đối chiếu duy nhất giữa click và conversion.
     const subIds = {
         sub_id1: clickCode,
         sub_id2: "toolshub",
@@ -117,7 +141,7 @@ async function createClick(userId, productId, requestInfo = {}) {
 
     const finalDestinationUrl = trackedUrl.toString();
 
-    await db.execute(
+    const [result] = await db.execute(
         `INSERT INTO affiliate_clicks (
             click_code,
             user_id,
@@ -128,31 +152,124 @@ async function createClick(userId, productId, requestInfo = {}) {
             ip_hash,
             user_agent,
             clicked_at,
-            attribution_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), 'pending')`,
+            attribution_status,
+            link_created_at,
+            first_clicked_at,
+            click_count
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'pending', NOW(), NULL, 0)`,
         [
             clickCode,
             userId,
             productId,
             product.network_id,
             clickCode,
-            finalDestinationUrl,
-            hashIp(requestInfo.ip),
-            requestInfo.userAgent
-                ? String(requestInfo.userAgent).slice(0, 500)
-                : null
+            finalDestinationUrl
         ]
     );
 
     return {
+        id: result.insertId,
         clickCode,
         productId,
-        clickUrl: `/api/affiliate/go/${clickCode}`
+        clickUrl: `/api/affiliate/go/${clickCode}`,
+        linkCreatedAt: new Date().toISOString(),
+        clickCount: 0
     };
 }
 
+/* =====================================================
+   CREATE CLICK - COMPATIBILITY
+   Giữ API cũ cho Product Detail.
+   Click chỉ được ghi nhận khi truy cập clickUrl.
+===================================================== */
 
-async function getClickDestination(clickCode) {
+async function createClick(userId, productId) {
+    return createLink(userId, productId);
+}
+
+/* =====================================================
+   GET USER LINKS
+===================================================== */
+
+async function getLinks(userId, options = {}) {
+    userId = positiveId(userId, "INVALID_USER_ID");
+
+    const page = Number(options.page ?? 1);
+    const limit = Number(options.limit ?? 20);
+
+    if (!Number.isSafeInteger(page) || page < 1) {
+        throw new Error("INVALID_PAGE");
+    }
+
+    if (
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        limit > 100
+    ) {
+        throw new Error("INVALID_LIMIT");
+    }
+
+    const offset = (page - 1) * limit;
+
+    const [countRows] = await db.execute(
+        `SELECT COUNT(*) AS total
+         FROM affiliate_clicks
+         WHERE user_id = ?`,
+        [userId]
+    );
+
+    const total = Number(countRows[0]?.total || 0);
+
+    const [rows] = await db.execute(
+        `SELECT
+            id,
+            click_code,
+            user_id,
+            product_id,
+            network_id,
+            tracking_sub_id,
+            clicked_at,
+            attribution_status,
+            link_created_at,
+            first_clicked_at,
+            click_count
+         FROM affiliate_clicks
+         WHERE user_id = ?
+         ORDER BY link_created_at DESC, id DESC
+         LIMIT ? OFFSET ?`,
+        [userId, limit, offset]
+    );
+
+    const links = rows.map(row => ({
+        id: row.id,
+        clickCode: row.click_code,
+        productId: row.product_id,
+        networkId: row.network_id,
+        trackingSubId: row.tracking_sub_id,
+        clickUrl: `/api/affiliate/go/${row.click_code}`,
+        clickCount: Number(row.click_count || 0),
+        clickedAt: row.clicked_at,
+        firstClickedAt: row.first_clicked_at,
+        linkCreatedAt: row.link_created_at,
+        attributionStatus: row.attribution_status
+    }));
+
+    return {
+        links,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
+}
+
+/* =====================================================
+   RECORD CLICK + GET DESTINATION
+===================================================== */
+
+async function getClickDestination(clickCode, requestInfo = {}) {
     clickCode = String(clickCode || "").trim().toLowerCase();
 
     if (!/^[a-f0-9]{32}$/.test(clickCode)) {
@@ -197,19 +314,44 @@ async function getClickDestination(clickCode) {
     }
 
     const destination = new URL(
-    validateLazadaUrl(click.destination_url)
+        validateLazadaUrl(click.destination_url)
     );
 
-    const storedClickCode = destination.searchParams.get("sub_id1");
+    const storedClickCode =
+        destination.searchParams.get("sub_id1");
 
     if (storedClickCode !== click.click_code) {
         throw new Error("AFFILIATE_CLICK_DESTINATION_MISMATCH");
     }
 
+    const ipHash = hashIp(requestInfo.ip);
+
+    const userAgent = requestInfo.userAgent
+        ? String(requestInfo.userAgent).slice(0, 500)
+        : null;
+
+    await db.execute(
+        `UPDATE affiliate_clicks
+         SET
+            ip_hash = ?,
+            user_agent = ?,
+            clicked_at = NOW(),
+            first_clicked_at = COALESCE(first_clicked_at, NOW()),
+            click_count = click_count + 1
+         WHERE id = ?`,
+        [
+            ipHash,
+            userAgent,
+            click.id
+        ]
+    );
+
     return destination.toString();
 }
 
 module.exports = {
+    createLink,
     createClick,
+    getLinks,
     getClickDestination
 };
