@@ -191,7 +191,14 @@ async function getProducts(query = {}, options = {}) {
         params.push(positiveId(query.network_id, "INVALID_AFFILIATE_NETWORK_ID"));
     }
 
+    if (query.category_status === "uncategorized") {
     if (query.category_id) {
+        throw new Error("INVALID_CATEGORY_FILTER");
+    }
+    conditions.push("p.category_id IS NULL");
+    } else if (query.category_status) {
+        throw new Error("INVALID_CATEGORY_FILTER");
+    } else if (query.category_id) {
         conditions.push("p.category_id = ?");
         params.push(positiveId(query.category_id, "INVALID_CATEGORY_ID"));
     }
@@ -713,8 +720,14 @@ async function bulkApproveAllDraftProducts(query = {}, actorUserId, audit = {}) 
             positiveId(query.network_id, "INVALID_AFFILIATE_NETWORK_ID")
         );
     }
-
-    if (query.category_id) {
+    if (query.category_status === "uncategorized") {
+        if (query.category_id) {
+            throw new Error("INVALID_CATEGORY_FILTER");
+        }
+        conditions.push("p.category_id IS NULL");
+    } else if (query.category_status) {
+        throw new Error("INVALID_CATEGORY_FILTER");
+    } else if (query.category_id) {
         conditions.push("p.category_id = ?");
         params.push(positiveId(query.category_id, "INVALID_CATEGORY_ID"));
     }
