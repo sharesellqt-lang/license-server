@@ -458,9 +458,10 @@ router.get("/orders", async (req, res) => {
     }
 });
 
+
 /* =====================================================
    MEMBER COMMISSIONS
-   Chỉ lấy hoa hồng thuộc đơn hàng của thành viên.
+   Hiển thị hoa hồng Affiliate dưới dạng Credits.
 ===================================================== */
 
 router.get("/commissions", async (req, res) => {
@@ -542,6 +543,7 @@ router.get("/commissions", async (req, res) => {
         const where = `WHERE ${conditions.join(" AND ")}`;
         const baseWhere = `WHERE ${baseConditions.join(" AND ")}`;
 
+        // Danh sách commission và giao dịch Credits thực tế.
         const [rows] = await db.execute(
             `SELECT
                 c.id,
@@ -555,12 +557,62 @@ router.get("/commissions", async (req, res) => {
                 c.amount,
                 c.currency,
                 c.status,
+                c.reward_transaction_id,
                 c.processed_at,
                 c.created_at,
                 o.order_status,
                 o.payment_status,
                 o.attribution_status,
-                o.conversion_time
+                o.conversion_time,
+
+                COALESCE((
+                    SELECT SUM(rt.amount)
+                    FROM reward_transactions rt
+                    WHERE rt.reference_type = 'affiliate_commission'
+                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND rt.type = 'credit'
+                      AND rt.source = 'affiliate'
+                ), 0) AS credited_amount,
+
+                COALESCE((
+                    SELECT r.amount
+                    FROM affiliate_credit_recoveries r
+                    WHERE r.commission_id = c.id
+                    LIMIT 1
+                ), 0) AS recovery_amount,
+
+                COALESCE((
+                    SELECT r.recovered_amount
+                    FROM affiliate_credit_recoveries r
+                    WHERE r.commission_id = c.id
+                    LIMIT 1
+                ), 0) AS recovered_amount,
+
+                (
+                    SELECT r.status
+                    FROM affiliate_credit_recoveries r
+                    WHERE r.commission_id = c.id
+                    LIMIT 1
+                ) AS recovery_status,
+
+                (
+                    SELECT COUNT(*)
+                    FROM reward_transactions rt
+                    WHERE rt.reference_type = 'affiliate_commission'
+                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND rt.type = 'credit'
+                      AND rt.source = 'affiliate'
+                ) AS credited_transactions,
+
+                (
+                    SELECT COUNT(*)
+                    FROM reward_transactions rt
+                    WHERE rt.reference_type = 'affiliate_commission'
+                      AND rt.reference_id = CAST(c.id AS CHAR)
+                      AND rt.type = 'reversal'
+                      AND rt.source = 'affiliate'
+                ) AS recovery_transactions
+
              FROM affiliate_commissions c
              JOIN affiliate_networks n
                 ON n.id = c.network_id
@@ -581,45 +633,99 @@ router.get("/commissions", async (req, res) => {
             params
         );
 
+        // Thống kê Credits thực tế từ Reward Wallet.
         const [statsRows] = await db.execute(
             `SELECT
-                COALESCE(c.currency, 'VND') AS currency,
-                COUNT(*) AS total_records,
-                SUM(CASE
-                    WHEN c.status = 'pending'
-                    THEN c.amount ELSE 0
-                END) AS pending_amount,
-                SUM(CASE
-                    WHEN c.status = 'confirmed'
-                    THEN c.amount ELSE 0
-                END) AS confirmed_amount,
-                SUM(CASE
-                    WHEN c.status = 'reversed'
-                    THEN c.amount ELSE 0
-                END) AS reversed_amount,
-                SUM(c.amount) AS total_amount
+                COALESCE(SUM(
+                    CASE
+                        WHEN rt.type = 'credit'
+                        THEN rt.amount
+                        ELSE 0
+                    END
+                ), 0) AS credited_amount,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN rt.type = 'reversal'
+                        THEN rt.amount
+                        ELSE 0
+                    END
+                ), 0) AS recovered_amount,
+
+                COUNT(DISTINCT c.id) AS total_records,
+
+                COALESCE(SUM(
+                    CASE
+                        WHEN c.status = 'pending'
+                         AND c.event_type IN ('commission', 'adjustment')
+                         AND c.currency = 'VND'
+                        THEN c.amount
+                        ELSE 0
+                    END
+                ), 0) AS pending_amount
+
              FROM affiliate_commissions c
-             ${baseWhere}
-             GROUP BY COALESCE(c.currency, 'VND')
-             ORDER BY currency`,
-            baseParams
+
+             JOIN affiliate_orders o
+                ON o.id = c.order_id
+
+             LEFT JOIN reward_transactions rt
+                ON rt.user_id = ?
+               AND rt.source = 'affiliate'
+               AND (
+                    (
+                        rt.reference_type = 'affiliate_commission'
+                        AND rt.reference_id = CAST(c.id AS CHAR)
+                        AND rt.type IN ('credit', 'reversal')
+                    )
+                    OR
+                    (
+                        rt.reference_type = 'affiliate_credit_recovery'
+                        AND rt.type = 'reversal'
+                        AND EXISTS (
+                            SELECT 1
+                            FROM affiliate_credit_recoveries ar
+                            WHERE ar.id = CAST(rt.reference_id AS UNSIGNED)
+                              AND ar.commission_id = c.id
+                              AND ar.user_id = ?
+                        )
+                    )
+               )
+
+             ${baseWhere}`,
+            [userId, userId, ...baseParams]
         );
+
+        const stats = statsRows[0] || {};
 
         const total = Number(countRows[0]?.total || 0);
 
+        const creditedAmount = BigInt(stats.credited_amount || 0);
+        const recoveredAmount = BigInt(stats.recovered_amount || 0);
+        const pendingAmount = BigInt(stats.pending_amount || 0);
+
         return res.json({
             success: true,
-            commissions: rows,
+
+            commissions: rows.map(row => ({
+                ...row,
+                creditedAmount: String(row.credited_amount || 0),
+                recoveryAmount: String(row.recovery_amount || 0),
+                recoveredAmount: String(row.recovered_amount || 0),
+                recoveryStatus: row.recovery_status || null,
+                creditedTransactions: Number(row.credited_transactions || 0),
+                recoveryTransactions: Number(row.recovery_transactions || 0)
+            })),
+
             stats: {
-                byCurrency: statsRows.map(row => ({
-                    currency: row.currency,
-                    totalRecords: Number(row.total_records || 0),
-                    pendingAmount: Number(row.pending_amount || 0),
-                    confirmedAmount: Number(row.confirmed_amount || 0),
-                    reversedAmount: Number(row.reversed_amount || 0),
-                    totalAmount: Number(row.total_amount || 0)
-                }))
+                totalRecords: Number(stats.total_records || 0),
+
+                creditedAmount: creditedAmount.toString(),
+                recoveredAmount: recoveredAmount.toString(),
+                netCredits: (creditedAmount - recoveredAmount).toString(),
+                pendingAmount: pendingAmount.toString()
             },
+
             pagination: {
                 page,
                 limit,
@@ -632,5 +738,6 @@ router.get("/commissions", async (req, res) => {
         return handleError(res, error);
     }
 });
+
 
 module.exports = router;
