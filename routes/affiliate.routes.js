@@ -700,9 +700,21 @@ router.get("/commissions", async (req, res) => {
 
         const total = Number(countRows[0]?.total || 0);
 
-        const creditedAmount = BigInt(stats.credited_amount || 0);
-        const recoveredAmount = BigInt(stats.recovered_amount || 0);
-        const pendingAmount = BigInt(stats.pending_amount || 0);
+        // Chuyển DECIMAL từ MySQL thành BigInt an toàn.
+        // Chỉ chấp nhận số nguyên hoặc số thập phân có phần lẻ bằng 0.
+        const toCreditsBigInt = (value) => {
+            const normalized = String(value ?? "0").trim();
+
+            if (!/^-?\d+(?:\.0+)?$/.test(normalized)) {
+                throw new Error(`Invalid Credits amount: ${normalized}`);
+            }
+
+            return BigInt(normalized.split(".")[0]);
+        };
+
+        const creditedAmount = toCreditsBigInt(stats.credited_amount);
+        const recoveredAmount = toCreditsBigInt(stats.recovered_amount);
+        const pendingAmount = toCreditsBigInt(stats.pending_amount);
 
         return res.json({
             success: true,
