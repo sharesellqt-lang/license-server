@@ -27,13 +27,17 @@ function normalizeClickCode(value) {
 async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
     orderId = positiveId(orderId);
     clickCode = normalizeClickCode(clickCode);
-    actorUserId = positiveId(actorUserId, "INVALID_ACTOR_USER_ID");
+
+    actorUserId = actorUserId == null || actorUserId === ""
+        ? null
+        : positiveId(actorUserId, "INVALID_ACTOR_USER_ID");
 
     const conn = await db.getConnection();
 
     try {
         await conn.beginTransaction();
 
+        // 1. Lock đơn hàng để tránh attribution đồng thời.
         const [orderRows] = await conn.execute(
             `SELECT *
              FROM affiliate_orders
@@ -49,11 +53,22 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
 
         const order = orderRows[0];
 
+        // 2. Sub ID 1 phải trùng clickCode.
+        if (
+            String(order.sub_id_1 || "").trim().toLowerCase() !== clickCode
+        ) {
+            throw new Error("AFFILIATE_SUB_ID_1_MISMATCH");
+        }
+
+        // 3. Tìm và lock click tương ứng.
         const [clickRows] = await conn.execute(
             `SELECT
                 c.*,
                 p.product_id AS external_product_id,
                 p.sku_id AS external_sku_id,
+                p.status AS product_status,
+                n.status AS network_status,
+                n.code AS network_code,
                 CASE
                     WHEN ? IS NULL THEN 0
                     WHEN c.clicked_at <= ? THEN 1
@@ -62,6 +77,8 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
              FROM affiliate_clicks c
              JOIN affiliate_products p
                 ON p.id = c.product_id
+             JOIN affiliate_networks n
+                ON n.id = c.network_id
              WHERE c.click_code = ?
              LIMIT 1
              FOR UPDATE`,
@@ -78,8 +95,23 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
 
         const click = clickRows[0];
 
-        if (String(order.network_id) !== String(click.network_id)) {
+        // 4. Kiểm tra network.
+        if (
+            String(order.network_id) !== String(click.network_id)
+        ) {
             throw new Error("AFFILIATE_NETWORK_MISMATCH");
+        }
+
+        if (
+            click.network_code !== "lazada" ||
+            click.network_status !== "active"
+        ) {
+            throw new Error("AFFILIATE_NETWORK_INACTIVE");
+        }
+
+        // 5. Kiểm tra sản phẩm và SKU.
+        if (click.product_status !== "active") {
+            throw new Error("AFFILIATE_PRODUCT_INACTIVE");
         }
 
         if (
@@ -99,10 +131,12 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
             throw new Error("AFFILIATE_SKU_MISMATCH");
         }
 
+        // 6. Click phải xảy ra trước hoặc tại thời điểm conversion.
         if (!click.click_time_valid) {
             throw new Error("AFFILIATE_CLICK_TIME_INVALID");
         }
 
+        // 7. Không cho phép đổi click đã được gán.
         if (order.click_id) {
             if (String(order.click_id) !== String(click.id)) {
                 throw new Error("AFFILIATE_ORDER_ALREADY_ATTRIBUTED");
@@ -126,6 +160,7 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
             throw new Error("AFFILIATE_CLICK_NOT_ELIGIBLE");
         }
 
+        // 8. Cập nhật attribution.
         await conn.execute(
             `UPDATE affiliate_orders
              SET click_id = ?,
@@ -142,6 +177,7 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
             [click.id]
         );
 
+        // 9. Ghi audit trong cùng transaction.
         await writeAudit(conn, {
             actorUserId,
             targetUserId: click.user_id,
@@ -156,10 +192,11 @@ async function matchOrderToClick(orderId, clickCode, actorUserId, audit = {}) {
                 clickId: click.id,
                 clickCode: click.click_code,
                 userId: click.user_id,
-                attributionStatus: "verified"
+                attributionStatus: "verified",
+                source: actorUserId ? "admin" : "system"
             },
-            ipAddress: audit.ipAddress,
-            userAgent: audit.userAgent
+            ipAddress: audit.ipAddress ?? null,
+            userAgent: audit.userAgent ?? null
         });
 
         await conn.commit();

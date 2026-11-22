@@ -106,10 +106,195 @@ function validateInput(data) {
     };
 }
 
+
+/**
+ * Ưu tiên dùng Credits vừa được cộng để thu hồi
+ * các khoản Affiliate còn thiếu.
+ *
+ * Yêu cầu: wallet đã được khóa FOR UPDATE trước khi gọi.
+ * Không tự quản lý transaction.
+ */
+async function processPendingRecoveriesWithConnection(
+    conn,
+    data,
+    wallet
+) {
+    let availableCredit = data.amount;
+    let currentBalance = BigInt(wallet.balance);
+    const recoveries = [];
+
+    if (availableCredit <= 0n) {
+        return {
+            recoveredAmount: 0n,
+            remainingCredit: availableCredit,
+            currentBalance,
+            recoveries
+        };
+    }
+
+    // Thứ tự khóa thống nhất: wallet trước, recovery sau.
+    const [rows] = await conn.execute(
+        `SELECT
+            id,
+            commission_id,
+            amount,
+            recovered_amount
+         FROM affiliate_credit_recoveries
+         WHERE user_id = ?
+           AND status IN ('pending', 'partial')
+           AND recovered_amount < amount
+         ORDER BY id ASC
+         FOR UPDATE`,
+        [data.userId]
+    );
+
+    for (const recovery of rows) {
+        if (availableCredit <= 0n) break;
+
+        const debtAmount = BigInt(recovery.amount);
+        const recoveredBefore = BigInt(recovery.recovered_amount);
+        const debtRemaining = debtAmount - recoveredBefore;
+
+        if (debtRemaining <= 0n) continue;
+
+        const deduction = debtRemaining < availableCredit
+            ? debtRemaining
+            : availableCredit;
+
+        const recoveredAfter = recoveredBefore + deduction;
+        const balanceBefore = currentBalance;
+        const balanceAfter = balanceBefore - deduction;
+
+        if (balanceAfter < 0n) {
+            throw new Error("INSUFFICIENT_CREDITS_FOR_RECOVERY");
+        }
+
+        const recoveryId = String(recovery.id);
+        const commissionId = String(recovery.commission_id);
+
+        // Idempotency gắn với số tiền đã thu hồi lũy kế.
+        const idempotencyKey =
+            `affiliate:recovery:${recoveryId}:${recoveredAfter}`;
+
+        // Trừ số dư ví.
+        await conn.execute(
+            `UPDATE reward_wallets
+             SET balance = ?
+             WHERE id = ?`,
+            [
+                balanceAfter.toString(),
+                wallet.id
+            ]
+        );
+
+        // Ghi giao dịch reversal riêng.
+        const [result] = await conn.execute(
+            `INSERT INTO reward_transactions (
+                wallet_id,
+                user_id,
+                type,
+                source,
+                amount,
+                balance_before,
+                balance_after,
+                reference_type,
+                reference_id,
+                idempotency_key,
+                description,
+                metadata,
+                created_by_admin_id
+            ) VALUES (
+                ?, ?, 'reversal', 'affiliate',
+                ?, ?, ?, ?, ?, ?, ?, ?, NULL
+            )`,
+            [
+                wallet.id,
+                data.userId,
+                deduction.toString(),
+                balanceBefore.toString(),
+                balanceAfter.toString(),
+                "affiliate_credit_recovery",
+                recoveryId,
+                idempotencyKey,
+                "Thu hồi Credits Affiliate còn thiếu",
+                JSON.stringify({
+                    recoveryId,
+                    commissionId,
+                    originalCreditId: data.referenceId || null,
+                    originalCreditSource: data.source,
+                    recoveredBefore: recoveredBefore.toString(),
+                    recoveredAfter: recoveredAfter.toString()
+                })
+            ]
+        );
+
+        // Cập nhật tiến độ thu hồi.
+        const status = recoveredAfter >= debtAmount
+            ? "recovered"
+            : "partial";
+
+        await conn.execute(
+            `UPDATE affiliate_credit_recoveries
+             SET recovered_amount = ?,
+                 status = ?
+             WHERE id = ?`,
+            [
+                recoveredAfter.toString(),
+                status,
+                recovery.id
+            ]
+        );
+
+        await writeAudit(conn, {
+            actorUserId: data.actorUserId || null,
+            targetUserId: data.userId,
+            action: "credits.affiliate_recovery",
+            entityType: "reward_transaction",
+            entityId: result.insertId,
+            oldData: {
+                balance: outputNumber(balanceBefore),
+                recoveredAmount: outputNumber(recoveredBefore),
+                recoveryStatus: recoveredBefore > 0n
+                    ? "partial"
+                    : "pending"
+            },
+            newData: {
+                balance: outputNumber(balanceAfter),
+                amount: outputNumber(deduction),
+                recoveredAmount: outputNumber(recoveredAfter),
+                recoveryStatus: status,
+                recoveryId,
+                commissionId
+            }
+        });
+
+        currentBalance = balanceAfter;
+        availableCredit -= deduction;
+
+        recoveries.push({
+            recoveryId,
+            commissionId,
+            amount: deduction.toString(),
+            recoveredAmount: recoveredAfter.toString(),
+            remainingAmount: (debtAmount - recoveredAfter).toString(),
+            status,
+            transactionId: result.insertId
+        });
+    }
+
+    return {
+        recoveredAmount: data.amount - availableCredit,
+        remainingCredit: availableCredit,
+        currentBalance,
+        recoveries
+    };
+}
+
 /**
  * Thực hiện giao dịch trên connection được truyền vào.
  * Không tự beginTransaction, commit, rollback hoặc release.
  */
+
 async function applyTransactionWithConnection(conn, input) {
     if (!conn || typeof conn.execute !== "function") {
         throw new Error("INVALID_DATABASE_CONNECTION");
@@ -124,7 +309,7 @@ async function applyTransactionWithConnection(conn, input) {
         [data.userId]
     );
 
-    // Khóa ví.
+    // Khóa ví trước khi xử lý bất kỳ khoản thu hồi nào.
     const [walletRows] = await conn.execute(
         `SELECT id, user_id, balance, lifetime_earned,
                 lifetime_spent, status
@@ -145,7 +330,7 @@ async function applyTransactionWithConnection(conn, input) {
         throw new Error("WALLET_LOCKED");
     }
 
-    // Kiểm tra idempotency.
+    // Kiểm tra idempotency trước khi xử lý thu hồi.
     const [existingRows] = await conn.execute(
         `SELECT id, user_id, type, source, amount,
                 balance_before, balance_after,
@@ -178,7 +363,8 @@ async function applyTransactionWithConnection(conn, input) {
             transactionId: existing.id,
             balanceBefore: outputNumber(existing.balance_before),
             balanceAfter: outputNumber(existing.balance_after),
-            currentBalance: outputNumber(wallet.balance)
+            currentBalance: outputNumber(wallet.balance),
+            recovery: null
         };
     }
 
@@ -199,7 +385,7 @@ async function applyTransactionWithConnection(conn, input) {
         balanceAfter = balanceBefore - data.amount;
     }
 
-    // Cập nhật ví.
+    // Cập nhật ví và thống kê tích lũy.
     if (data.type === "credit") {
         await conn.execute(
             `UPDATE reward_wallets
@@ -226,7 +412,7 @@ async function applyTransactionWithConnection(conn, input) {
         );
     }
 
-    // Ghi Ledger.
+    // Ghi giao dịch cộng/trừ Credits ban đầu.
     const [result] = await conn.execute(
         `INSERT INTO reward_transactions (
             wallet_id,
@@ -262,26 +448,44 @@ async function applyTransactionWithConnection(conn, input) {
         ]
     );
 
-await writeAudit(conn, {
-    actorUserId: data.actorUserId,
-    targetUserId: data.userId,
-    action: data.type === "credit"
-        ? "credits.credited"
-        : "credits.debited",
-    entityType: "reward_transaction",
-    entityId: result.insertId,
-    oldData: {
-        balance: outputNumber(balanceBefore)
-    },
-    newData: {
-        balance: outputNumber(balanceAfter),
-        type: data.type,
-        amount: outputNumber(data.amount),
-        source: data.source,
-        referenceType: data.referenceType || null,
-        referenceId: data.referenceId || null
+    await writeAudit(conn, {
+        actorUserId: data.actorUserId,
+        targetUserId: data.userId,
+        action: data.type === "credit"
+            ? "credits.credited"
+            : "credits.debited",
+        entityType: "reward_transaction",
+        entityId: result.insertId,
+        oldData: {
+            balance: outputNumber(balanceBefore)
+        },
+        newData: {
+            balance: outputNumber(balanceAfter),
+            type: data.type,
+            amount: outputNumber(data.amount),
+            source: data.source,
+            referenceType: data.referenceType || null,
+            referenceId: data.referenceId || null
+        }
+    });
+
+    // Chỉ giao dịch credit mới kích hoạt thu hồi tự động.
+    let recovery = null;
+    let currentBalance = balanceAfter;
+
+    if (data.type === "credit") {
+        recovery = await processPendingRecoveriesWithConnection(
+            conn,
+            data,
+            {
+                ...wallet,
+                balance: balanceAfter.toString()
+            }
+        );
+
+        currentBalance = recovery.currentBalance;
     }
-});
+
     return {
         success: true,
         duplicate: false,
@@ -289,9 +493,18 @@ await writeAudit(conn, {
         type: data.type,
         amount: outputNumber(data.amount),
         balanceBefore: outputNumber(balanceBefore),
-        balanceAfter: outputNumber(balanceAfter)
+        balanceAfter: outputNumber(currentBalance),
+        currentBalance: outputNumber(currentBalance),
+        recovery: recovery
+            ? {
+                recoveredAmount: recovery.recoveredAmount.toString(),
+                remainingCredit: recovery.remainingCredit.toString(),
+                recoveries: recovery.recoveries
+            }
+            : null
     };
 }
+
 
 /**
  * API cũ: tự quản lý connection và transaction.

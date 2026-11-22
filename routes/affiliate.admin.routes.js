@@ -163,12 +163,6 @@ function sendError(res, error) {
         "INVALID_PRODUCT_IMPORT_ROW",
         "INVALID_CATEGORY_ID",
         "INVALID_AFFILIATE_SYNC_TYPE",
-        "AFFILIATE_NETWORK_MISMATCH",
-        "AFFILIATE_PRODUCT_MISMATCH",
-        "AFFILIATE_SKU_MISMATCH",
-        "AFFILIATE_CLICK_TIME_INVALID",
-        "AFFILIATE_ORDER_ALREADY_ATTRIBUTED",
-        "AFFILIATE_CLICK_NOT_ELIGIBLE",
         "AFFILIATE_PRODUCT_DELETE_IDS_REQUIRED",
         "AFFILIATE_PRODUCT_DELETE_TOO_MANY",
         "INVALID_CAROUSEL_ID",
@@ -182,6 +176,10 @@ function sendError(res, error) {
         "INVALID_MANUAL_PRODUCT_ID",
         "INVALID_CATEGORY_ID",
         "INVALID_NETWORK_ID",
+        "AFFILIATE_SUB_ID_1_MISSING",
+        "INVALID_AFFILIATE_PAYOUT",
+        "INVALID_AFFILIATE_PAYOUT_PRECISION",
+        "INVALID_AFFILIATE_COMMISSION_TOTAL",
     ];
 
     const notFoundErrors = [
@@ -201,6 +199,17 @@ function sendError(res, error) {
         "AFFILIATE_PRODUCT_HAS_CLICKS",
         "AFFILIATE_PRODUCT_HAS_ORDERS",
         "CAROUSEL_SLUG_EXISTS",
+        "AFFILIATE_SUB_ID_1_MISMATCH",
+        "AFFILIATE_NETWORK_MISMATCH",
+        "AFFILIATE_PRODUCT_MISMATCH",
+        "AFFILIATE_SKU_MISMATCH",
+        "AFFILIATE_CLICK_TIME_INVALID",
+        "AFFILIATE_ORDER_ALREADY_ATTRIBUTED",
+        "AFFILIATE_CLICK_NOT_ELIGIBLE",
+        "AFFILIATE_ORDER_NOT_ATTRIBUTED",
+        "AFFILIATE_COMMISSION_NOT_CONFIRMED",
+        "UNSUPPORTED_AFFILIATE_CURRENCY",
+        "AFFILIATE_COMMISSION_EVENT_DUPLICATE",
     ];
 
     const status = badRequestErrors.includes(code)
@@ -604,14 +613,14 @@ router.post(
                 "INVALID_AFFILIATE_SYNC_TYPE"
             );
 
-            const result = await reportService.importConversionReport(
-                rows,
-                {
-                    networkCode,
-                    syncType,
-                    createdBy: req.user.id
-                }
-            );
+            const result = await reportService.importConversionReport(rows, {
+                networkCode,
+                syncType,
+                createdBy: req.user.id,
+                audit: auditInfo(req)
+            });
+
+            return res.json(result);
 
             return res.json(result);
         } catch (error) {

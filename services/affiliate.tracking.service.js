@@ -57,6 +57,8 @@ function validateLazadaUrl(value) {
     return url.toString();
 }
 
+
+
 async function createClick(userId, productId, requestInfo = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
     productId = positiveId(productId, "INVALID_AFFILIATE_PRODUCT_ID");
@@ -96,11 +98,24 @@ async function createClick(userId, productId, requestInfo = {}) {
         throw new Error("UNSUPPORTED_AFFILIATE_NETWORK");
     }
 
-    const destinationUrl = validateLazadaUrl(
-        product.affiliate_link
-    );
-
+    const destinationUrl = validateLazadaUrl(product.affiliate_link);
     const clickCode = generateClickCode();
+
+    // Sub ID 1 là mã đối chiếu duy nhất giữa click và conversion.
+    const subIds = {
+        sub_id1: clickCode,
+        sub_id2: "toolshub",
+        sub_id3: `u${userId}`,
+        sub_id4: `p${productId}`
+    };
+
+    const trackedUrl = new URL(destinationUrl);
+
+    for (const [key, value] of Object.entries(subIds)) {
+        trackedUrl.searchParams.set(key, value);
+    }
+
+    const finalDestinationUrl = trackedUrl.toString();
 
     await db.execute(
         `INSERT INTO affiliate_clicks (
@@ -120,11 +135,11 @@ async function createClick(userId, productId, requestInfo = {}) {
             userId,
             productId,
             product.network_id,
-            null,
-            destinationUrl,
+            clickCode,
+            finalDestinationUrl,
             hashIp(requestInfo.ip),
             requestInfo.userAgent
-                ? String(requestInfo.userAgent).slice(0, 1000)
+                ? String(requestInfo.userAgent).slice(0, 500)
                 : null
         ]
     );
@@ -135,6 +150,7 @@ async function createClick(userId, productId, requestInfo = {}) {
         clickUrl: `/api/affiliate/go/${clickCode}`
     };
 }
+
 
 async function getClickDestination(clickCode) {
     clickCode = String(clickCode || "").trim().toLowerCase();
@@ -180,7 +196,17 @@ async function getClickDestination(clickCode) {
         throw new Error("UNSUPPORTED_AFFILIATE_NETWORK");
     }
 
-    return validateLazadaUrl(click.destination_url);
+    const destination = new URL(
+    validateLazadaUrl(click.destination_url)
+    );
+
+    const storedClickCode = destination.searchParams.get("sub_id1");
+
+    if (storedClickCode !== click.click_code) {
+        throw new Error("AFFILIATE_CLICK_DESTINATION_MISMATCH");
+    }
+
+    return destination.toString();
 }
 
 module.exports = {

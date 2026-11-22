@@ -4,7 +4,14 @@
 const db = require("../db");
 
 const orderService = require("./affiliate.order.service");
+const attributionService = require("./affiliate.attribution.service");
 const commissionService = require("./affiliate.commission.service");
+
+const PENDING_ATTRIBUTION_ERRORS = [
+    "AFFILIATE_SUB_ID_1_MISSING",
+    "AFFILIATE_CLICK_NOT_FOUND",
+    "AFFILIATE_CLICK_TIME_INVALID"
+];
 
 const PENDING_COMMISSION_ERRORS = [
     "AFFILIATE_ORDER_NOT_ATTRIBUTED",
@@ -113,6 +120,28 @@ function normalizeOrderIds(value) {
     ];
 }
 
+async function getOrderForAttribution(orderId, networkId) {
+    const [rows] = await db.execute(
+        `SELECT
+            id,
+            network_id,
+            sub_id_1,
+            click_id,
+            attribution_status
+         FROM affiliate_orders
+         WHERE id = ?
+           AND network_id = ?
+         LIMIT 1`,
+        [orderId, networkId]
+    );
+
+    if (!rows.length) {
+        throw new Error("AFFILIATE_ORDER_NOT_FOUND");
+    }
+
+    return rows[0];
+}
+
 async function importConversionReport(rows, options = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new Error("AFFILIATE_REPORT_EMPTY");
@@ -146,13 +175,80 @@ async function importConversionReport(rows, options = {}) {
 
         const orderIds = normalizeOrderIds(importResult.orderIds);
 
+        let attributionVerified = 0;
+        let attributionPending = 0;
+        let attributionFailed = 0;
+
         let commissionProcessed = 0;
         let commissionPending = 0;
         let commissionFailed = 0;
 
+        const attributionErrors = [];
         const commissionErrors = [];
 
         for (const orderId of orderIds) {
+            // 1. Xác minh attribution bằng Sub ID 1.
+            try {
+                const order = await getOrderForAttribution(
+                    orderId,
+                    network.id
+                );
+
+                const clickCode = String(
+                    order.sub_id_1 || ""
+                ).trim().toLowerCase();
+
+                if (!clickCode) {
+                    throw new Error("AFFILIATE_SUB_ID_1_MISSING");
+                }
+
+                if (!/^[a-f0-9]{32}$/.test(clickCode)) {
+                    throw new Error("INVALID_AFFILIATE_CLICK_CODE");
+                }
+
+                const attribution = await attributionService.matchOrderToClick(
+                    orderId,
+                    clickCode,
+                    options.createdBy || null,
+                    {
+                        ipAddress:
+                            options.audit?.ipAddress ||
+                            options.ipAddress ||
+                            null,
+                        userAgent:
+                            options.audit?.userAgent ||
+                            options.userAgent ||
+                            null
+                    }
+                );
+
+                if (
+                    !attribution ||
+                    attribution.attributionStatus !== "verified"
+                ) {
+                    throw new Error("AFFILIATE_ATTRIBUTION_NOT_VERIFIED");
+                }
+
+                attributionVerified++;
+            } catch (error) {
+                const code = error.message ||
+                    "AFFILIATE_ATTRIBUTION_FAILED";
+
+                if (PENDING_ATTRIBUTION_ERRORS.includes(code)) {
+                    attributionPending++;
+                } else {
+                    attributionFailed++;
+                    attributionErrors.push({
+                        orderId,
+                        code
+                    });
+                }
+
+                // Không xét commission nếu attribution chưa verified.
+                continue;
+            }
+
+            // 2. Xử lý commission sau khi attribution verified.
             try {
                 await commissionService.processOrderCommission(orderId);
                 commissionProcessed++;
@@ -162,15 +258,13 @@ async function importConversionReport(rows, options = {}) {
 
                 if (PENDING_COMMISSION_ERRORS.includes(code)) {
                     commissionPending++;
-                    continue;
+                } else {
+                    commissionFailed++;
+                    commissionErrors.push({
+                        orderId,
+                        code
+                    });
                 }
-
-                commissionFailed++;
-
-                commissionErrors.push({
-                    orderId,
-                    code
-                });
             }
         }
 
@@ -180,25 +274,28 @@ async function importConversionReport(rows, options = {}) {
 
         const errors = [
             ...importErrors,
+            ...attributionErrors,
             ...commissionErrors
         ];
 
-        const hasFailures =
-            importFailed > 0 ||
-            commissionFailed > 0;
+        const failedRows =
+            importFailed +
+            attributionFailed +
+            commissionFailed;
 
-        const syncStatus = hasFailures
-            ? "partial"
-            : "success";
-
-        // success_rows phản ánh các dòng đã nhập và xử lý thành công
-        // hoặc đang chờ điều kiện xử lý commission.
         const successRows = Math.max(
             0,
-            imported + updated - commissionFailed
+            imported +
+            updated -
+            attributionPending -
+            attributionFailed -
+            commissionPending -
+            commissionFailed
         );
 
-        const failedRows = importFailed + commissionFailed;
+        const syncStatus = failedRows > 0
+            ? "partial"
+            : "success";
 
         await finishSyncLog(syncId, {
             status: syncStatus,
@@ -212,24 +309,23 @@ async function importConversionReport(rows, options = {}) {
         return {
             success: true,
             syncId,
-
             network: {
                 id: network.id,
                 code: network.code,
                 name: network.name
             },
-
             summary: {
                 totalRows: rows.length,
                 imported,
                 updated,
                 failed: importFailed,
-
+                attributionVerified,
+                attributionPending,
+                attributionFailed,
                 commissionProcessed,
                 commissionPending,
                 commissionFailed
             },
-
             errors
         };
     } catch (error) {

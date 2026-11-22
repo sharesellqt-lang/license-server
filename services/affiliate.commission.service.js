@@ -24,9 +24,7 @@ function positiveId(value, error = "INVALID_AFFILIATE_ORDER_ID") {
 function parsePayout(value) {
     if (value == null || value === "") return 0n;
 
-    const normalized = String(value)
-        .trim()
-        .replace(/,/g, "");
+    const normalized = String(value).trim().replace(/,/g, "");
 
     if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
         throw new Error("INVALID_AFFILIATE_PAYOUT");
@@ -34,8 +32,6 @@ function parsePayout(value) {
 
     const [integerPart, decimalPart = ""] = normalized.split(".");
 
-    // Credits được tính theo đơn vị VND nguyên.
-    // Không tự ý làm tròn hoặc cắt bỏ phần thập phân.
     if (/[1-9]/.test(decimalPart)) {
         throw new Error("INVALID_AFFILIATE_PAYOUT_PRECISION");
     }
@@ -76,21 +72,15 @@ function makeIdempotencyKey(eventHash) {
     return `affiliate:${eventHash}`;
 }
 
+function normalizeStatus(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
 // =====================================================
 // ORDER STATUS
 // =====================================================
 
-function normalizeStatus(value) {
-    return String(value || "")
-        .trim()
-        .toLowerCase();
-}
-
 function isTerminallyRejectedOrder(order) {
-    const paymentStatus = normalizeStatus(order.payment_status);
-    const validity = normalizeStatus(order.validity);
-    const orderStatus = normalizeStatus(order.order_status);
-
     const rejectedStatuses = [
         "cancelled",
         "canceled",
@@ -99,12 +89,12 @@ function isTerminallyRejectedOrder(order) {
         "invalid"
     ];
 
-    if (rejectedStatuses.includes(orderStatus)) return true;
-    if (rejectedStatuses.includes(paymentStatus)) return true;
-    if (rejectedStatuses.includes(validity)) return true;
-    if (order.returned_time) return true;
-
-    return false;
+    return (
+        rejectedStatuses.includes(normalizeStatus(order.order_status)) ||
+        rejectedStatuses.includes(normalizeStatus(order.payment_status)) ||
+        rejectedStatuses.includes(normalizeStatus(order.validity)) ||
+        Boolean(order.returned_time)
+    );
 }
 
 function isConfirmedOrder(order) {
@@ -170,6 +160,24 @@ async function getCommissionTotal(conn, orderId) {
 }
 
 // =====================================================
+// CHECK OUTSTANDING RECOVERY
+// =====================================================
+
+async function hasOutstandingRecovery(conn, orderId) {
+    const [rows] = await conn.execute(
+        `SELECT id
+         FROM affiliate_credit_recoveries
+         WHERE order_id = ?
+           AND status IN ('pending', 'partial')
+           AND recovered_amount < amount
+         LIMIT 1`,
+        [orderId]
+    );
+
+    return rows.length > 0;
+}
+
+// =====================================================
 // COMMISSION EVENT
 // =====================================================
 
@@ -183,9 +191,7 @@ async function createCommissionEvent(conn, data) {
     });
 
     const [existing] = await conn.execute(
-        `SELECT
-            id,
-            reward_transaction_id
+        `SELECT id, reward_transaction_id
          FROM affiliate_commissions
          WHERE network_id = ?
            AND source_record_hash = ?
@@ -231,6 +237,202 @@ async function createCommissionEvent(conn, data) {
 }
 
 // =====================================================
+// CREATE RECOVERY AND COLLECT AVAILABLE CREDITS
+// =====================================================
+
+async function createAndCollectRecovery(conn, data) {
+    const userId = Number(data.userId);
+    const amount = BigInt(data.amount);
+
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+        throw new Error("INVALID_USER_ID");
+    }
+
+    if (amount <= 0n) {
+        throw new Error("INVALID_RECOVERY_AMOUNT");
+    }
+
+    // Lock wallet trước recovery để thống nhất thứ tự khóa.
+    await conn.execute(
+        `INSERT IGNORE INTO reward_wallets (user_id)
+         VALUES (?)`,
+        [userId]
+    );
+
+    const [walletRows] = await conn.execute(
+        `SELECT id, user_id, balance, status
+         FROM reward_wallets
+         WHERE user_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [userId]
+    );
+
+    if (!walletRows.length) {
+        throw new Error("WALLET_NOT_FOUND");
+    }
+
+    const wallet = walletRows[0];
+
+        if (wallet.status !== "active") {
+            throw new Error("WALLET_LOCKED");
+        }
+
+    // Tìm recovery theo commission.
+    const [recoveryRows] = await conn.execute(
+        `SELECT *
+         FROM affiliate_credit_recoveries
+         WHERE commission_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [data.commissionId]
+    );
+
+    let recovery;
+
+    if (recoveryRows.length) {
+        recovery = recoveryRows[0];
+
+        if (
+            Number(recovery.user_id) !== userId ||
+            String(recovery.order_id) !== String(data.orderId)
+        ) {
+            throw new Error("AFFILIATE_RECOVERY_CONFLICT");
+        }
+
+        const recovered = BigInt(recovery.recovered_amount);
+
+        if (amount < recovered) {
+            throw new Error("AFFILIATE_RECOVERY_AMOUNT_BELOW_RECOVERED");
+        }
+
+        const status = amount === recovered
+            ? "recovered"
+            : recovered > 0n
+                ? "partial"
+                : "pending";
+
+        await conn.execute(
+            `UPDATE affiliate_credit_recoveries
+             SET amount = ?,
+                 status = ?
+             WHERE id = ?`,
+            [
+                amount.toString(),
+                status,
+                recovery.id
+            ]
+        );
+
+        recovery.amount = amount.toString();
+        recovery.status = status;
+    } else {
+        const [insertResult] = await conn.execute(
+            `INSERT INTO affiliate_credit_recoveries (
+                user_id,
+                order_id,
+                commission_id,
+                amount,
+                recovered_amount,
+                status
+            ) VALUES (?, ?, ?, ?, 0, 'pending')`,
+            [
+                userId,
+                data.orderId,
+                data.commissionId,
+                amount.toString()
+            ]
+        );
+
+        recovery = {
+            id: insertResult.insertId,
+            user_id: userId,
+            order_id: data.orderId,
+            commission_id: data.commissionId,
+            amount: amount.toString(),
+            recovered_amount: "0",
+            status: "pending"
+        };
+    }
+
+    const recoveredBefore = BigInt(recovery.recovered_amount);
+    const remaining = amount - recoveredBefore;
+
+ if (remaining <= 0n) {
+    return {
+        recoveryId: String(recovery.id),
+        amount: amount.toString(),
+        recoveredAmount: recoveredBefore.toString(),
+        remainingAmount: remaining.toString(),
+        status: "recovered",
+        rewardTransactionId: null
+    };
+}
+    const balance = BigInt(wallet.balance);
+    const collectAmount = balance < remaining
+        ? balance
+        : remaining;
+
+    if (collectAmount <= 0n) {
+        return {
+            recoveryId: String(recovery.id),
+            amount: amount.toString(),
+            recoveredAmount: recoveredBefore.toString(),
+            remainingAmount: remaining.toString(),
+            status: recovery.status,
+            rewardTransactionId: null
+        };
+    }
+
+    const recoveredAfter = recoveredBefore + collectAmount;
+
+    const idempotencyKey =
+        `affiliate:recovery:${recovery.id}:${recoveredAfter}`;
+
+    const rewardResult = await rewardService.reverseCreditWithConnection(
+        conn,
+        {
+            userId,
+            amount: collectAmount.toString(),
+            idempotencyKey,
+            referenceType: "affiliate_credit_recovery",
+            referenceId: String(recovery.id),
+            description: "Thu hồi Credits hoa hồng Affiliate",
+            metadata: {
+                orderId: String(data.orderId),
+                commissionId: String(data.commissionId),
+                recoveryId: String(recovery.id)
+            }
+        }
+    );
+
+    const status = recoveredAfter >= amount
+        ? "recovered"
+        : "partial";
+
+    await conn.execute(
+        `UPDATE affiliate_credit_recoveries
+         SET recovered_amount = ?,
+             status = ?
+         WHERE id = ?`,
+        [
+            recoveredAfter.toString(),
+            status,
+            recovery.id
+        ]
+    );
+
+    return {
+        recoveryId: String(recovery.id),
+        amount: amount.toString(),
+        recoveredAmount: recoveredAfter.toString(),
+        remainingAmount: (amount - recoveredAfter).toString(),
+        status,
+        rewardTransactionId: rewardResult.transactionId
+    };
+}
+
+// =====================================================
 // PROCESS ORDER COMMISSION
 // =====================================================
 
@@ -244,7 +446,6 @@ async function processOrderCommission(orderId) {
 
         const order = await getOrderForCommission(conn, orderId);
 
-        // Phải xác định đúng thành viên trước khi cấp hoặc thu hồi.
         if (
             !order.click_id ||
             !order.attributed_user_id ||
@@ -253,7 +454,6 @@ async function processOrderCommission(orderId) {
             throw new Error("AFFILIATE_ORDER_NOT_ATTRIBUTED");
         }
 
-        // Chỉ hỗ trợ VND trong phiên bản hiện tại.
         if (
             String(order.currency || "").trim().toUpperCase() !== "VND"
         ) {
@@ -269,21 +469,15 @@ async function processOrderCommission(orderId) {
         let targetAmount = 0n;
 
         if (isTerminallyRejectedOrder(order)) {
-            // Đơn bị hủy hoặc hoàn trả:
-            // mục tiêu hoa hồng bằng 0.
             targetAmount = 0n;
         } else if (isConfirmedOrder(order)) {
             targetAmount = parsePayout(order.payout);
         } else {
-            // Đơn chưa được Lazada xác nhận:
-            // không cấp và không thu hồi Credits.
             throw new Error("AFFILIATE_COMMISSION_NOT_CONFIRMED");
         }
 
         const difference = targetAmount - currentTotal;
 
-        // Không có chênh lệch: không tạo event,
-        // không phát sinh giao dịch Credits.
         if (difference === 0n) {
             await conn.commit();
 
@@ -293,6 +487,16 @@ async function processOrderCommission(orderId) {
                 message: "Hoa hồng đã được xử lý",
                 totalCredits: currentTotal.toString()
             };
+        }
+
+        // Không tự động cộng lại hoa hồng nếu vẫn còn
+        // khoản thu hồi cũ chưa được xử lý xong.
+        // Tránh cấp sai Credits khi trạng thái đơn thay đổi ngược.
+        if (
+            difference > 0n &&
+            await hasOutstandingRecovery(conn, order.id)
+        ) {
+            throw new Error("AFFILIATE_RECOVERY_RECONCILIATION_REQUIRED");
         }
 
         const eventType = difference > 0n
@@ -320,18 +524,17 @@ async function processOrderCommission(orderId) {
         });
 
         if (event.duplicate) {
-            // Không tiếp tục cấp Credits nếu event đã tồn tại.
-            // Rollback để tránh xử lý không nhất quán.
             throw new Error("AFFILIATE_COMMISSION_EVENT_DUPLICATE");
         }
 
-        const referenceId = event.commissionId;
+        const commissionId = event.commissionId;
         const idempotencyKey = makeIdempotencyKey(event.eventHash);
 
-        let rewardResult;
+        let rewardTransactionId = null;
+        let recoveryResult = null;
 
         if (difference > 0n) {
-            rewardResult = await rewardService.creditWalletWithConnection(
+            const rewardResult = await rewardService.creditWalletWithConnection(
                 conn,
                 {
                     userId: order.attributed_user_id,
@@ -339,48 +542,38 @@ async function processOrderCommission(orderId) {
                     source: "affiliate",
                     idempotencyKey,
                     referenceType: "affiliate_commission",
-                    referenceId,
+                    referenceId: commissionId,
                     description: "Credits hoa hồng Affiliate",
                     metadata: {
                         orderId: String(order.id),
-                        commissionId: referenceId,
+                        commissionId,
                         eventType,
                         currency: order.currency,
                         payout: String(order.payout)
                     }
                 }
             );
-        } else {
-            if (
-                typeof rewardService.reverseCreditWithConnection !== "function"
-            ) {
-                throw new Error("REWARD_REVERSAL_SERVICE_NOT_AVAILABLE");
+
+            if (!rewardResult || !rewardResult.transactionId) {
+                throw new Error("AFFILIATE_REWARD_TRANSACTION_FAILED");
             }
 
-            rewardResult = await rewardService.reverseCreditWithConnection(
-                conn,
-                {
-                    userId: order.attributed_user_id,
-                    amount: amount.toString(),
-                    idempotencyKey,
-                    referenceType: "affiliate_commission",
-                    referenceId,
-                    description: "Thu hồi Credits hoa hồng Affiliate",
-                    metadata: {
-                        orderId: String(order.id),
-                        commissionId: referenceId,
-                        eventType,
-                        currency: order.currency,
-                        payout: String(order.payout ?? "0")
-                    }
-                }
-            );
+            rewardTransactionId = rewardResult.transactionId;
+        } else {
+            recoveryResult = await createAndCollectRecovery(conn, {
+                userId: order.attributed_user_id,
+                orderId: order.id,
+                commissionId,
+                amount
+            });
+
+            rewardTransactionId =
+                recoveryResult.rewardTransactionId || null;
         }
 
-        if (!rewardResult || !rewardResult.transactionId) {
-            throw new Error("AFFILIATE_REWARD_TRANSACTION_FAILED");
-        }
-
+        // Sự kiện commission đã được ghi nhận.
+        // Với reversal, reward_transaction_id có thể NULL
+        // nếu chưa thu hồi được Credits nào.
         await conn.execute(
             `UPDATE affiliate_commissions
              SET status = 'confirmed',
@@ -389,8 +582,8 @@ async function processOrderCommission(orderId) {
              WHERE id = ?
                AND status = 'pending'`,
             [
-                rewardResult.transactionId,
-                referenceId
+                rewardTransactionId,
+                commissionId
             ]
         );
 
@@ -399,11 +592,12 @@ async function processOrderCommission(orderId) {
         return {
             success: true,
             duplicate: false,
-            commissionId: referenceId,
-            rewardTransactionId: rewardResult.transactionId,
+            commissionId,
+            rewardTransactionId,
             eventType,
             amount: amount.toString(),
-            totalCredits: targetAmount.toString()
+            totalCredits: targetAmount.toString(),
+            recovery: recoveryResult
         };
     } catch (error) {
         await conn.rollback();
