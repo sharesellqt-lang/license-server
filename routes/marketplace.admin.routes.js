@@ -13,6 +13,8 @@ const canViewSupport = requireContributorPermission("marketplace.support.view");
 const canManageSupport = requireContributorPermission("marketplace.support.manage");
 const commissionHoldAdminService = require("../services/marketplace.commission.hold.admin.service");
 const dashboardService = require("../services/marketplace.admin.dashboard.service");
+const orderAdminService = require("../services/marketplace.admin.order.service");
+const deliveryAdminService = require("../services/marketplace.admin.delivery.service");
 
 const canManageCommissions = requireContributorPermission(
     "marketplace.commission.manage"
@@ -33,6 +35,9 @@ const canManageSellers = requireContributorPermission(
 const canReviewSellers = requireContributorPermission(
     "marketplace.seller.review"
 );
+
+const canViewOrders = requireContributorPermission("marketplace.order.view");
+const canViewDeliveries = requireContributorPermission("marketplace.delivery.view");
 
 function getAuditInfo(req) {
     return {
@@ -78,6 +83,11 @@ function handleError(res, error) {
         COMMISSION_NOT_HOLDABLE: 409,
         COMMISSION_HOLD_NOT_ADMIN_OWNED: 409,
         COMMISSION_HOLD_ALREADY_RELEASED: 409,
+        INVALID_ORDER_ID: 400,
+        ORDER_NOT_FOUND: 404,
+        INVALID_DELIVERY_ID: 400,
+        DELIVERY_NOT_FOUND: 404,
+
     };
 
     const status = errorMap[code] || (
@@ -539,4 +549,50 @@ router.post(
         }
     }
 );
+
+
+// ========================================
+// ORDERS ADMIN - READ ONLY
+// ========================================
+
+router.get("/orders", canViewOrders, async (req, res) => {
+    try {
+        const result = await orderAdminService.getOrders(req.query);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/orders/:id", canViewOrders, async (req, res) => {
+    try {
+        const result = await orderAdminService.getOrderDetail(req.params.id);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+
+// ========================================
+// DELIVERIES ADMIN - READ ONLY
+// ========================================
+
+router.get("/deliveries", canViewDeliveries, async (req, res) => {
+    try {
+        const result = await deliveryAdminService.getDeliveries(req.query);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/deliveries/:id", canViewDeliveries, async (req, res) => {
+    try {
+        const result = await deliveryAdminService.getDeliveryDetail(req.params.id);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 module.exports = router;
