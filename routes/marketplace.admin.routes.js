@@ -12,6 +12,7 @@ const supportAdminService = require("../services/marketplace.support.admin.servi
 const canViewSupport = requireContributorPermission("marketplace.support.view");
 const canManageSupport = requireContributorPermission("marketplace.support.manage");
 const commissionHoldAdminService = require("../services/marketplace.commission.hold.admin.service");
+const dashboardService = require("../services/marketplace.admin.dashboard.service");
 
 const canManageCommissions = requireContributorPermission(
     "marketplace.commission.manage"
@@ -95,6 +96,26 @@ function handleError(res, error) {
             : code
     });
 }
+
+// ========================================
+// MARKETPLACE ADMIN DASHBOARD
+// GET /api/marketplace/admin/dashboard
+// ========================================
+
+router.get("/dashboard", canViewSellers, async (req, res) => {
+    try {
+        const result = await dashboardService.getMarketplaceAdminDashboard({
+            includeFinance: req.user?.isAdmin === true
+        });
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 
 // ========================================
 // GET SELLER APPLICATIONS
