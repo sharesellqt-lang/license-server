@@ -10,6 +10,11 @@ const canViewProducts = requireContributorPermission("marketplace.product.view")
 const canCreateProduct = requireContributorPermission("marketplace.product.create");
 const canEditProduct = requireContributorPermission("marketplace.product.edit");
 const canSubmitProduct = requireContributorPermission("marketplace.product.submit");
+const productAssetService = require("../services/marketplace.product.asset.service");
+const privateFileService = require("../services/marketplace.private-file.service");
+const { upload } = require("../middleware/marketplace.product.upload");
+const supportService = require("../services/marketplace.support.service");
+const orderService = require("../services/marketplace.order.service");
 
 const router = express.Router();
 
@@ -62,7 +67,44 @@ function handleError(res, error) {
         SELLER_NOT_ACTIVE: 403,
         PRODUCT_NOT_EDITABLE: 409,
         PRODUCT_CANNOT_BE_SUBMITTED: 409,
-        PRODUCT_CANNOT_BE_ARCHIVED: 409
+        PRODUCT_CANNOT_BE_ARCHIVED: 409,
+        INVALID_PRODUCT_ID: 400,
+        PRODUCT_FILE_REQUIRED: 400,
+        INVALID_PRODUCT_FILE_ROLE: 400,
+        INVALID_PRODUCT_FILE_TYPE: 400,
+        PRODUCT_FILE_SIGNATURE_INVALID: 400,
+        INVALID_DEMO_TYPE: 400,
+        INVALID_DEMO_INFORMATION: 400,
+        INVALID_DEMO_URL: 400,
+        DEMO_FILE_TYPE_MISMATCH: 400,
+        PRODUCT_FILE_NOT_FOUND: 404,
+        PRODUCT_DEMO_NOT_FOUND: 404,
+        PRODUCT_FILE_IN_USE_BY_DEMO: 409,
+        PRODUCT_FILES_NOT_EDITABLE: 409,
+        PRODUCT_DEMOS_NOT_EDITABLE: 409,
+        PRODUCT_FILE_TOO_LARGE: 400,
+        INVALID_FILE_ID: 400,
+        PRIVATE_FILE_NOT_FOUND: 404,
+        INVALID_TICKET_CATEGORY: 400,
+        INVALID_TICKET_SUBJECT: 400,
+        INVALID_TICKET_DESCRIPTION: 400,
+        ORDER_NOT_OWNED: 403,
+        INVALID_ID: 400,
+        INVALID_BUYER: 400,
+        INVALID_ORDER_ID: 400,
+        INVALID_PRODUCT_ID: 400,
+        INVALID_ORDER_ITEMS: 400,
+        INVALID_PRODUCT_TYPE: 400,
+        INVALID_PRODUCT_PRICE: 400,
+        INVALID_ORDER_TOTAL: 400,
+        UNSUPPORTED_CURRENCY: 400,
+        DUPLICATE_ORDER_PRODUCT: 400,
+        BUYER_NOT_FOUND: 404,
+        PRODUCT_NOT_FOUND: 404,
+        ORDER_NOT_FOUND: 404,
+        PRODUCT_NOT_AVAILABLE: 409,
+        CANNOT_BUY_OWN_PRODUCT: 409
+        
     };
 
     const status = errorMap[code] || (
@@ -79,6 +121,29 @@ function handleError(res, error) {
         message: status === 500
             ? "Đã xảy ra lỗi hệ thống"
             : code
+    });
+}
+
+
+function uploadProductFile(req, res, next) {
+    upload.single("file")(req, res, error => {
+        if (!error) return next();
+
+        const code = error.code === "LIMIT_FILE_SIZE"
+            ? "PRODUCT_FILE_TOO_LARGE"
+            : error.message === "INVALID_PRODUCT_FILE_TYPE"
+                ? "INVALID_PRODUCT_FILE_TYPE"
+                : "PRODUCT_UPLOAD_FAILED";
+
+        const status = code === "PRODUCT_UPLOAD_FAILED" ? 500 : 400;
+
+        return res.status(status).json({
+            success: false,
+            code,
+            message: status === 500
+                ? "Không thể tải file lên"
+                : code
+        });
     });
 }
 
@@ -243,6 +308,399 @@ router.post("/seller/products/:id/archive", canEditProduct, async (req, res) => 
         return res.json({
             success: true,
             message: "Đã lưu trữ sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// SELLER: PRODUCT FILES
+// ========================================
+
+// Upload product file
+router.post(
+    "/seller/products/:id/files",
+    canEditProduct,
+    uploadProductFile,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.attachProductFile(
+                req.user.id,
+                req.params.id,
+                req.file,
+                req.body.fileRole,
+                getAuditInfo(req)
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "Đã tải file lên",
+                data: result
+            });
+        } catch (error) {
+            if (req.file) {
+                await productAssetService.removeFile(req.file.filename);
+            }
+
+            return handleError(res, error);
+        }
+    }
+);
+
+// List product files
+router.get(
+    "/seller/products/:id/files",
+    canViewProducts,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.getMyProductFiles(
+                req.user.id,
+                req.params.id
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Delete product file
+router.delete(
+    "/seller/products/:id/files/:fileId",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.deleteProductFile(
+                req.user.id,
+                req.params.id,
+                req.params.fileId,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã xóa file sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// ========================================
+// SELLER: PRODUCT DEMOS
+// ========================================
+
+// List product demos
+router.get(
+    "/seller/products/:id/demos",
+    canViewProducts,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.getMyProductDemos(
+                req.user.id,
+                req.params.id
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Create product demo
+router.post(
+    "/seller/products/:id/demos",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.saveProductDemo(
+                req.user.id,
+                req.params.id,
+                req.body || {},
+                null,
+                getAuditInfo(req)
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "Đã thêm demo sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Update product demo
+router.put(
+    "/seller/products/:id/demos/:demoId",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.saveProductDemo(
+                req.user.id,
+                req.params.id,
+                req.body || {},
+                req.params.demoId,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã cập nhật demo sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Delete product demo
+router.delete(
+    "/seller/products/:id/demos/:demoId",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.deleteProductDemo(
+                req.user.id,
+                req.params.id,
+                req.params.demoId,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã xóa demo sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Seller tải file thuộc sản phẩm của mình.
+router.get(
+    "/seller/products/:id/files/:fileId/download",
+    canViewProducts,
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getSellerProductFile(
+                req.user.id,
+                req.params.id,
+                req.params.fileId
+            );
+
+            await privateFileService.sendPrivateFile(res, file, {
+                download: true
+            });
+        } catch (error) {
+            if (res.headersSent) return res.destroy();
+            handleError(res, error);
+        }
+    }
+);
+
+// Buyer xem file demo của sản phẩm đã Published.
+router.get(
+    "/products/:id/demos/:demoId/file",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getPublicDemoFile(
+                req.params.id,
+                req.params.demoId
+            );
+
+            await privateFileService.sendPrivateFile(res, file, {
+                download: false
+            });
+        } catch (error) {
+            if (res.headersSent) return res.destroy();
+            handleError(res, error);
+        }
+    }
+);
+
+// Buyer tải file đã được gắn với lần giao hàng của chính mình.
+router.get(
+    "/buyer/deliveries/:deliveryId/files/:fileId/download",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getBuyerDeliveryFile(
+                req.user.id,
+                req.params.deliveryId,
+                req.params.fileId
+            );
+
+            await privateFileService.sendPrivateFile(res, file, {
+                download: true
+            });
+        } catch (error) {
+            if (res.headersSent) return res.destroy();
+            handleError(res, error);
+        }
+    }
+);
+
+// Seller tải file của sản phẩm mình sở hữu.
+router.get(
+    "/seller/products/:id/files/:fileId/download",
+    canViewProducts,
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getSellerProductFile(
+                req.user.id,
+                req.params.id,
+                req.params.fileId
+            );
+
+            await privateFileService.sendPrivateFile(res, file);
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
+
+// Buyer tải file giao hàng của đơn hàng mình đã thanh toán.
+router.get(
+    "/buyer/deliveries/:deliveryId/files/:fileId/download",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getBuyerDeliveryFile(
+                req.user.id,
+                req.params.deliveryId,
+                req.params.fileId
+            );
+
+            await privateFileService.sendPrivateFile(res, file);
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
+
+router.post(
+    "/buyer/order-items/:orderItemId/support-tickets",
+    async (req, res) => {
+        try {
+            const result = await supportService.createBuyerTicket(
+                req.user.id,
+                req.params.orderItemId,
+                {
+                    category: req.body.category,
+                    subject: req.body.subject,
+                    description: req.body.description
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "SUPPORT_TICKET_CREATED",
+                data: result
+            });
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
+
+
+// ========================================
+// MARKETPLACE: PUBLIC PRODUCT CATALOG
+// ========================================
+
+router.get("/products", async (req, res) => {
+    try {
+        const result = await orderService.getPublishedProducts(req.query);
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/products/:id", async (req, res) => {
+    try {
+        const result = await orderService.getPublishedProductDetail(
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// BUYER: CHECKOUT
+// ========================================
+
+router.post("/orders", async (req, res) => {
+    try {
+        const result = await orderService.createOrder(
+            req.user.id,
+            req.body
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Tạo đơn hàng thành công.",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// BUYER: MY ORDERS
+// ========================================
+
+router.get("/buyer/orders", async (req, res) => {
+    try {
+        const result = await orderService.getBuyerOrders(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/buyer/orders/:id", async (req, res) => {
+    try {
+        const result = await orderService.getBuyerOrderDetail(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
             data: result
         });
     } catch (error) {

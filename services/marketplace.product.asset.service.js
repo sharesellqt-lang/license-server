@@ -344,14 +344,18 @@ async function deleteProductFile(userId, productId, fileId, audit = {}) {
     }
 }
 
+
 async function saveProductDemo(userId, productId, data, demoId = null, audit = {}) {
     productId = validId(productId);
     if (demoId !== null) demoId = validId(demoId);
 
-    const type = String(data.demoType || "");
-    const allowedTypes = ["image", "video", "url", "file"];
+    const isUpdate = demoId !== null;
+    const type = String(data.demoType || "").trim();
+    const allowedDemoTypes = ["image", "video", "url", "file"];
 
-    if (!allowedTypes.includes(type)) fail("INVALID_DEMO_TYPE");
+    if (!allowedDemoTypes.includes(type)) {
+        fail("INVALID_DEMO_TYPE");
+    }
 
     const title = String(data.title || "").trim();
     const description = String(data.description || "").trim();
@@ -366,48 +370,22 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
     if (type === "url") {
         demoUrl = String(data.demoUrl || "").trim();
 
-        let parsed;
+        if (!demoUrl || demoUrl.length > 5000) {
+            fail("INVALID_DEMO_URL");
+        }
+
         try {
-            parsed = new URL(demoUrl);
-        } catch (_) {
+            const parsed = new URL(demoUrl);
+
+            if (!["http:", "https:"].includes(parsed.protocol)) {
+                fail("INVALID_DEMO_URL");
+            }
+        } catch (error) {
+            if (error.code === "INVALID_DEMO_URL") throw error;
             fail("INVALID_DEMO_URL");
         }
-
-        if (!["http:", "https:"].includes(parsed.protocol)) {
-            fail("INVALID_DEMO_URL");
-        }
-
-        if (demoUrl.length > 5000) fail("INVALID_DEMO_URL");
     } else {
         fileId = validId(data.fileId);
-
-        if (type === "image" || type === "video") {
-            const connCheck = await db.getConnection();
-            try {
-                const [files] = await connCheck.execute(
-                    `SELECT id, mime_type, file_role
-                     FROM marketplace_product_files
-                     WHERE id = ? AND product_id = ?
-                       AND is_active = 1
-                     LIMIT 1`,
-                    [fileId, productId]
-                );
-
-                if (!files.length) fail("PRODUCT_FILE_NOT_FOUND");
-
-                const mime = files[0].mime_type || "";
-
-                if (type === "image" && !mime.startsWith("image/")) {
-                    fail("DEMO_FILE_TYPE_MISMATCH");
-                }
-
-                if (type === "video" && !mime.startsWith("video/")) {
-                    fail("DEMO_FILE_TYPE_MISMATCH");
-                }
-            } finally {
-                connCheck.release();
-            }
-        }
     }
 
     let conn;
@@ -427,12 +405,53 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
             fail("PRODUCT_DEMOS_NOT_EDITABLE");
         }
 
+        // Validate and lock the referenced file in the same transaction.
+        if (fileId !== null) {
+            const [files] = await conn.execute(
+                `SELECT id, mime_type, file_role
+                 FROM marketplace_product_files
+                 WHERE id = ?
+                   AND product_id = ?
+                   AND is_active = 1
+                 LIMIT 1
+                 FOR UPDATE`,
+                [fileId, productId]
+            );
+
+            if (!files.length) {
+                fail("PRODUCT_FILE_NOT_FOUND");
+            }
+
+            const file = files[0];
+            const mime = String(file.mime_type || "").toLowerCase();
+
+            if (type === "image") {
+                if (
+                    !mime.startsWith("image/") ||
+                    file.file_role !== "preview"
+                ) {
+                    fail("DEMO_FILE_TYPE_MISMATCH");
+                }
+            } else if (type === "video") {
+                if (
+                    !mime.startsWith("video/") ||
+                    file.file_role !== "preview"
+                ) {
+                    fail("DEMO_FILE_TYPE_MISMATCH");
+                }
+            } else if (type === "file") {
+                if (!["preview", "documentation"].includes(file.file_role)) {
+                    fail("DEMO_FILE_TYPE_MISMATCH");
+                }
+            }
+        }
+
         const sortOrder = Math.max(
             0,
             Math.min(100000, Number(data.sortOrder) || 0)
         );
 
-        if (demoId) {
+        if (isUpdate) {
             const [existing] = await conn.execute(
                 `SELECT id
                  FROM marketplace_product_demos
@@ -442,7 +461,9 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
                 [demoId, productId]
             );
 
-            if (!existing.length) fail("PRODUCT_DEMO_NOT_FOUND");
+            if (!existing.length) {
+                fail("PRODUCT_DEMO_NOT_FOUND");
+            }
 
             await conn.execute(
                 `UPDATE marketplace_product_demos
@@ -467,8 +488,13 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
         } else {
             const [result] = await conn.execute(
                 `INSERT INTO marketplace_product_demos (
-                    product_id, demo_type, title, description,
-                    demo_url, file_id, sort_order
+                    product_id,
+                    demo_type,
+                    title,
+                    description,
+                    demo_url,
+                    file_id,
+                    sort_order
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     productId,
@@ -486,14 +512,17 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
 
         await writeAudit(conn, {
             actorUserId: userId,
-            action: demoId ? "marketplace.product.demo_saved" : "marketplace.product.demo_created",
+            action: isUpdate
+                ? "marketplace.product.demo_updated"
+                : "marketplace.product.demo_created",
             entityType: "marketplace_product_demo",
             entityId: String(demoId),
             newData: {
                 productId,
                 demoType: type,
                 title,
-                fileId
+                fileId,
+                sortOrder
             },
             ipAddress: audit.ipAddress || null,
             userAgent: audit.userAgent || null
@@ -517,9 +546,38 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
                 await conn.rollback();
             } catch (_) {}
         }
+
         throw error;
     } finally {
         if (conn) conn.release();
+    }
+}
+
+
+async function getMyProductDemos(userId, productId) {
+    productId = validId(productId);
+
+    const conn = await db.getConnection();
+
+    try {
+        await getSellerAndProduct(conn, userId, productId);
+
+        const [rows] = await conn.execute(
+            `SELECT d.id, d.product_id, d.demo_type, d.title,
+                    d.description, d.demo_url, d.file_id,
+                    d.sort_order, d.is_active, d.created_at,
+                    f.original_name, f.mime_type, f.file_size
+             FROM marketplace_product_demos d
+             LEFT JOIN marketplace_product_files f
+               ON f.id = d.file_id
+             WHERE d.product_id = ?
+             ORDER BY d.sort_order ASC, d.id ASC`,
+            [productId]
+        );
+
+        return rows;
+    } finally {
+        conn.release();
     }
 }
 
@@ -582,6 +640,7 @@ module.exports = {
     getMyProductFiles,
     deleteProductFile,
     saveProductDemo,
+    getMyProductDemos,
     deleteProductDemo,
     removeFile
 };

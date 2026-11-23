@@ -8,6 +8,14 @@ const sellerService = require("../services/marketplace.seller.service");
 const productService = require("../services/marketplace.product.service");
 const canViewProducts = requireContributorPermission("marketplace.product.view");
 const canModerateProducts = requireContributorPermission("marketplace.product.moderate");
+const supportAdminService = require("../services/marketplace.support.admin.service");
+const canViewSupport = requireContributorPermission("marketplace.support.view");
+const canManageSupport = requireContributorPermission("marketplace.support.manage");
+const commissionHoldAdminService = require("../services/marketplace.commission.hold.admin.service");
+
+const canManageCommissions = requireContributorPermission(
+    "marketplace.commission.manage"
+);
 
 const router = express.Router();
 
@@ -54,7 +62,21 @@ function handleError(res, error) {
         PRODUCT_ALREADY_ARCHIVED: 409,
         PRODUCT_NOT_IN_REVIEW: 409,
         PRODUCT_CANNOT_BE_SUSPENDED: 409,
-        PRODUCT_NOT_APPROVED: 409
+        PRODUCT_NOT_APPROVED: 409,
+        INVALID_ID: 400,
+        INVALID_TICKET_STATUS: 400,
+        INVALID_TICKET_RESOLUTION: 400,
+        TICKET_RESOLUTION_REQUIRED: 400,
+        SUPPORT_TICKET_NOT_FOUND: 404,
+        SUPPORT_TICKET_ALREADY_CLOSED: 409,
+        INVALID_ID: 400,
+        INVALID_COMMISSION_HOLD_REASON: 400,
+        INVALID_COMMISSION_HOLD_RELEASE_NOTE: 400,
+        COMMISSION_NOT_FOUND: 404,
+        COMMISSION_HOLD_NOT_FOUND: 404,
+        COMMISSION_NOT_HOLDABLE: 409,
+        COMMISSION_HOLD_NOT_ADMIN_OWNED: 409,
+        COMMISSION_HOLD_ALREADY_RELEASED: 409,
     };
 
     const status = errorMap[code] || (
@@ -373,4 +395,127 @@ router.post("/products/:id/publish", canModerateProducts, async (req, res) => {
     }
 });
 
+// Danh sách khiếu nại Marketplace
+router.get("/support-tickets", canViewSupport, async (req, res) => {
+    try {
+        const result = await supportAdminService.getTickets(req.query);
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Chi tiết khiếu nại
+router.get("/support-tickets/:id", canViewSupport, async (req, res) => {
+    try {
+        const result = await supportAdminService.getTicketDetail(
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Cập nhật trạng thái khiếu nại
+router.put("/support-tickets/:id/status", canManageSupport, async (req, res) => {
+    try {
+        const result = await supportAdminService.updateTicketStatus(
+            req.params.id,
+            req.user.id,
+            {
+                status: req.body?.status,
+                resolution: req.body?.resolution
+            },
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "SUPPORT_TICKET_UPDATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// COMMISSION HOLDS
+// ========================================
+
+// Danh sách các khoản hoa hồng đang hoặc đã bị giữ
+// GET /api/marketplace/admin/commission-holds
+router.get("/commission-holds", canManageCommissions, async (req, res) => {
+    try {
+        const result = await commissionHoldAdminService.getCommissionHolds(
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Tạo yêu cầu giữ hoa hồng thủ công
+// POST /api/marketplace/admin/commissions/:id/hold
+router.post("/commissions/:id/hold", canManageCommissions, async (req, res) => {
+    try {
+        const result = await commissionHoldAdminService.createAdminHold(
+            req.params.id,
+            req.user.id,
+            {
+                reason: req.body?.reason
+            },
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "COMMISSION_HOLD_CREATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Gỡ yêu cầu giữ hoa hồng do Admin tạo
+// POST /api/marketplace/admin/commission-holds/:id/release
+router.post(
+    "/commission-holds/:id/release",
+    canManageCommissions,
+    async (req, res) => {
+        try {
+            const result = await commissionHoldAdminService.releaseAdminHold(
+                req.params.id,
+                req.user.id,
+                {
+                    releaseNote: req.body?.releaseNote
+                },
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "COMMISSION_HOLD_RELEASED",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
 module.exports = router;

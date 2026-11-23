@@ -14,6 +14,7 @@ const fs = require("fs");
 const app = express();
 const projectService = require("./services/airdrop.project.service");
 const airdropRoutes = require("./routes/airdrop.routes");
+const marketplaceCommissionRelease = require("./services/marketplace.commission.release.service");
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({
@@ -205,21 +206,38 @@ const marketplacePaymentExpiration = require("./services/marketplace.payment.exp
 
 let marketplaceExpiryJobRunning = false;
 
+
 async function runMarketplacePaymentExpiration() {
   if (marketplaceExpiryJobRunning) return;
 
   marketplaceExpiryJobRunning = true;
 
   try {
-    const result = await marketplacePaymentExpiration.cancelExpiredOrders();
+    // 1. Hủy đơn hàng chưa thanh toán quá hạn.
+    try {
+      const result = await marketplacePaymentExpiration.cancelExpiredOrders();
 
-    if (result.cancelledCount > 0) {
-      console.log(
-        `[MARKETPLACE EXPIRY] Cancelled ${result.cancelledCount} expired orders`
-      );
+      if (result.cancelledCount > 0) {
+        console.log(
+          `[MARKETPLACE EXPIRY] Cancelled ${result.cancelledCount} expired orders`
+        );
+      }
+    } catch (err) {
+      console.error("MARKETPLACE EXPIRY SCHEDULER ERROR:", err);
     }
-  } catch (err) {
-    console.error("MARKETPLACE EXPIRY SCHEDULER ERROR:", err);
+
+    // 2. Giải phóng commission đã hết thời hạn bảo vệ.
+    try {
+      const result = await marketplaceCommissionRelease.releaseEligibleCommissions();
+
+      if (result.releasedCount > 0) {
+        console.log(
+          `[MARKETPLACE COMMISSION] Released ${result.releasedCount} commissions`
+        );
+      }
+    } catch (err) {
+      console.error("MARKETPLACE COMMISSION RELEASE ERROR:", err);
+    }
   } finally {
     marketplaceExpiryJobRunning = false;
   }
