@@ -24,6 +24,7 @@
     "mongoose": "^9.5.0",
     "multer": "^2.5.0",
     "mysql2": "^3.22.3",
+    "node-cron": "^4.6.0",
     "node-fetch": "^3.3.2",
     "openai": "^6.39.1",
     "socket.io": "^4.8.3"

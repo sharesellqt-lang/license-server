@@ -73,6 +73,10 @@ app.use("/api/airdrop", airdropRoutes);
 app.use("/api/rewards", require("./routes/rewards.routes"));
 app.use("/api/contributor", require("./routes/contributor.routes"));
 app.use("/api/contributor/admin",require("./routes/contributor.admin.routes"));
+app.use("/api/marketplace", require("./routes/marketplace.routes"));
+app.use("/api/marketplace/admin", require("./routes/marketplace.admin.routes"));
+app.use("/api/marketplace", require("./routes/marketplace.payment.routes"));
+app.use("/api/marketplace/admin", require("./routes/marketplace.payment.admin.routes"));
 app.use("/api/affiliate/carousels", require("./routes/affiliate.carousel.public.routes"));
 app.use("/api/affiliate", require("./routes/affiliate.routes"));
 app.use("/api/affiliate/admin", require("./routes/affiliate.admin.routes"));
@@ -196,7 +200,24 @@ if (!JWT_SECRET) {
   throw new Error("❌ JWT_SECRET missing");
 }
 
+const {
+  cancelExpiredMarketplaceOrders
+} = require("./services/marketplace.payment.expiry.service");
 
+// Run Marketplace payment expiry check every 60 seconds.
+const marketplaceExpiryTimer = setInterval(() => {
+  cancelExpiredMarketplaceOrders().catch(err => {
+    console.error("MARKETPLACE EXPIRY SCHEDULER ERROR:", err);
+  });
+}, 60 * 1000);
+
+// Run once when the server starts.
+cancelExpiredMarketplaceOrders().catch(err => {
+  console.error("MARKETPLACE EXPIRY STARTUP ERROR:", err);
+});
+
+const cron = require("node-cron");
+const marketplacePaymentExpiration = require("./services/marketplace.payment.expiration.service");
 // ✅ INIT
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
@@ -876,6 +897,7 @@ app.post("/api/log-tool", authMiddleware, async (req, res) => {
   }
 });
 
+
 // =========================
 // START SERVER
 // =========================
@@ -884,13 +906,35 @@ const http = require("http");
 const server = http.createServer(app);
 
 server.listen(PORT, "0.0.0.0", () => {
-    console.log("🚀 Server chạy port", PORT);
+  console.log("🚀 Server chạy port", PORT);
 
-    initDB().catch(error => {
-        console.error("❌ DB INIT FAILED:", error);
-    });
+  initDB().catch(error => {
+    console.error("❌ DB INIT FAILED:", error);
+  });
+
+  // Marketplace: auto-cancel expired unpaid orders every 5 minutes.
+  cron.schedule("*/5 * * * *", async () => {
+    try {
+      const result =
+        await marketplacePaymentExpiration.cancelExpiredOrders();
+
+      if (result.cancelledCount > 0) {
+        console.log(
+          `[MARKETPLACE AUTO CANCEL] Đã hủy ${result.cancelledCount} đơn quá hạn:`,
+          result.orderIds
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[MARKETPLACE AUTO CANCEL ERROR]:",
+        error.message
+      );
+    }
+  });
+
+  console.log("⏰ Marketplace payment expiration job: mỗi 5 phút");
 });
 
 server.on("error", error => {
-    console.error("❌ SERVER START ERROR:", error);
+  console.error("❌ SERVER START ERROR:", error);
 });

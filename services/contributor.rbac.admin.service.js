@@ -40,6 +40,77 @@ async function getPermissions() {
     return rows;
 }
 
+
+async function assignRoleWithConnection(
+    conn,
+    actorUserId,
+    targetUserId,
+    roleKey,
+    audit = {}
+) {
+    if (!conn || typeof conn.execute !== "function") {
+        throw new Error("INVALID_RBAC_CONNECTION");
+    }
+
+    const actorId = positiveId(actorUserId);
+    const targetId = positiveId(targetUserId);
+    const key = validKey(roleKey, "INVALID_ROLE_KEY");
+
+    const [users] = await conn.execute(
+        "SELECT id FROM users WHERE id = ? LIMIT 1 FOR UPDATE",
+        [targetId]
+    );
+
+    if (!users.length) throw new Error("TARGET_USER_NOT_FOUND");
+
+    const [roles] = await conn.execute(
+        `SELECT id, role_key, name
+         FROM contributor_roles
+         WHERE role_key = ? AND enabled = 1
+         LIMIT 1`,
+        [key]
+    );
+
+    if (!roles.length) throw new Error("ROLE_NOT_FOUND");
+
+    const role = roles[0];
+
+    const [existing] = await conn.execute(
+        `SELECT id
+         FROM contributor_user_roles
+         WHERE user_id = ? AND role_id = ?
+         LIMIT 1`,
+        [targetId, role.id]
+    );
+
+    if (existing.length) {
+        return { assigned: false, alreadyAssigned: true, role };
+    }
+
+    await conn.execute(
+        `INSERT INTO contributor_user_roles
+         (user_id, role_id, assigned_by_user_id)
+         VALUES (?, ?, ?)`,
+        [targetId, role.id, actorId]
+    );
+
+    await writeAudit(conn, {
+        ...audit,
+        actorUserId: actorId,
+        targetUserId: targetId,
+        action: "role.assigned",
+        entityType: "role",
+        entityId: role.role_key,
+        newData: {
+            roleKey: role.role_key,
+            roleName: role.name,
+            source: "marketplace_seller_activation"
+        }
+    });
+
+    return { assigned: true, role };
+}
+
 async function assignRole(actorUserId, targetUserId, roleKey, audit = {}) {
     const actorId = positiveId(actorUserId);
     const targetId = positiveId(targetUserId);
@@ -551,10 +622,11 @@ module.exports = {
     getRoles,
     getPermissions,
     assignRole,
+    assignRoleWithConnection,
     revokeRole,
     setUserPermission,
     removeUserPermission,
     getUserAccess,
     getMembers,
-    getMemberDetail
+    getMemberDetail,
 };
