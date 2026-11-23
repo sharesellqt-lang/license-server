@@ -4,6 +4,12 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const sellerService = require("../services/marketplace.seller.service");
+const productService = require("../services/marketplace.product.service");
+const requireContributorPermission = require("../middleware/requireContributorPermission");
+const canViewProducts = requireContributorPermission("marketplace.product.view");
+const canCreateProduct = requireContributorPermission("marketplace.product.create");
+const canEditProduct = requireContributorPermission("marketplace.product.edit");
+const canSubmitProduct = requireContributorPermission("marketplace.product.submit");
 
 const router = express.Router();
 
@@ -33,7 +39,30 @@ function handleError(res, error) {
         SELLER_STATUS_INVALID: 409,
         SELLER_CANNOT_ACCEPT_AGREEMENT: 409,
         SELLER_CURRENT_AGREEMENT_NOT_ACCEPTED: 409,
-        MARKETPLACE_AGREEMENT_NOT_AVAILABLE: 503
+        MARKETPLACE_AGREEMENT_NOT_AVAILABLE: 503,
+        INVALID_TITLE: 400,
+        INVALID_SHORT_DESCRIPTION: 400,
+        INVALID_DESCRIPTION: 400,
+        INVALID_VERSION: 400,
+        INVALID_REQUIREMENTS: 400,
+        INVALID_COMPATIBILITY: 400,
+        INVALID_LICENSE_TERMS: 400,
+        INVALID_DOCUMENTATION: 400,
+        INVALID_SUPPORT_POLICY: 400,
+        INVALID_UPDATE_POLICY: 400,
+        INVALID_REFUND_POLICY: 400,
+        INVALID_PRODUCT_PRICE: 400,
+        INVALID_PRODUCT_TYPE: 400,
+        INVALID_PRODUCT_CURRENCY: 400,
+        NO_PRODUCT_FIELDS_TO_UPDATE: 400,
+        PRODUCT_INFORMATION_INCOMPLETE: 400,
+        INVALID_USER_ID: 400,
+        SELLER_NOT_FOUND: 404,
+        PRODUCT_NOT_FOUND: 404,
+        SELLER_NOT_ACTIVE: 403,
+        PRODUCT_NOT_EDITABLE: 409,
+        PRODUCT_CANNOT_BE_SUBMITTED: 409,
+        PRODUCT_CANNOT_BE_ARCHIVED: 409
     };
 
     const status = errorMap[code] || (
@@ -111,6 +140,109 @@ router.post("/seller/accept-agreement", async (req, res) => {
         return res.json({
             success: true,
             message: "Đã chấp nhận thỏa thuận Marketplace",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// SELLER: PRODUCTS
+// ========================================
+
+router.get("/seller/products", canViewProducts, async (req, res) => {
+    try {
+        const result = await productService.getMyProducts(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/seller/products/:id", canViewProducts, async (req, res) => {
+    try {
+        const result = await productService.getMyProductDetail(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/seller/products", canCreateProduct, async (req, res) => {
+    try {
+        const result = await productService.createProduct(
+            req.user.id,
+            req.body || {},
+            getAuditInfo(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Đã tạo sản phẩm nháp",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.put("/seller/products/:id", canEditProduct, async (req, res) => {
+    try {
+        const result = await productService.updateProduct(
+            req.user.id,
+            req.params.id,
+            req.body || {},
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã cập nhật sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/seller/products/:id/submit", canSubmitProduct, async (req, res) => {
+    try {
+        const result = await productService.submitProduct(
+            req.user.id,
+            req.params.id,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã gửi sản phẩm để kiểm duyệt",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/seller/products/:id/archive", canEditProduct, async (req, res) => {
+    try {
+        const result = await productService.archiveProduct(
+            req.user.id,
+            req.params.id,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã lưu trữ sản phẩm",
             data: result
         });
     } catch (error) {

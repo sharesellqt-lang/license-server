@@ -200,24 +200,37 @@ if (!JWT_SECRET) {
   throw new Error("❌ JWT_SECRET missing");
 }
 
-const {
-  cancelExpiredMarketplaceOrders
-} = require("./services/marketplace.payment.expiry.service");
-
-// Run Marketplace payment expiry check every 60 seconds.
-const marketplaceExpiryTimer = setInterval(() => {
-  cancelExpiredMarketplaceOrders().catch(err => {
-    console.error("MARKETPLACE EXPIRY SCHEDULER ERROR:", err);
-  });
-}, 60 * 1000);
-
-// Run once when the server starts.
-cancelExpiredMarketplaceOrders().catch(err => {
-  console.error("MARKETPLACE EXPIRY STARTUP ERROR:", err);
-});
-
 const cron = require("node-cron");
 const marketplacePaymentExpiration = require("./services/marketplace.payment.expiration.service");
+
+let marketplaceExpiryJobRunning = false;
+
+async function runMarketplacePaymentExpiration() {
+  if (marketplaceExpiryJobRunning) return;
+
+  marketplaceExpiryJobRunning = true;
+
+  try {
+    const result = await marketplacePaymentExpiration.cancelExpiredOrders();
+
+    if (result.cancelledCount > 0) {
+      console.log(
+        `[MARKETPLACE EXPIRY] Cancelled ${result.cancelledCount} expired orders`
+      );
+    }
+  } catch (err) {
+    console.error("MARKETPLACE EXPIRY SCHEDULER ERROR:", err);
+  } finally {
+    marketplaceExpiryJobRunning = false;
+  }
+}
+
+cron.schedule("*/1 * * * *", runMarketplacePaymentExpiration, {
+  timezone: "Asia/Ho_Chi_Minh"
+});
+
+runMarketplacePaymentExpiration();
+
 // ✅ INIT
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 

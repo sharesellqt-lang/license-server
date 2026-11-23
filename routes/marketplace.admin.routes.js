@@ -5,6 +5,9 @@ const express = require("express");
 const auth = require("../middleware/auth");
 const requireContributorPermission = require("../middleware/requireContributorPermission");
 const sellerService = require("../services/marketplace.seller.service");
+const productService = require("../services/marketplace.product.service");
+const canViewProducts = requireContributorPermission("marketplace.product.view");
+const canModerateProducts = requireContributorPermission("marketplace.product.moderate");
 
 const router = express.Router();
 
@@ -41,7 +44,17 @@ function handleError(res, error) {
         SELLER_STATUS_INVALID: 409,
         SELLER_ALREADY_CLOSED: 409,
         SELLER_CURRENT_AGREEMENT_NOT_ACCEPTED: 409,
-        MARKETPLACE_AGREEMENT_NOT_AVAILABLE: 503
+        MARKETPLACE_AGREEMENT_NOT_AVAILABLE: 503,
+        INVALID_PRODUCT_ID: 400,
+        INVALID_PRODUCT_TYPE: 400,
+        INVALID_PRODUCT_DECISION: 400,
+        INVALID_REVIEW_FEEDBACK: 400,
+        INVALID_REVIEW_CHECKLIST: 400,
+        PRODUCT_NOT_FOUND: 404,
+        PRODUCT_ALREADY_ARCHIVED: 409,
+        PRODUCT_NOT_IN_REVIEW: 409,
+        PRODUCT_CANNOT_BE_SUSPENDED: 409,
+        PRODUCT_NOT_APPROVED: 409
     };
 
     const status = errorMap[code] || (
@@ -225,5 +238,139 @@ router.post(
         }
     }
 );
+
+// ========================================
+// ADMIN: PRODUCTS
+// ========================================
+
+router.get("/products", canViewProducts, async (req, res) => {
+    try {
+        const result = await productService.getAdminProducts(req.query);
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/products/:id", canViewProducts, async (req, res) => {
+    try {
+        const result = await productService.getAdminProductDetail(
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/products/:id/approve", canModerateProducts, async (req, res) => {
+    try {
+        const result = await productService.moderateProduct(
+            req.params.id,
+            req.user.id,
+            "approved",
+            req.body?.feedback,
+            req.body?.checklist,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã duyệt sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/products/:id/reject", canModerateProducts, async (req, res) => {
+    try {
+        const result = await productService.moderateProduct(
+            req.params.id,
+            req.user.id,
+            "rejected",
+            req.body?.feedback,
+            req.body?.checklist,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã từ chối sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/products/:id/request-revision", canModerateProducts, async (req, res) => {
+    try {
+        const result = await productService.moderateProduct(
+            req.params.id,
+            req.user.id,
+            "revision_required",
+            req.body?.feedback,
+            req.body?.checklist,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã yêu cầu Seller chỉnh sửa sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/products/:id/suspend", canModerateProducts, async (req, res) => {
+    try {
+        const result = await productService.moderateProduct(
+            req.params.id,
+            req.user.id,
+            "suspended",
+            req.body?.feedback,
+            req.body?.checklist,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã đình chỉ sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/products/:id/publish", canModerateProducts, async (req, res) => {
+    try {
+        const result = await productService.publishProduct(
+            req.params.id,
+            req.user.id,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "Đã xuất bản sản phẩm",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 
 module.exports = router;
