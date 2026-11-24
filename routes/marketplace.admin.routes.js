@@ -20,6 +20,9 @@ const commissionAdminService = require("../services/marketplace.commission.admin
 const canManageCommissions = requireContributorPermission(
     "marketplace.commission.manage"
 );
+const canViewCommissions = requireContributorPermission(
+    "marketplace.commission.view"
+);
 
 const router = express.Router();
 
