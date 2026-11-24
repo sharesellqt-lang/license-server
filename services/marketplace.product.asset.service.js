@@ -5,6 +5,7 @@ const db = require("../db");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { TextDecoder } = require("util");
 const { uploadDir, allowedTypes } = require("../middleware/marketplace.product.upload");
 const { writeAudit } = require("./contributor.audit.service");
 
@@ -51,6 +52,7 @@ async function removeFile(filename) {
     }
 }
 
+
 async function validateSignature(file) {
     const handle = await fs.promises.open(file.path, "r");
 
@@ -92,6 +94,37 @@ async function validateSignature(file) {
                 return data.length >= 12 &&
                     data.toString("ascii", 4, 8) === "ftyp";
 
+            case "text/plain": {
+                const decoder = new TextDecoder("utf-8", { fatal: true });
+
+                const stream = fs.createReadStream(file.path);
+
+                try {
+                    for await (const chunk of stream) {
+                        const text = decoder.decode(chunk, { stream: true });
+
+                        // Chặn byte NUL và các ký tự điều khiển không phù hợp.
+                        if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)) {
+                            return false;
+                        }
+                    }
+
+                    // Kiểm tra phần UTF-8 còn lại và phát hiện chuỗi bị lỗi.
+                    const remaining = decoder.decode();
+
+                    if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(remaining)) {
+                        return false;
+                    }
+
+                    return true;
+                } catch (error) {
+                    if (error instanceof TypeError) return false;
+                    throw error;
+                } finally {
+                    stream.destroy();
+                }
+            }
+
             default:
                 return false;
         }
@@ -99,6 +132,7 @@ async function validateSignature(file) {
         await handle.close();
     }
 }
+
 
 async function getSellerAndProduct(conn, userId, productId, lock = false) {
     const [sellers] = await conn.execute(
