@@ -23,6 +23,7 @@ function cleanText(value, max, error, required = false) {
 
     return text || null;
 }
+
 function validEmail(value) {
     if (!value) return null;
 
@@ -37,6 +38,7 @@ function validEmail(value) {
 
     return email;
 }
+
 function auditData(actorUserId, targetUserId, action, oldData, newData, audit = {}) {
     return {
         ...audit,
@@ -50,7 +52,30 @@ function auditData(actorUserId, targetUserId, action, oldData, newData, audit = 
     };
 }
 
-async function getCurrentAgreement(conn) {
+// ========================================
+// CURRENT SELLER AGREEMENT
+// ========================================
+
+// Lấy agreement hiện hành cho frontend hiển thị
+async function getCurrentAgreement() {
+    const [rows] = await db.execute(
+        `SELECT id, version, title, content, effective_at
+         FROM marketplace_agreements
+         WHERE status = 'active'
+           AND (effective_at IS NULL OR effective_at <= NOW())
+         ORDER BY effective_at DESC, id DESC
+         LIMIT 1`
+    );
+
+    if (!rows.length) {
+        throw new Error("MARKETPLACE_AGREEMENT_NOT_AVAILABLE");
+    }
+
+    return rows[0];
+}
+
+// Lấy và khóa agreement trong transaction
+async function getCurrentAgreementForUpdate(conn) {
     const [rows] = await conn.execute(
         `SELECT id, version, title, content, effective_at
          FROM marketplace_agreements
@@ -92,6 +117,11 @@ async function registerSeller(userId, data = {}, audit = {}) {
         throw new Error("SELLER_AGREEMENT_REQUIRED");
     }
 
+    const agreementId = positiveId(
+        data.agreementId,
+        "INVALID_AGREEMENT_ID"
+    );
+
     const displayName = cleanText(
         data.displayName,
         150,
@@ -125,17 +155,24 @@ async function registerSeller(userId, data = {}, audit = {}) {
         await conn.beginTransaction();
 
         const [users] = await conn.execute(
-            "SELECT id FROM users WHERE id = ? LIMIT 1 FOR UPDATE",
+            `SELECT id
+             FROM users
+             WHERE id = ?
+             LIMIT 1
+             FOR UPDATE`,
             [uid]
         );
 
-        if (!users.length) throw new Error("TARGET_USER_NOT_FOUND");
+        if (!users.length) {
+            throw new Error("TARGET_USER_NOT_FOUND");
+        }
 
         const [existing] = await conn.execute(
             `SELECT id, status
              FROM marketplace_sellers
              WHERE user_id = ?
-             LIMIT 1`,
+             LIMIT 1
+             FOR UPDATE`,
             [uid]
         );
 
@@ -143,7 +180,12 @@ async function registerSeller(userId, data = {}, audit = {}) {
             throw new Error("SELLER_ALREADY_EXISTS");
         }
 
-        const agreement = await getCurrentAgreement(conn);
+        // Kiểm tra agreement người dùng đã xem có còn hiện hành không
+        const agreement = await getCurrentAgreementForUpdate(conn);
+
+        if (Number(agreement.id) !== agreementId) {
+            throw new Error("SELLER_AGREEMENT_CHANGED");
+        }
 
         const [result] = await conn.execute(
             `INSERT INTO marketplace_sellers (
@@ -167,6 +209,7 @@ async function registerSeller(userId, data = {}, audit = {}) {
 
         const sellerId = result.insertId;
 
+        // Ghi nhận phiên bản agreement mà Seller đã chấp nhận
         await conn.execute(
             `INSERT INTO marketplace_seller_agreements (
                 seller_id,
@@ -185,20 +228,23 @@ async function registerSeller(userId, data = {}, audit = {}) {
             ]
         );
 
-        await writeAudit(conn, auditData(
-            uid,
-            uid,
-            "marketplace.seller.registered",
-            null,
-            {
-                sellerId,
-                displayName,
-                status: "pending",
-                agreementId: agreement.id,
-                agreementVersion: agreement.version
-            },
-            audit
-        ));
+        await writeAudit(
+            conn,
+            auditData(
+                uid,
+                uid,
+                "marketplace.seller.registered",
+                null,
+                {
+                    sellerId,
+                    displayName,
+                    status: "pending",
+                    agreementId: agreement.id,
+                    agreementVersion: agreement.version
+                },
+                audit
+            )
+        );
 
         await conn.commit();
 
@@ -239,7 +285,9 @@ async function acceptCurrentAgreement(userId, audit = {}) {
             [uid]
         );
 
-        if (!sellers.length) throw new Error("SELLER_NOT_FOUND");
+        if (!sellers.length) {
+            throw new Error("SELLER_NOT_FOUND");
+        }
 
         const seller = sellers[0];
 
@@ -247,7 +295,7 @@ async function acceptCurrentAgreement(userId, audit = {}) {
             throw new Error("SELLER_CANNOT_ACCEPT_AGREEMENT");
         }
 
-        const agreement = await getCurrentAgreement(conn);
+        const agreement = await getCurrentAgreementForUpdate(conn);
 
         const accepted = await hasAcceptedAgreement(
             conn,
@@ -274,18 +322,21 @@ async function acceptCurrentAgreement(userId, audit = {}) {
                 ]
             );
 
-            await writeAudit(conn, auditData(
-                uid,
-                uid,
-                "marketplace.seller.agreement_accepted",
-                null,
-                {
-                    sellerId: seller.id,
-                    agreementId: agreement.id,
-                    agreementVersion: agreement.version
-                },
-                audit
-            ));
+            await writeAudit(
+                conn,
+                auditData(
+                    uid,
+                    uid,
+                    "marketplace.seller.agreement_accepted",
+                    null,
+                    {
+                        sellerId: seller.id,
+                        agreementId: agreement.id,
+                        agreementVersion: agreement.version
+                    },
+                    audit
+                )
+            );
         }
 
         await conn.commit();
@@ -351,7 +402,9 @@ async function getSellerDetail(sellerId) {
         [id]
     );
 
-    if (!rows.length) throw new Error("SELLER_NOT_FOUND");
+    if (!rows.length) {
+        throw new Error("SELLER_NOT_FOUND");
+    }
 
     const [agreements] = await db.execute(
         `SELECT
@@ -464,7 +517,6 @@ async function getSellerApplications(params = {}) {
 // ADMIN: ACTIVATE SELLER
 // ========================================
 
-
 async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
     const id = positiveId(sellerId, "INVALID_SELLER_ID");
     const actorId = positiveId(actorUserId);
@@ -480,7 +532,7 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
     try {
         await conn.beginTransaction();
 
-        // 1. Lấy user_id của Seller (chưa khóa Seller)
+        // 1. Lấy user_id của Seller
         const [sellerRefs] = await conn.execute(
             `SELECT user_id
              FROM marketplace_sellers
@@ -509,7 +561,7 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
             throw new Error("TARGET_USER_NOT_FOUND");
         }
 
-        // 3. Sau đó mới khóa Seller
+        // 3. Khóa Seller
         const [rows] = await conn.execute(
             `SELECT *
              FROM marketplace_sellers
@@ -525,7 +577,6 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
 
         const seller = rows[0];
 
-        // Đảm bảo liên kết Seller - User không thay đổi
         if (Number(seller.user_id) !== Number(targetUserId)) {
             throw new Error("SELLER_USER_MISMATCH");
         }
@@ -535,11 +586,7 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
         }
 
         // 4. Kiểm tra Seller đã chấp nhận agreement hiện hành
-        const agreement = await getCurrentAgreement(conn);
-
-        if (!agreement) {
-            throw new Error("MARKETPLACE_AGREEMENT_NOT_AVAILABLE");
-        }
+        const agreement = await getCurrentAgreementForUpdate(conn);
 
         const accepted = await hasAcceptedAgreement(
             conn,
@@ -572,22 +619,25 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
         );
 
         // 7. Ghi audit
-        await writeAudit(conn, auditData(
-            actorId,
-            seller.user_id,
-            "marketplace.seller.activated",
-            {
-                status: seller.status,
-                reviewNote: seller.review_note
-            },
-            {
-                status: "active",
-                reviewNote,
-                agreementId: agreement.id,
-                agreementVersion: agreement.version
-            },
-            audit
-        ));
+        await writeAudit(
+            conn,
+            auditData(
+                actorId,
+                seller.user_id,
+                "marketplace.seller.activated",
+                {
+                    status: seller.status,
+                    reviewNote: seller.review_note
+                },
+                {
+                    status: "active",
+                    reviewNote,
+                    agreementId: agreement.id,
+                    agreementVersion: agreement.version
+                },
+                audit
+            )
+        );
 
         await conn.commit();
 
@@ -665,7 +715,9 @@ async function closeSeller(sellerId, actorUserId, reason, audit = {}) {
             [id]
         );
 
-        if (!rows.length) throw new Error("SELLER_NOT_FOUND");
+        if (!rows.length) {
+            throw new Error("SELLER_NOT_FOUND");
+        }
 
         const seller = rows[0];
 
@@ -683,20 +735,23 @@ async function closeSeller(sellerId, actorUserId, reason, audit = {}) {
             [actorId, reviewNote, id]
         );
 
-        await writeAudit(conn, auditData(
-            actorId,
-            seller.user_id,
-            "marketplace.seller.closed",
-            {
-                status: seller.status,
-                reviewNote: seller.review_note
-            },
-            {
-                status: "closed",
-                reviewNote
-            },
-            audit
-        ));
+        await writeAudit(
+            conn,
+            auditData(
+                actorId,
+                seller.user_id,
+                "marketplace.seller.closed",
+                {
+                    status: seller.status,
+                    reviewNote: seller.review_note
+                },
+                {
+                    status: "closed",
+                    reviewNote
+                },
+                audit
+            )
+        );
 
         await conn.commit();
 
@@ -749,7 +804,9 @@ async function changeSellerStatus(
             [id]
         );
 
-        if (!rows.length) throw new Error("SELLER_NOT_FOUND");
+        if (!rows.length) {
+            throw new Error("SELLER_NOT_FOUND");
+        }
 
         const seller = rows[0];
 
@@ -767,20 +824,23 @@ async function changeSellerStatus(
             [newStatus, actorId, reviewNote, id]
         );
 
-        await writeAudit(conn, auditData(
-            actorId,
-            seller.user_id,
-            action,
-            {
-                status: seller.status,
-                reviewNote: seller.review_note
-            },
-            {
-                status: newStatus,
-                reviewNote
-            },
-            audit
-        ));
+        await writeAudit(
+            conn,
+            auditData(
+                actorId,
+                seller.user_id,
+                action,
+                {
+                    status: seller.status,
+                    reviewNote: seller.review_note
+                },
+                {
+                    status: newStatus,
+                    reviewNote
+                },
+                audit
+            )
+        );
 
         await conn.commit();
 
@@ -797,6 +857,7 @@ async function changeSellerStatus(
 }
 
 module.exports = {
+    getCurrentAgreement,
     registerSeller,
     acceptCurrentAgreement,
     getMySellerProfile,

@@ -160,6 +160,8 @@ function handleError(res, error) {
         PAYOUT_REQUEST_DUPLICATE: 409,
         PAYOUT_SUPPORT_TICKET_ACTIVE: 409,
         PAYOUT_COMMISSION_ALREADY_REQUESTED: 409,
+        INVALID_AGREEMENT_ID: 400,
+        SELLER_AGREEMENT_CHANGED: 409,
         
     };
 
@@ -226,6 +228,18 @@ router.post("/seller/register", async (req, res) => {
     }
 });
 
+router.get("/seller/agreement/current", async (req, res) => {
+    try {
+        const result = await sellerService.getCurrentAgreement();
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 // ========================================
 // SELLER: MY PROFILE
 // GET /api/marketplace/seller/me
