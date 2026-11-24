@@ -26,6 +26,9 @@ const canManageSellers = requireContributorPermission("marketplace.seller.manage
 const canReviewSellers = requireContributorPermission("marketplace.seller.review");
 const canViewOrders = requireContributorPermission("marketplace.order.view");
 const canViewDeliveries = requireContributorPermission("marketplace.delivery.view");
+const settingsAdminService = require("../services/marketplace.settings.admin.service");
+const canViewSettings = requireContributorPermission("marketplace.settings.view");
+const canManageSettings = requireContributorPermission("marketplace.settings.manage");
 
 const router = express.Router();
 
@@ -89,6 +92,14 @@ function handleError(res, error) {
         SUPPORT_TICKET_NOT_FOUND: 404,
         COMMISSION_NOT_FOUND: 404,
         COMMISSION_HOLD_NOT_FOUND: 404,
+        INVALID_ADMIN_USER_ID: 400,
+        INVALID_SETTINGS_PAYLOAD: 400,
+        EMPTY_SETTINGS_PAYLOAD: 400,
+        INVALID_SETTING_VALUE: 400,
+        INVALID_PAYMENT_VERIFICATION_MODE: 400,
+        MARKETPLACE_SETTING_NOT_ALLOWED: 400,
+        MARKETPLACE_SETTING_NOT_FOUND: 404,
+        COMMISSION_RATES_MUST_EQUAL_100: 400,
 
         ER_DUP_ENTRY: 409
     };
@@ -610,6 +621,36 @@ router.get("/deliveries/:id", canViewDeliveries, async (req, res) => {
     }
 });
 
+// ========================================
+// MARKETPLACE SETTINGS
+// ========================================
+
+router.get("/settings", canViewSettings, async (req, res) => {
+    try {
+        const result = await settingsAdminService.getSettings();
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.put("/settings", canManageSettings, async (req, res) => {
+    try {
+        const result = await settingsAdminService.updateSettings(
+            req.user.id,
+            req.body,
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "MARKETPLACE_SETTINGS_UPDATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 // ========================================
 // PAYOUTS ADMIN
 // ========================================
