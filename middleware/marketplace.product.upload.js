@@ -20,7 +20,8 @@ const allowedTypes = {
     "application/pdf": ".pdf",
     "application/zip": ".zip",
     "application/x-zip-compressed": ".zip",
-    "video/mp4": ".mp4"
+    "video/mp4": ".mp4",
+    "text/plain": ".txt"
 };
 
 const storage = multer.diskStorage({
