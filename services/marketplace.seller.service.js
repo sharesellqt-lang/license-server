@@ -52,12 +52,50 @@ function auditData(actorUserId, targetUserId, action, oldData, newData, audit = 
     };
 }
 
+async function rollbackSafely(conn) {
+    try {
+        await conn.rollback();
+    } catch (error) {
+        console.error("[MARKETPLACE SELLER] Rollback failed:", error);
+    }
+}
+
+async function createExistingSellerError(userId, fallbackError = null) {
+    const error = new Error("SELLER_ALREADY_EXISTS");
+    error.code = "SELLER_ALREADY_EXISTS";
+
+    try {
+        const [rows] = await db.execute(
+            `SELECT id, status
+             FROM marketplace_sellers
+             WHERE user_id = ?
+             LIMIT 1`,
+            [userId]
+        );
+
+        if (rows.length) {
+            error.sellerId = rows[0].id;
+            error.sellerStatus = rows[0].status;
+            return error;
+        }
+    } catch (lookupError) {
+        console.error(
+            "[MARKETPLACE SELLER] Existing seller lookup failed:",
+            lookupError
+        );
+    }
+
+    if (fallbackError) error.originalError = fallbackError;
+
+    return error;
+}
 // ========================================
 // CURRENT SELLER AGREEMENT
 // ========================================
 
 // Lấy agreement hiện hành cho frontend hiển thị
-async function getCurrentAgreement() {
+
+async function getCurrentAgreement(userId = null) {
     const [rows] = await db.execute(
         `SELECT id, version, title, content, effective_at
          FROM marketplace_agreements
@@ -71,8 +109,64 @@ async function getCurrentAgreement() {
         throw new Error("MARKETPLACE_AGREEMENT_NOT_AVAILABLE");
     }
 
-    return rows[0];
+    const agreement = rows[0];
+
+    // Tương thích với những nơi gọi không truyền userId.
+    if (userId === null || userId === undefined) {
+        return agreement;
+    }
+
+    const uid = positiveId(userId);
+
+    const [sellers] = await db.execute(
+        `SELECT id, status
+         FROM marketplace_sellers
+         WHERE user_id = ?
+         LIMIT 1`,
+        [uid]
+    );
+
+    if (!sellers.length) {
+        return {
+            ...agreement,
+            acceptance: null
+        };
+    }
+
+    const seller = sellers[0];
+
+    const [acceptedRows] = await db.execute(
+        `SELECT
+            sa.accepted_at,
+            a.version
+         FROM marketplace_seller_agreements sa
+         INNER JOIN marketplace_agreements a
+            ON a.id = sa.agreement_id
+         WHERE sa.seller_id = ?
+           AND sa.agreement_id = ?
+         LIMIT 1`,
+        [seller.id, agreement.id]
+    );
+
+    const accepted = acceptedRows.length > 0;
+
+    return {
+        ...agreement,
+        seller: {
+            status: seller.status
+        },
+        acceptance: {
+            accepted,
+            acceptedAt: accepted
+                ? acceptedRows[0].accepted_at
+                : null,
+            acceptedVersion: accepted
+                ? acceptedRows[0].version
+                : null
+        }
+    };
 }
+
 
 // Lấy và khóa agreement trong transaction
 async function getCurrentAgreementForUpdate(conn) {
@@ -112,6 +206,10 @@ async function hasAcceptedAgreement(conn, sellerId, agreementId) {
 
 async function registerSeller(userId, data = {}, audit = {}) {
     const uid = positiveId(userId);
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("INVALID_SELLER_DATA");
+    }
 
     if (data.acceptedTerms !== true) {
         throw new Error("SELLER_AGREEMENT_REQUIRED");
@@ -154,6 +252,7 @@ async function registerSeller(userId, data = {}, audit = {}) {
     try {
         await conn.beginTransaction();
 
+        // 1. Khóa User để tuần tự hóa đăng ký cùng tài khoản.
         const [users] = await conn.execute(
             `SELECT id
              FROM users
@@ -167,6 +266,7 @@ async function registerSeller(userId, data = {}, audit = {}) {
             throw new Error("TARGET_USER_NOT_FOUND");
         }
 
+        // 2. Kiểm tra Seller hiện có.
         const [existing] = await conn.execute(
             `SELECT id, status
              FROM marketplace_sellers
@@ -177,16 +277,21 @@ async function registerSeller(userId, data = {}, audit = {}) {
         );
 
         if (existing.length) {
-            throw new Error("SELLER_ALREADY_EXISTS");
+            const error = new Error("SELLER_ALREADY_EXISTS");
+            error.code = "SELLER_ALREADY_EXISTS";
+            error.sellerId = existing[0].id;
+            error.sellerStatus = existing[0].status;
+            throw error;
         }
 
-        // Kiểm tra agreement người dùng đã xem có còn hiện hành không
+        // 3. Xác minh Agreement hiện hành.
         const agreement = await getCurrentAgreementForUpdate(conn);
 
         if (Number(agreement.id) !== agreementId) {
             throw new Error("SELLER_AGREEMENT_CHANGED");
         }
 
+        // 4. Tạo Seller ở trạng thái pending.
         const [result] = await conn.execute(
             `INSERT INTO marketplace_sellers (
                 user_id,
@@ -209,7 +314,7 @@ async function registerSeller(userId, data = {}, audit = {}) {
 
         const sellerId = result.insertId;
 
-        // Ghi nhận phiên bản agreement mà Seller đã chấp nhận
+        // 5. Ghi nhận phiên bản Agreement đã chấp thuận.
         await conn.execute(
             `INSERT INTO marketplace_seller_agreements (
                 seller_id,
@@ -228,6 +333,7 @@ async function registerSeller(userId, data = {}, audit = {}) {
             ]
         );
 
+        // 6. Ghi Audit Log cùng transaction.
         await writeAudit(
             conn,
             auditData(
@@ -258,7 +364,16 @@ async function registerSeller(userId, data = {}, audit = {}) {
             }
         };
     } catch (error) {
-        await conn.rollback();
+        await rollbackSafely(conn);
+
+        // Xử lý cả trường hợp bị trùng UNIQUE user_id.
+        if (
+            error.code === "ER_DUP_ENTRY" ||
+            error.errno === 1062
+        ) {
+            throw await createExistingSellerError(uid, error);
+        }
+
         throw error;
     } finally {
         conn.release();
@@ -351,8 +466,8 @@ async function acceptCurrentAgreement(userId, audit = {}) {
             }
         };
     } catch (error) {
-        await conn.rollback();
-        throw error;
+    await rollbackSafely(conn);
+    throw error;
     } finally {
         conn.release();
     }
@@ -646,8 +761,8 @@ async function activateSeller(sellerId, actorUserId, note = null, audit = {}) {
             userId: seller.user_id,
             status: "active"
         };
-    } catch (error) {
-        await conn.rollback();
+   } catch (error) {
+        await rollbackSafely(conn);
         throw error;
     } finally {
         conn.release();
@@ -759,14 +874,97 @@ async function closeSeller(sellerId, actorUserId, reason, audit = {}) {
             sellerId: id,
             status: "closed"
         };
-    } catch (error) {
-        await conn.rollback();
+   } catch (error) {
+        await rollbackSafely(conn);
         throw error;
     } finally {
         conn.release();
     }
 }
 
+// ========================================
+// ADMIN: REOPEN SELLER
+// ========================================
+
+async function reopenSeller(sellerId, actorUserId, reason, audit = {}) {
+    const id = positiveId(sellerId, "INVALID_SELLER_ID");
+    const actorId = positiveId(actorUserId);
+
+    const reviewNote = cleanText(
+        reason,
+        10000,
+        "INVALID_REVIEW_NOTE",
+        true
+    );
+
+    const conn = await db.getConnection();
+
+    try {
+        await conn.beginTransaction();
+
+        const [rows] = await conn.execute(
+            `SELECT *
+             FROM marketplace_sellers
+             WHERE id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [id]
+        );
+
+        if (!rows.length) {
+            throw new Error("SELLER_NOT_FOUND");
+        }
+
+        const seller = rows[0];
+
+        if (!["rejected", "closed"].includes(seller.status)) {
+            throw new Error("SELLER_REOPEN_STATUS_INVALID");
+        }
+
+        await conn.execute(
+            `UPDATE marketplace_sellers
+             SET status = 'pending',
+                 reviewed_by = ?,
+                 reviewed_at = NOW(),
+                 review_note = ?
+             WHERE id = ?`,
+            [actorId, reviewNote, id]
+        );
+
+        await writeAudit(
+            conn,
+            auditData(
+                actorId,
+                seller.user_id,
+                "marketplace.seller.reopened",
+                {
+                    status: seller.status,
+                    reviewNote: seller.review_note
+                },
+                {
+                    status: "pending",
+                    reviewNote,
+                    reopenedFrom: seller.status
+                },
+                audit
+            )
+        );
+
+        await conn.commit();
+
+        return {
+            sellerId: id,
+            userId: seller.user_id,
+            previousStatus: seller.status,
+            status: "pending"
+        };
+   } catch (error) {
+    await rollbackSafely(conn);
+    throw error;
+    } finally {
+        conn.release();
+    }
+}
 // ========================================
 // SHARED STATUS TRANSITION
 // ========================================
@@ -848,9 +1046,9 @@ async function changeSellerStatus(
             sellerId: id,
             status: newStatus
         };
-    } catch (error) {
-        await conn.rollback();
-        throw error;
+   } catch (error) {
+    await rollbackSafely(conn);
+    throw error;
     } finally {
         conn.release();
     }
@@ -866,5 +1064,6 @@ module.exports = {
     activateSeller,
     rejectSeller,
     suspendSeller,
-    closeSeller
+    closeSeller,
+    reopenSeller
 };

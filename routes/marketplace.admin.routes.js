@@ -100,6 +100,8 @@ function handleError(res, error) {
         MARKETPLACE_SETTING_NOT_ALLOWED: 400,
         MARKETPLACE_SETTING_NOT_FOUND: 404,
         COMMISSION_RATES_MUST_EQUAL_100: 400,
+        INVALID_REVIEW_NOTE: 400,
+        SELLER_REOPEN_STATUS_INVALID: 409,
 
         ER_DUP_ENTRY: 409
     };
@@ -284,6 +286,35 @@ router.post("/sellers/:id/close", canManageSellers, async (req, res) => {
     }
 });
 
+// ========================================
+// REOPEN SELLER
+// POST /api/marketplace/admin/sellers/:id/reopen
+// Chỉ Admin có quyền quản lý và duyệt Seller mới được mở lại
+// ========================================
+
+router.post(
+    "/sellers/:id/reopen",
+    canManageSellers,
+    canReviewSellers,
+    async (req, res) => {
+        try {
+            const result = await sellerService.reopenSeller(
+                req.params.id,
+                req.user.id,
+                req.body?.reason,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã mở lại hồ sơ Seller để xét duyệt",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
 // ========================================
 // ADMIN: PRODUCTS
 // ========================================

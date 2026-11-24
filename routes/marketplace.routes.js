@@ -30,8 +30,24 @@ function getAuditInfo(req) {
     };
 }
 
+function getSellerRegistrationErrorCode(status) {
+    const codes = {
+        pending: "SELLER_APPLICATION_PENDING",
+        active: "SELLER_ALREADY_ACTIVE",
+        rejected: "SELLER_APPLICATION_REJECTED",
+        suspended: "SELLER_ACCOUNT_SUSPENDED",
+        closed: "SELLER_ACCOUNT_CLOSED"
+    };
+
+    return codes[status] || "SELLER_ALREADY_EXISTS";
+}
+
 function handleError(res, error) {
-    const code = error.message || "MARKETPLACE_OPERATION_FAILED";
+    let code = error.message || "MARKETPLACE_OPERATION_FAILED";
+
+    if (code === "SELLER_ALREADY_EXISTS" && error.sellerStatus) {
+        code = getSellerRegistrationErrorCode(error.sellerStatus);
+    }
 
     const errorMap = {
         INVALID_USER_ID: 400,
@@ -162,6 +178,35 @@ function handleError(res, error) {
         PAYOUT_COMMISSION_ALREADY_REQUESTED: 409,
         INVALID_AGREEMENT_ID: 400,
         SELLER_AGREEMENT_CHANGED: 409,
+        INVALID_AGREEMENT_ID: 400,
+        SELLER_AGREEMENT_CHANGED: 409,
+        SELLER_AGREEMENT_REQUIRED: 400,
+        INVALID_SELLER_DATA: 400,
+        INVALID_AGREEMENT_ID: 400,
+        SELLER_AGREEMENT_CHANGED: 409,
+        SELLER_AGREEMENT_REQUIRED: 400,
+
+        SELLER_ALREADY_EXISTS: 409,
+        SELLER_APPLICATION_PENDING: 409,
+        SELLER_ALREADY_ACTIVE: 409,
+        SELLER_APPLICATION_REJECTED: 409,
+        SELLER_ACCOUNT_SUSPENDED: 409,
+        SELLER_ACCOUNT_CLOSED: 409,
+        INVALID_SELLER_DATA: 400,
+        INVALID_AGREEMENT_ID: 400,
+        SELLER_AGREEMENT_CHANGED: 409,
+        SELLER_AGREEMENT_REQUIRED: 400,
+        SELLER_ALREADY_EXISTS: 409,
+        SELLER_APPLICATION_PENDING: 409,
+        SELLER_ALREADY_ACTIVE: 409,
+        SELLER_APPLICATION_REJECTED: 409,
+        SELLER_ACCOUNT_SUSPENDED: 409,
+        SELLER_ACCOUNT_CLOSED: 409,
+        INVALID_SELLER_ID: 400,
+        INVALID_REVIEW_NOTE: 400,
+        SELLER_REOPEN_STATUS_INVALID: 409,
+        SELLER_STATUS_INVALID: 409,
+        SELLER_NOT_FOUND: 404,
         
     };
 
@@ -224,13 +269,33 @@ router.post("/seller/register", async (req, res) => {
             data: result
         });
     } catch (error) {
+        // Bổ sung trạng thái nếu lỗi duplicate key không mang theo status.
+        if (
+            error.message === "SELLER_ALREADY_EXISTS" &&
+            !error.sellerStatus
+        ) {
+            try {
+                const profile = await sellerService.getMySellerProfile(
+                    req.user.id
+                );
+
+                error.sellerStatus = profile?.status || null;
+            } catch (lookupError) {
+                console.error(
+                    "[SELLER REGISTER] Lookup existing Seller:",
+                    lookupError
+                );
+            }
+        }
+
         return handleError(res, error);
     }
 });
 
+
 router.get("/seller/agreement/current", async (req, res) => {
     try {
-        const result = await sellerService.getCurrentAgreement();
+        const result = await sellerService.getCurrentAgreement(req.user.id);
 
         return res.json({
             success: true,
@@ -240,6 +305,7 @@ router.get("/seller/agreement/current", async (req, res) => {
         return handleError(res, error);
     }
 });
+
 // ========================================
 // SELLER: MY PROFILE
 // GET /api/marketplace/seller/me
