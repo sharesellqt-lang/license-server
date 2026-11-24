@@ -20,6 +20,7 @@ const canModerateProducts = requireContributorPermission("marketplace.product.mo
 const canViewSupport = requireContributorPermission("marketplace.support.view");
 const canManageSupport = requireContributorPermission("marketplace.support.manage");
 const canManageCommissions = requireContributorPermission("marketplace.commission.manage");
+const canViewCommissions = requireContributorPermission("marketplace.commission.view");
 const canViewSellers = requireContributorPermission("marketplace.seller.view");
 const canManageSellers = requireContributorPermission("marketplace.seller.manage");
 const canReviewSellers = requireContributorPermission("marketplace.seller.review");
@@ -472,6 +473,34 @@ router.get("/commission-holds", canManageCommissions, async (req, res) => {
         });
     } catch (error) {
         return handleError(res, error);
+    }
+});
+
+
+router.get("/commissions/statistics", canViewCommissions, async (req, res, next) => {
+    try {
+        const result = await commissionHoldAdminService.getCommissionStatistics(req.query);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return next(error);
+    }
+});
+
+router.get("/commissions", canViewCommissions, async (req, res, next) => {
+    try {
+        const result = await commissionHoldAdminService.getCommissions(req.query);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return next(error);
+    }
+});
+
+router.get("/commissions/:id", canViewCommissions, async (req, res, next) => {
+    try {
+        const result = await commissionHoldAdminService.getCommissionDetail(req.params.id);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return next(error);
     }
 });
 
