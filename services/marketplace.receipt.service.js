@@ -24,7 +24,7 @@ async function sendReceiptFile(res, storageKey) {
 
     if (
         filename !== storageKey ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i.test(filename)
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i.test(filename)
     ) {
         return res.status(404).json({
             success: false,

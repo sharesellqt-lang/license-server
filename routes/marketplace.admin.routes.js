@@ -4,44 +4,31 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const requireContributorPermission = require("../middleware/requireContributorPermission");
+
 const sellerService = require("../services/marketplace.seller.service");
 const productService = require("../services/marketplace.product.service");
-const canViewProducts = requireContributorPermission("marketplace.product.view");
-const canModerateProducts = requireContributorPermission("marketplace.product.moderate");
 const supportAdminService = require("../services/marketplace.support.admin.service");
-const canViewSupport = requireContributorPermission("marketplace.support.view");
-const canManageSupport = requireContributorPermission("marketplace.support.manage");
 const commissionHoldAdminService = require("../services/marketplace.commission.hold.admin.service");
 const dashboardService = require("../services/marketplace.admin.dashboard.service");
 const orderAdminService = require("../services/marketplace.admin.order.service");
 const deliveryAdminService = require("../services/marketplace.admin.delivery.service");
-const commissionAdminService = require("../services/marketplace.commission.admin.service");
 
-const canManageCommissions = requireContributorPermission(
-    "marketplace.commission.manage"
-);
-const canViewCommissions = requireContributorPermission(
-    "marketplace.commission.view"
-);
+const payoutAdminRoutes = require("./marketplace.payout.admin.routes");
+
+const canViewProducts = requireContributorPermission("marketplace.product.view");
+const canModerateProducts = requireContributorPermission("marketplace.product.moderate");
+const canViewSupport = requireContributorPermission("marketplace.support.view");
+const canManageSupport = requireContributorPermission("marketplace.support.manage");
+const canManageCommissions = requireContributorPermission("marketplace.commission.manage");
+const canViewSellers = requireContributorPermission("marketplace.seller.view");
+const canManageSellers = requireContributorPermission("marketplace.seller.manage");
+const canReviewSellers = requireContributorPermission("marketplace.seller.review");
+const canViewOrders = requireContributorPermission("marketplace.order.view");
+const canViewDeliveries = requireContributorPermission("marketplace.delivery.view");
 
 const router = express.Router();
 
 router.use(auth);
-
-const canViewSellers = requireContributorPermission(
-    "marketplace.seller.view"
-);
-
-const canManageSellers = requireContributorPermission(
-    "marketplace.seller.manage"
-);
-
-const canReviewSellers = requireContributorPermission(
-    "marketplace.seller.review"
-);
-
-const canViewOrders = requireContributorPermission("marketplace.order.view");
-const canViewDeliveries = requireContributorPermission("marketplace.delivery.view");
 
 function getAuditInfo(req) {
     return {
@@ -51,41 +38,64 @@ function getAuditInfo(req) {
 }
 
 function handleError(res, error) {
-    const code = error.message || "MARKETPLACE_PAYOUT_ADMIN_OPERATION_FAILED";
+    const code = error?.code || error?.message || "MARKETPLACE_ADMIN_OPERATION_FAILED";
 
     const errorMap = {
         INVALID_PAYOUT_ID: 400,
         INVALID_USER_ID: 400,
+        INVALID_ADMIN_USER_ID: 400,
+        INVALID_SELLER_ID: 400,
         INVALID_PAYOUT_STATUS: 400,
-        PAYOUT_REQUEST_NOT_FOUND: 404,
-        PAYOUT_NOT_FOUND: 404,
-        PAYOUT_STATUS_INVALID: 409,
-        PAYOUT_STATUS_CHANGED: 409,
-        PAYOUT_ALREADY_PROCESSED: 409,
-        PAYOUT_COMMISSION_STATE_CHANGED: 409,
-        PAYOUT_COMMISSION_NOT_FOUND: 404,
-        PAYOUT_COMMISSION_NOT_ELIGIBLE: 409,
-        PAYOUT_COMMISSION_ON_HOLD: 409,
-        PAYOUT_COMMISSION_HAS_ACTIVE_TICKET: 409,
-        PAYOUT_ORDER_NOT_ELIGIBLE: 409,
-        PAYOUT_TRANSACTION_REFERENCE_REQUIRED: 400,
-        DUPLICATE_PAYOUT_TRANSACTION_REFERENCE: 409,
+        INVALID_PAYOUT_DATE_FILTER: 400,
         INVALID_PAYOUT_AMOUNT: 400,
+        PAYOUT_TRANSACTION_REFERENCE_REQUIRED: 400,
         PAYOUT_PROOF_REQUIRED: 400,
         INVALID_PAYOUT_PROOF_FILE_TYPE: 400,
         LIMIT_FILE_SIZE: 400,
         LIMIT_FILE_COUNT: 400,
         LIMIT_UNEXPECTED_FILE: 400,
-        INVALID_COMMISSION_ID: 400,
+
+        PAYOUT_REQUEST_NOT_FOUND: 404,
+        PAYOUT_NOT_FOUND: 404,
+        PAYOUT_COMMISSION_NOT_FOUND: 404,
+        PAYOUT_ORDER_NOT_FOUND: 404,
+
+        PAYOUT_STATUS_INVALID: 409,
+        PAYOUT_STATUS_CHANGED: 409,
+        PAYOUT_ALREADY_PROCESSED: 409,
+        PAYOUT_COMMISSION_STATE_CHANGED: 409,
+        PAYOUT_COMMISSION_NOT_ELIGIBLE: 409,
+        PAYOUT_COMMISSION_ON_HOLD: 409,
+        PAYOUT_COMMISSION_HAS_ACTIVE_TICKET: 409,
+        PAYOUT_ORDER_NOT_ELIGIBLE: 409,
+        DUPLICATE_PAYOUT_TRANSACTION_REFERENCE: 409,
+        PAYOUT_TRANSACTION_REFERENCE_DUPLICATE: 409,
+        PAYOUT_TRANSACTION_REFERENCE_LOCK_FAILED: 409,
+        PAYOUT_INVALID_STATUS_TRANSITION: 409,
+        PAYOUT_COMMISSION_PAYMENT_CONFLICT: 409,
+        PAYOUT_ITEM_STATE_CHANGED: 409,
+        PAYOUT_ITEM_UPDATE_CONFLICT: 409,
+        PAYOUT_ITEMS_NOT_FOUND: 409,
+        PAYOUT_ITEMS_INTEGRITY_ERROR: 409,
+        PAYOUT_TOTAL_MISMATCH: 409,
+        PAYOUT_COMMISSION_AMOUNT_MISMATCH: 409,
+        PAYOUT_REJECTION_REASON_REQUIRED: 400,
+
+        INVALID_ID: 400,
+        INVALID_PRODUCT_ID: 400,
+        PRODUCT_NOT_FOUND: 404,
+        SELLER_NOT_FOUND: 404,
+        SUPPORT_TICKET_NOT_FOUND: 404,
         COMMISSION_NOT_FOUND: 404,
+        COMMISSION_HOLD_NOT_FOUND: 404,
+
+        ER_DUP_ENTRY: 409
     };
 
-    const status = errorMap[code] || (
-        error.code === "ER_DUP_ENTRY" ? 409 : 500
-    );
+    const status = errorMap[code] || 500;
 
     if (status === 500) {
-        console.error("[MARKETPLACE PAYOUT ADMIN ERROR]", error);
+        console.error("[MARKETPLACE ADMIN ERROR]", error);
     }
 
     return res.status(status).json({
@@ -94,6 +104,7 @@ function handleError(res, error) {
         message: status === 500 ? "Đã xảy ra lỗi hệ thống" : code
     });
 }
+
 // ========================================
 // MARKETPLACE ADMIN DASHBOARD
 // GET /api/marketplace/admin/dashboard
@@ -119,51 +130,41 @@ router.get("/dashboard", canViewSellers, async (req, res) => {
 // GET /api/marketplace/admin/sellers
 // ========================================
 
-router.get(
-    "/sellers",
-    canViewSellers,
-    async (req, res) => {
-        try {
-            const result = await sellerService.getSellerApplications({
-                status: req.query.status,
-                search: req.query.search,
-                page: req.query.page,
-                limit: req.query.limit
-            });
+router.get("/sellers", canViewSellers, async (req, res) => {
+    try {
+        const result = await sellerService.getSellerApplications({
+            status: req.query.status,
+            search: req.query.search,
+            page: req.query.page,
+            limit: req.query.limit
+        });
 
-            return res.json({
-                success: true,
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
     }
-);
+});
 
 // ========================================
 // GET SELLER DETAIL
 // GET /api/marketplace/admin/sellers/:id
 // ========================================
 
-router.get(
-    "/sellers/:id",
-    canViewSellers,
-    async (req, res) => {
-        try {
-            const result = await sellerService.getSellerDetail(
-                req.params.id
-            );
+router.get("/sellers/:id", canViewSellers, async (req, res) => {
+    try {
+        const result = await sellerService.getSellerDetail(req.params.id);
 
-            return res.json({
-                success: true,
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
     }
-);
+});
 
 // ========================================
 // ACTIVATE SELLER
@@ -228,56 +229,48 @@ router.post(
 // POST /api/marketplace/admin/sellers/:id/suspend
 // ========================================
 
-router.post(
-    "/sellers/:id/suspend",
-    canManageSellers,
-    async (req, res) => {
-        try {
-            const result = await sellerService.suspendSeller(
-                req.params.id,
-                req.user.id,
-                req.body?.reason,
-                getAuditInfo(req)
-            );
+router.post("/sellers/:id/suspend", canManageSellers, async (req, res) => {
+    try {
+        const result = await sellerService.suspendSeller(
+            req.params.id,
+            req.user.id,
+            req.body?.reason,
+            getAuditInfo(req)
+        );
 
-            return res.json({
-                success: true,
-                message: "Đã tạm ngưng Seller",
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
+        return res.json({
+            success: true,
+            message: "Đã tạm ngưng Seller",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
     }
-);
+});
 
 // ========================================
 // CLOSE SELLER
 // POST /api/marketplace/admin/sellers/:id/close
 // ========================================
 
-router.post(
-    "/sellers/:id/close",
-    canManageSellers,
-    async (req, res) => {
-        try {
-            const result = await sellerService.closeSeller(
-                req.params.id,
-                req.user.id,
-                req.body?.reason,
-                getAuditInfo(req)
-            );
+router.post("/sellers/:id/close", canManageSellers, async (req, res) => {
+    try {
+        const result = await sellerService.closeSeller(
+            req.params.id,
+            req.user.id,
+            req.body?.reason,
+            getAuditInfo(req)
+        );
 
-            return res.json({
-                success: true,
-                message: "Đã đóng tài khoản Seller",
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
+        return res.json({
+            success: true,
+            message: "Đã đóng tài khoản Seller",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
     }
-);
+});
 
 // ========================================
 // ADMIN: PRODUCTS
@@ -298,9 +291,7 @@ router.get("/products", canViewProducts, async (req, res) => {
 
 router.get("/products/:id", canViewProducts, async (req, res) => {
     try {
-        const result = await productService.getAdminProductDetail(
-            req.params.id
-        );
+        const result = await productService.getAdminProductDetail(req.params.id);
 
         return res.json({
             success: true,
@@ -413,7 +404,10 @@ router.post("/products/:id/publish", canModerateProducts, async (req, res) => {
     }
 });
 
-// Danh sách khiếu nại Marketplace
+// ========================================
+// SUPPORT TICKETS
+// ========================================
+
 router.get("/support-tickets", canViewSupport, async (req, res) => {
     try {
         const result = await supportAdminService.getTickets(req.query);
@@ -427,12 +421,9 @@ router.get("/support-tickets", canViewSupport, async (req, res) => {
     }
 });
 
-// Chi tiết khiếu nại
 router.get("/support-tickets/:id", canViewSupport, async (req, res) => {
     try {
-        const result = await supportAdminService.getTicketDetail(
-            req.params.id
-        );
+        const result = await supportAdminService.getTicketDetail(req.params.id);
 
         return res.json({
             success: true,
@@ -443,7 +434,6 @@ router.get("/support-tickets/:id", canViewSupport, async (req, res) => {
     }
 });
 
-// Cập nhật trạng thái khiếu nại
 router.put("/support-tickets/:id/status", canManageSupport, async (req, res) => {
     try {
         const result = await supportAdminService.updateTicketStatus(
@@ -467,77 +457,9 @@ router.put("/support-tickets/:id/status", canManageSupport, async (req, res) => 
 });
 
 // ========================================
-// COMMISSIONS ADMIN - READ ONLY
-// ========================================
-
-// Thống kê hoa hồng
-// GET /api/marketplace/admin/commissions/statistics
-router.get(
-    "/commissions/statistics",
-    canViewCommissions,
-    async (req, res) => {
-        try {
-            const result = await commissionAdminService.getCommissionStatistics(
-                req.query
-            );
-
-            return res.json({
-                success: true,
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
-    }
-);
-
-// Danh sách hoa hồng
-// GET /api/marketplace/admin/commissions
-router.get(
-    "/commissions",
-    canViewCommissions,
-    async (req, res) => {
-        try {
-            const result = await commissionAdminService.getCommissions(
-                req.query
-            );
-
-            return res.json({
-                success: true,
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
-    }
-);
-
-// Chi tiết hoa hồng
-// GET /api/marketplace/admin/commissions/:id
-router.get(
-    "/commissions/:id",
-    canViewCommissions,
-    async (req, res) => {
-        try {
-            const result = await commissionAdminService.getCommissionDetail(
-                req.params.id
-            );
-
-            return res.json({
-                success: true,
-                data: result
-            });
-        } catch (error) {
-            return handleError(res, error);
-        }
-    }
-);
-// ========================================
 // COMMISSION HOLDS
 // ========================================
 
-// Danh sách các khoản hoa hồng đang hoặc đã bị giữ
-// GET /api/marketplace/admin/commission-holds
 router.get("/commission-holds", canManageCommissions, async (req, res) => {
     try {
         const result = await commissionHoldAdminService.getCommissionHolds(
@@ -553,8 +475,6 @@ router.get("/commission-holds", canManageCommissions, async (req, res) => {
     }
 });
 
-// Tạo yêu cầu giữ hoa hồng thủ công
-// POST /api/marketplace/admin/commissions/:id/hold
 router.post("/commissions/:id/hold", canManageCommissions, async (req, res) => {
     try {
         const result = await commissionHoldAdminService.createAdminHold(
@@ -576,8 +496,6 @@ router.post("/commissions/:id/hold", canManageCommissions, async (req, res) => {
     }
 });
 
-// Gỡ yêu cầu giữ hoa hồng do Admin tạo
-// POST /api/marketplace/admin/commission-holds/:id/release
 router.post(
     "/commission-holds/:id/release",
     canManageCommissions,
@@ -603,7 +521,6 @@ router.post(
     }
 );
 
-
 // ========================================
 // ORDERS ADMIN - READ ONLY
 // ========================================
@@ -611,7 +528,11 @@ router.post(
 router.get("/orders", canViewOrders, async (req, res) => {
     try {
         const result = await orderAdminService.getOrders(req.query);
-        return res.json({ success: true, data: result });
+
+        return res.json({
+            success: true,
+            data: result
+        });
     } catch (error) {
         return handleError(res, error);
     }
@@ -620,12 +541,15 @@ router.get("/orders", canViewOrders, async (req, res) => {
 router.get("/orders/:id", canViewOrders, async (req, res) => {
     try {
         const result = await orderAdminService.getOrderDetail(req.params.id);
-        return res.json({ success: true, data: result });
+
+        return res.json({
+            success: true,
+            data: result
+        });
     } catch (error) {
         return handleError(res, error);
     }
 });
-
 
 // ========================================
 // DELIVERIES ADMIN - READ ONLY
@@ -634,7 +558,11 @@ router.get("/orders/:id", canViewOrders, async (req, res) => {
 router.get("/deliveries", canViewDeliveries, async (req, res) => {
     try {
         const result = await deliveryAdminService.getDeliveries(req.query);
-        return res.json({ success: true, data: result });
+
+        return res.json({
+            success: true,
+            data: result
+        });
     } catch (error) {
         return handleError(res, error);
     }
@@ -643,9 +571,20 @@ router.get("/deliveries", canViewDeliveries, async (req, res) => {
 router.get("/deliveries/:id", canViewDeliveries, async (req, res) => {
     try {
         const result = await deliveryAdminService.getDeliveryDetail(req.params.id);
-        return res.json({ success: true, data: result });
+
+        return res.json({
+            success: true,
+            data: result
+        });
     } catch (error) {
         return handleError(res, error);
     }
 });
+
+// ========================================
+// PAYOUTS ADMIN
+// ========================================
+
+router.use("/", payoutAdminRoutes);
+
 module.exports = router;

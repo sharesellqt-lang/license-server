@@ -5,13 +5,6 @@ const crypto = require("crypto");
 const db = require("../db");
 const { writeAudit } = require("./contributor.audit.service");
 
-const ACTIVE_PAYOUT_STATUSES = [
-    "pending",
-    "under_review",
-    "approved",
-    "processing"
-];
-
 const ACTIVE_TICKET_STATUSES = [
     "open",
     "waiting_seller",
@@ -21,16 +14,21 @@ const ACTIVE_TICKET_STATUSES = [
 
 function positiveId(value, error = "INVALID_ID") {
     const id = Number(value);
-
-    if (!Number.isSafeInteger(id) || id <= 0) {
-        throw new Error(error);
-    }
-
+    if (!Number.isSafeInteger(id) || id <= 0) throw new Error(error);
     return id;
 }
 
 function cleanText(value, maxLength = 2000) {
     return String(value || "").trim().slice(0, maxLength);
+}
+
+function validDateOnly(value) {
+    const date = String(value || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+
+    const parsed = new Date(`${date}T00:00:00.000Z`);
+    return !Number.isNaN(parsed.getTime()) &&
+        parsed.toISOString().slice(0, 10) === date;
 }
 
 function auditData(adminUserId, sellerUserId, payoutId, action, oldData, newData, audit = {}) {
@@ -48,7 +46,6 @@ function auditData(adminUserId, sellerUserId, payoutId, action, oldData, newData
 
 function parseBankSnapshot(value) {
     if (!value) return {};
-
     try {
         return typeof value === "string" ? JSON.parse(value) : value;
     } catch (_) {
@@ -99,10 +96,7 @@ async function getPayoutForUpdate(conn, payoutId) {
         [payoutId]
     );
 
-    if (!rows.length) {
-        throw new Error("PAYOUT_REQUEST_NOT_FOUND");
-    }
-
+    if (!rows.length) throw new Error("PAYOUT_REQUEST_NOT_FOUND");
     return rows[0];
 }
 
@@ -115,6 +109,7 @@ async function getPayoutItemsForUpdate(conn, payoutId) {
             pi.amount,
             pi.currency,
             pi.status,
+            c.id AS matched_commission_id,
             c.seller_id,
             c.seller_user_id,
             c.order_id,
@@ -125,7 +120,7 @@ async function getPayoutItemsForUpdate(conn, payoutId) {
             c.eligible_at,
             c.status AS commission_status
          FROM marketplace_payout_items pi
-         INNER JOIN marketplace_commissions c
+         LEFT JOIN marketplace_commissions c
             ON c.id = pi.commission_id
          WHERE pi.payout_request_id = ?
          ORDER BY pi.id ASC
@@ -133,11 +128,24 @@ async function getPayoutItemsForUpdate(conn, payoutId) {
         [payoutId]
     );
 
-    if (!rows.length) {
-        throw new Error("PAYOUT_ITEMS_NOT_FOUND");
+    if (!rows.length) throw new Error("PAYOUT_ITEMS_NOT_FOUND");
+
+    if (rows.some(item => !item.matched_commission_id)) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
     }
 
     return rows;
+}
+
+function assertPayoutItemOwnership(payout, items) {
+    for (const item of items) {
+        if (
+            Number(item.seller_id) !== Number(payout.seller_id) ||
+            Number(item.seller_user_id) !== Number(payout.seller_user_id)
+        ) {
+            throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+        }
+    }
 }
 
 async function addTransaction(conn, data) {
@@ -169,15 +177,7 @@ async function addTransaction(conn, data) {
     );
 }
 
-async function writePayoutAudit(
-    conn,
-    payout,
-    adminUserId,
-    action,
-    oldData,
-    newData,
-    audit
-) {
+async function writePayoutAudit(conn, payout, adminUserId, action, oldData, newData, audit) {
     await writeAudit(
         conn,
         auditData(
@@ -194,10 +194,7 @@ async function writePayoutAudit(
 
 async function getPayoutList(options = {}) {
     const page = Math.max(1, Number.parseInt(options.page, 10) || 1);
-    const limit = Math.min(
-        100,
-        Math.max(1, Number.parseInt(options.limit, 10) || 20)
-    );
+    const limit = Math.min(100, Math.max(1, Number.parseInt(options.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
     const allowedStatuses = [
@@ -210,12 +207,25 @@ async function getPayoutList(options = {}) {
         "cancelled"
     ];
 
-    const status = options.status
-        ? String(options.status).trim()
-        : null;
+    const status = options.status ? String(options.status).trim() : null;
 
     if (status && !allowedStatuses.includes(status)) {
         throw new Error("INVALID_PAYOUT_STATUS");
+    }
+
+    const sellerId = options.sellerId
+        ? positiveId(options.sellerId, "INVALID_SELLER_ID")
+        : null;
+
+    const dateFrom = options.dateFrom ? String(options.dateFrom).trim() : null;
+    const dateTo = options.dateTo ? String(options.dateTo).trim() : null;
+
+    if (
+        (dateFrom && !validDateOnly(dateFrom)) ||
+        (dateTo && !validDateOnly(dateTo)) ||
+        (dateFrom && dateTo && dateFrom > dateTo)
+    ) {
+        throw new Error("INVALID_PAYOUT_DATE_FILTER");
     }
 
     const search = cleanText(options.keyword || options.search, 100);
@@ -225,6 +235,21 @@ async function getPayoutList(options = {}) {
     if (status) {
         conditions.push("pr.status = ?");
         params.push(status);
+    }
+
+    if (sellerId) {
+        conditions.push("pr.seller_id = ?");
+        params.push(sellerId);
+    }
+
+    if (dateFrom) {
+        conditions.push("pr.requested_at >= ?");
+        params.push(`${dateFrom} 00:00:00`);
+    }
+
+    if (dateTo) {
+        conditions.push("pr.requested_at < DATE_ADD(?, INTERVAL 1 DAY)");
+        params.push(`${dateTo} 00:00:00`);
     }
 
     if (search) {
@@ -261,6 +286,8 @@ async function getPayoutList(options = {}) {
         params
     );
 
+    const total = Number(countRows[0]?.total || 0);
+
     return {
         items: rows.map(row => ({
             ...safePayout(row),
@@ -269,10 +296,8 @@ async function getPayoutList(options = {}) {
         pagination: {
             page,
             limit,
-            total: Number(countRows[0].total || 0),
-            totalPages: Math.ceil(
-                Number(countRows[0].total || 0) / limit
-            )
+            total,
+            totalPages: Math.ceil(total / limit)
         }
     };
 }
@@ -294,9 +319,7 @@ async function getPayoutDetail(payoutId) {
         [payoutId]
     );
 
-    if (!rows.length) {
-        throw new Error("PAYOUT_REQUEST_NOT_FOUND");
-    }
+    if (!rows.length) throw new Error("PAYOUT_REQUEST_NOT_FOUND");
 
     const payout = rows[0];
 
@@ -308,6 +331,9 @@ async function getPayoutDetail(payoutId) {
             pi.currency,
             pi.status,
             pi.created_at,
+            c.id AS matched_commission_id,
+            c.seller_id,
+            c.seller_user_id,
             c.order_id,
             c.order_item_id,
             c.seller_amount,
@@ -316,7 +342,7 @@ async function getPayoutDetail(payoutId) {
             c.status AS commission_status,
             oi.product_title
          FROM marketplace_payout_items pi
-         INNER JOIN marketplace_commissions c
+         LEFT JOIN marketplace_commissions c
             ON c.id = pi.commission_id
          LEFT JOIN marketplace_order_items oi
             ON oi.id = c.order_item_id
@@ -324,6 +350,14 @@ async function getPayoutDetail(payoutId) {
          ORDER BY pi.id ASC`,
         [payoutId]
     );
+
+    if (!items.length) throw new Error("PAYOUT_ITEMS_NOT_FOUND");
+
+    if (items.some(item => !item.matched_commission_id)) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    assertPayoutItemOwnership(payout, items);
 
     const [transactions] = await db.execute(
         `SELECT
@@ -387,7 +421,6 @@ async function reviewPayout(payoutId, adminUserId, data = {}, audit = {}) {
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     const adminNote = cleanText(data.adminNote, 2000);
-
     const conn = await db.getConnection();
     let transactionStarted = false;
 
@@ -401,7 +434,7 @@ async function reviewPayout(payoutId, adminUserId, data = {}, audit = {}) {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
-        await conn.execute(
+        const [result] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'under_review',
                  admin_note = ?,
@@ -411,6 +444,10 @@ async function reviewPayout(payoutId, adminUserId, data = {}, audit = {}) {
                AND status = 'pending'`,
             [adminNote || null, adminUserId, payoutId]
         );
+
+        if (result.affectedRows !== 1) {
+            throw new Error("PAYOUT_STATUS_CHANGED");
+        }
 
         await addTransaction(conn, {
             payoutId,
@@ -435,10 +472,7 @@ async function reviewPayout(payoutId, adminUserId, data = {}, audit = {}) {
         await conn.commit();
         transactionStarted = false;
 
-        return {
-            id: payoutId,
-            status: "under_review"
-        };
+        return { id: payoutId, status: "under_review" };
     } catch (error) {
         if (transactionStarted) await conn.rollback();
         throw error;
@@ -452,7 +486,6 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     const adminNote = cleanText(data.adminNote, 2000);
-
     const conn = await db.getConnection();
     let transactionStarted = false;
 
@@ -467,6 +500,7 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
         }
 
         const items = await getPayoutItemsForUpdate(conn, payoutId);
+        assertPayoutItemOwnership(payout, items);
 
         for (const item of items) {
             if (item.commission_status !== "payout_requested") {
@@ -478,7 +512,7 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
             }
         }
 
-        await conn.execute(
+        const [payoutUpdate] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'approved',
                  admin_note = ?,
@@ -489,13 +523,21 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
             [adminNote || payout.admin_note, adminUserId, payoutId]
         );
 
-        await conn.execute(
+        if (payoutUpdate.affectedRows !== 1) {
+            throw new Error("PAYOUT_STATUS_CHANGED");
+        }
+
+        const [itemUpdate] = await conn.execute(
             `UPDATE marketplace_payout_items
              SET status = 'approved'
              WHERE payout_request_id = ?
                AND status = 'requested'`,
             [payoutId]
         );
+
+        if (itemUpdate.affectedRows !== items.length) {
+            throw new Error("PAYOUT_ITEM_UPDATE_CONFLICT");
+        }
 
         await addTransaction(conn, {
             payoutId,
@@ -520,10 +562,7 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
         await conn.commit();
         transactionStarted = false;
 
-        return {
-            id: payoutId,
-            status: "approved"
-        };
+        return { id: payoutId, status: "approved" };
     } catch (error) {
         if (transactionStarted) await conn.rollback();
         throw error;
@@ -542,15 +581,14 @@ async function restoreCommissionAfterRejection(conn, commission) {
         [commission.order_id]
     );
 
-    if (!orders.length) {
-        throw new Error("PAYOUT_ORDER_NOT_FOUND");
-    }
+    if (!orders.length) throw new Error("PAYOUT_ORDER_NOT_FOUND");
 
     const order = orders[0];
 
     const orderIsRisky =
         order.payment_status !== "paid" ||
-        ["cancelled", "disputed", "refunded"].includes(order.order_status);
+        ["cancelled", "disputed", "refunded", "partially_refunded"]
+            .includes(order.order_status);
 
     const [holds] = await conn.execute(
         `SELECT id
@@ -645,6 +683,8 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
         }
 
         const items = await getPayoutItemsForUpdate(conn, payoutId);
+        assertPayoutItemOwnership(payout, items);
+
         const restoredCommissions = [];
 
         for (const item of items) {
@@ -652,11 +692,16 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
                 throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
             }
 
-            const result = await restoreCommissionAfterRejection(conn, item);
-            restoredCommissions.push(result);
+            if (!["requested", "approved"].includes(item.status)) {
+                throw new Error("PAYOUT_ITEM_STATE_CHANGED");
+            }
+
+            restoredCommissions.push(
+                await restoreCommissionAfterRejection(conn, item)
+            );
         }
 
-        await conn.execute(
+        const [payoutUpdate] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'rejected',
                  rejection_reason = ?,
@@ -673,13 +718,21 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
             ]
         );
 
-        await conn.execute(
+        if (payoutUpdate.affectedRows !== 1) {
+            throw new Error("PAYOUT_STATUS_CHANGED");
+        }
+
+        const [itemUpdate] = await conn.execute(
             `UPDATE marketplace_payout_items
              SET status = 'rejected'
              WHERE payout_request_id = ?
                AND status IN ('requested', 'approved')`,
             [payoutId]
         );
+
+        if (itemUpdate.affectedRows !== items.length) {
+            throw new Error("PAYOUT_ITEM_UPDATE_CONFLICT");
+        }
 
         await addTransaction(conn, {
             payoutId,
@@ -730,7 +783,6 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     const adminNote = cleanText(data.adminNote, 2000);
-
     const conn = await db.getConnection();
     let transactionStarted = false;
 
@@ -745,6 +797,7 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
         }
 
         const items = await getPayoutItemsForUpdate(conn, payoutId);
+        assertPayoutItemOwnership(payout, items);
 
         for (const item of items) {
             if (
@@ -755,7 +808,7 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
             }
         }
 
-        await conn.execute(
+        const [result] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'processing',
                  admin_note = COALESCE(?, admin_note)
@@ -763,6 +816,10 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
                AND status = 'approved'`,
             [adminNote || null, payoutId]
         );
+
+        if (result.affectedRows !== 1) {
+            throw new Error("PAYOUT_STATUS_CHANGED");
+        }
 
         await addTransaction(conn, {
             payoutId,
@@ -787,10 +844,7 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
         await conn.commit();
         transactionStarted = false;
 
-        return {
-            id: payoutId,
-            status: "processing"
-        };
+        return { id: payoutId, status: "processing" };
     } catch (error) {
         if (transactionStarted) await conn.rollback();
         throw error;
@@ -798,7 +852,6 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
         conn.release();
     }
 }
-
 
 async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
@@ -816,10 +869,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     let transactionStarted = false;
     let namedLockAcquired = false;
 
-    // Chuẩn hóa tên khóa để tránh hai reference khác chữ hoa/thường
-    // tạo ra hai named lock riêng biệt.
     const lockReference = transactionReference.toUpperCase();
-
     const lockName = `mp_payout_ref_${crypto
         .createHash("sha256")
         .update(lockReference)
@@ -853,11 +903,11 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
         const [duplicateRows] = await conn.execute(
             `SELECT id
              FROM marketplace_payout_requests
-             WHERE transaction_reference = ?
+             WHERE UPPER(TRIM(transaction_reference)) = ?
                AND id <> ?
              LIMIT 1
              FOR UPDATE`,
-            [transactionReference, payoutId]
+            [lockReference, payoutId]
         );
 
         if (duplicateRows.length) {
@@ -865,10 +915,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
         }
 
         const items = await getPayoutItemsForUpdate(conn, payoutId);
-
-        if (!items.length) {
-            throw new Error("PAYOUT_ITEMS_NOT_FOUND");
-        }
+        assertPayoutItemOwnership(payout, items);
 
         let itemTotalCents = 0;
 
@@ -878,6 +925,10 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
                 item.status !== "approved"
             ) {
                 throw new Error("PAYOUT_ITEM_STATE_CHANGED");
+            }
+
+            if (String(item.currency) !== String(payout.currency)) {
+                throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
             }
 
             const amount = Math.round(Number(item.amount) * 100);
@@ -893,9 +944,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             }
         }
 
-        const payoutTotalCents = Math.round(
-            Number(payout.total_amount) * 100
-        );
+        const payoutTotalCents = Math.round(Number(payout.total_amount) * 100);
 
         if (
             !Number.isSafeInteger(payoutTotalCents) ||
@@ -905,7 +954,6 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             throw new Error("PAYOUT_TOTAL_MISMATCH");
         }
 
-        // Cập nhật từng commission.
         for (const item of items) {
             const [commissionUpdate] = await conn.execute(
                 `UPDATE marketplace_commissions
@@ -936,7 +984,6 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             }
         }
 
-        // Chuyển tất cả payout items sang paid.
         const [itemUpdate] = await conn.execute(
             `UPDATE marketplace_payout_items
              SET status = 'paid'
@@ -949,7 +996,6 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             throw new Error("PAYOUT_ITEM_UPDATE_CONFLICT");
         }
 
-        // Chỉ xác nhận payout paid nếu request vẫn processing.
         const [payoutUpdate] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'paid',
@@ -1028,10 +1074,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     } finally {
         if (namedLockAcquired) {
             try {
-                await conn.execute(
-                    "SELECT RELEASE_LOCK(?)",
-                    [lockName]
-                );
+                await conn.execute("SELECT RELEASE_LOCK(?)", [lockName]);
             } catch (error) {
                 console.error("[PAYOUT LOCK RELEASE ERROR]", error);
             }
@@ -1041,18 +1084,26 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     }
 }
 
-
 async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     proofStorageKey = cleanText(proofStorageKey, 500);
 
-    if (!proofStorageKey) {
-        throw new Error("PAYOUT_PROOF_REQUIRED");
-    }
+    if (!proofStorageKey) throw new Error("PAYOUT_PROOF_REQUIRED");
 
     const note = cleanText(data.note, 2000);
+    const originalName = cleanText(data.originalName, 255);
+    const mimeType = cleanText(data.mimeType, 100);
+    const fileSize = Number(data.fileSize);
+
+    const proofMetadata = {
+        originalName: originalName || null,
+        mimeType: mimeType || null,
+        fileSize: Number.isSafeInteger(fileSize) && fileSize >= 0
+            ? fileSize
+            : null
+    };
 
     const conn = await db.getConnection();
     let transactionStarted = false;
@@ -1082,7 +1133,10 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
             currency: payout.currency,
             proofStorageKey,
             note: note || "Payment proof uploaded",
-            metadata: { payoutStatus: payout.status },
+            metadata: {
+                payoutStatus: payout.status,
+                ...proofMetadata
+            },
             adminUserId
         });
 
@@ -1092,7 +1146,10 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
             adminUserId,
             "marketplace.payout.proof_added",
             { paymentProofKey: payout.payment_proof_key || null },
-            { paymentProofKey: proofStorageKey },
+            {
+                paymentProofKey: proofStorageKey,
+                ...proofMetadata
+            },
             audit
         );
 

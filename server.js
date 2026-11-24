@@ -82,6 +82,7 @@ app.use("/api/affiliate/carousels", require("./routes/affiliate.carousel.public.
 app.use("/api/affiliate", require("./routes/affiliate.routes"));
 app.use("/api/affiliate/admin", require("./routes/affiliate.admin.routes"));
 app.use("/api/stock-data", require("./routes/stock-data.routes"));
+app.use("/api/marketplace/admin", require("./routes/marketplace.payout.admin.routes"));
 
 app.get("/api/airdrop-test", (req, res) => {
     console.log("AIRDROP TEST HIT");
