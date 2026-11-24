@@ -174,6 +174,7 @@ async function createAdminHold(commissionId, actorUserId, data = {}, auditInfo =
     }
 }
 
+
 async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) {
     holdId = validId(holdId);
     actorUserId = validId(actorUserId);
@@ -189,6 +190,7 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
     try {
         await conn.beginTransaction();
 
+        // 1. Lock Hold
         const [holds] = await conn.execute(
             `SELECT *
              FROM marketplace_commission_holds
@@ -212,8 +214,9 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
             fail("COMMISSION_HOLD_ALREADY_RELEASED");
         }
 
+        // 2. Lock Commission
         const [commissions] = await conn.execute(
-            `SELECT id, status, eligible_at, order_item_id
+            `SELECT id, status, eligible_at, order_id, order_item_id
              FROM marketplace_commissions
              WHERE id = ?
              LIMIT 1
@@ -227,6 +230,23 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
 
         const commission = commissions[0];
 
+        // 3. Lock and inspect Order
+        const [orders] = await conn.execute(
+            `SELECT id, order_status, payment_status
+             FROM marketplace_orders
+             WHERE id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [commission.order_id]
+        );
+
+        if (!orders.length) {
+            fail("COMMISSION_ORDER_NOT_FOUND");
+        }
+
+        const order = orders[0];
+
+        // 4. Release this Admin Hold
         await conn.execute(
             `UPDATE marketplace_commission_holds
              SET status = 'released',
@@ -234,13 +254,17 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
                  released_at = NOW(),
                  reason = CONCAT(
                     COALESCE(reason, ''),
-                    CASE WHEN ? <> '' THEN CONCAT('\nRelease note: ', ?) ELSE '' END
+                    CASE WHEN ? <> ''
+                        THEN CONCAT('\nRelease note: ', ?)
+                        ELSE ''
+                    END
                  )
              WHERE id = ?
                AND status = 'active'`,
             [actorUserId, releaseNote, releaseNote, holdId]
         );
 
+        // 5. Check remaining active Holds
         const [activeHolds] = await conn.execute(
             `SELECT COUNT(*) AS total
              FROM marketplace_commission_holds
@@ -249,10 +273,14 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
             [commission.id]
         );
 
+        const remainingActiveHolds = Number(activeHolds[0].total || 0);
+
+        // 6. Check active Support Tickets
         const [activeTickets] = await conn.execute(
             `SELECT id
              FROM marketplace_support_tickets
-             WHERE order_item_id = ?
+             WHERE order_id = ?
+               AND order_item_id = ?
                AND status IN (
                    'open',
                    'waiting_seller',
@@ -261,20 +289,40 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
                )
              LIMIT 1
              FOR UPDATE`,
-            [commission.order_item_id]
+            [commission.order_id, commission.order_item_id]
         );
+
+        // 7. Check order eligibility
+        let releaseBlockedReason = null;
+
+        if (remainingActiveHolds > 0) {
+            releaseBlockedReason = "COMMISSION_HAS_ACTIVE_HOLDS";
+        } else if (activeTickets.length > 0) {
+            releaseBlockedReason = "COMMISSION_HAS_ACTIVE_TICKET";
+        } else if (
+            ["cancelled", "disputed", "refunded"].includes(order.order_status)
+        ) {
+            releaseBlockedReason = "COMMISSION_ORDER_NOT_ELIGIBLE";
+        } else if (
+            ["cancelled", "failed", "refunded", "partially_refunded"].includes(
+                order.payment_status
+            )
+        ) {
+            releaseBlockedReason = "COMMISSION_PAYMENT_NOT_ELIGIBLE";
+        }
 
         let commissionStatus = commission.status;
 
+        // 8. Restore status only when all conditions are valid
         if (
-            Number(activeHolds[0].total) === 0 &&
-            !activeTickets.length &&
+            !releaseBlockedReason &&
             commission.status === "on_hold"
         ) {
             await conn.execute(
                 `UPDATE marketplace_commissions
                  SET status = CASE
-                    WHEN eligible_at IS NOT NULL AND eligible_at <= NOW()
+                    WHEN eligible_at IS NOT NULL
+                         AND eligible_at <= NOW()
                         THEN 'available'
                     ELSE 'pending_protection'
                  END
@@ -294,6 +342,7 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
             commissionStatus = updated[0].status;
         }
 
+        // 9. Audit
         await auditService.writeAudit(conn, {
             actorUserId,
             action: "marketplace.commission.hold.released",
@@ -306,7 +355,11 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
             newData: {
                 holdStatus: "released",
                 releaseNote: releaseNote || null,
-                remainingActiveHolds: Number(activeHolds[0].total),
+                remainingActiveHolds,
+                activeSupportTicket: activeTickets.length > 0,
+                orderStatus: order.order_status,
+                paymentStatus: order.payment_status,
+                releaseBlockedReason,
                 commissionStatus
             },
             ipAddress: auditInfo.ipAddress || null,
@@ -319,8 +372,10 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
             holdId,
             commissionId: commission.id,
             holdStatus: "released",
-            remainingActiveHolds: Number(activeHolds[0].total),
-            commissionStatus
+            remainingActiveHolds,
+            commissionStatus,
+            releaseBlocked: Boolean(releaseBlockedReason),
+            releaseBlockedReason
         };
     } catch (error) {
         await conn.rollback();
@@ -329,6 +384,7 @@ async function releaseAdminHold(holdId, actorUserId, data = {}, auditInfo = {}) 
         conn.release();
     }
 }
+
 
 module.exports = {
     getCommissionHolds,

@@ -15,6 +15,8 @@ const privateFileService = require("../services/marketplace.private-file.service
 const { upload } = require("../middleware/marketplace.product.upload");
 const supportService = require("../services/marketplace.support.service");
 const orderService = require("../services/marketplace.order.service");
+const sellerBankService = require("../services/marketplace.seller.bank.service");
+const payoutService = require("../services/marketplace.payout.service");
 
 const router = express.Router();
 
@@ -103,7 +105,60 @@ function handleError(res, error) {
         PRODUCT_NOT_FOUND: 404,
         ORDER_NOT_FOUND: 404,
         PRODUCT_NOT_AVAILABLE: 409,
-        CANNOT_BUY_OWN_PRODUCT: 409
+        CANNOT_BUY_OWN_PRODUCT: 409,
+        // SELLER BANK ACCOUNTS
+        INVALID_BANK_ACCOUNT_ID: 400,
+        INVALID_BANK_NAME: 400,
+        INVALID_BANK_CODE: 400,
+        INVALID_BANK_ACCOUNT_NUMBER: 400,
+        INVALID_BANK_ACCOUNT_HOLDER: 400,
+        INVALID_BANK_BRANCH: 400,
+        SELLER_BANK_ACCOUNT_NOT_FOUND: 404,
+        SELLER_BANK_ACCOUNT_ALREADY_EXISTS: 409,
+        SELLER_BANK_ACCOUNT_DISABLED: 409,
+        SELLER_BANK_ACCOUNT_ALREADY_DISABLED: 409,
+        SELLER_BANK_ACCOUNT_IN_ACTIVE_PAYOUT: 409,
+        INVALID_PAYOUT_ID: 400,
+        INVALID_COMMISSION_ID: 400,
+        INVALID_PAYOUT_AMOUNT: 400,
+        PAYOUT_COMMISSION_IDS_REQUIRED: 400,
+        PAYOUT_TOO_MANY_COMMISSIONS: 400,
+        DUPLICATE_PAYOUT_COMMISSION: 400,
+        SELLER_NOT_ACTIVE: 403,
+        PAYOUT_COMMISSION_NOT_FOUND: 404,
+        PAYOUT_REQUEST_NOT_FOUND: 404,
+        PAYOUT_COMMISSION_NOT_AVAILABLE: 409,
+        PAYOUT_COMMISSION_NOT_ELIGIBLE: 409,
+        PAYOUT_COMMISSION_NO_REMAINING_AMOUNT: 409,
+        PAYOUT_CURRENCY_NOT_SUPPORTED: 409,
+        PAYOUT_ORDER_NOT_FOUND: 404,
+        PAYOUT_ORDER_NOT_ELIGIBLE: 409,
+        PAYOUT_DELIVERY_NOT_COMPLETED: 409,
+        PAYOUT_COMMISSION_ON_HOLD: 409,
+        PAYOUT_COMMISSION_HAS_ACTIVE_TICKET: 409,
+        PAYOUT_COMMISSION_ALREADY_REQUESTED: 409,
+        PAYOUT_COMMISSION_STATE_CHANGED: 409,
+        PAYOUT_REQUEST_DUPLICATE: 409,
+        SELLER_NOT_FOUND: 404,
+        SELLER_NOT_ACTIVE: 403,
+        SELLER_BANK_ACCOUNT_NOT_FOUND: 404,
+        INVALID_PAYOUT_REQUEST: 400,
+        INVALID_PAYOUT_AMOUNT: 400,
+        INVALID_PAYOUT_COMMISSION: 400,
+        PAYOUT_COMMISSION_NOT_AVAILABLE: 409,
+        PAYOUT_COMMISSION_NOT_ELIGIBLE: 409,
+        PAYOUT_COMMISSION_ON_HOLD: 409,
+        PAYOUT_COMMISSION_ALREADY_REQUESTED: 409,
+        PAYOUT_ORDER_NOT_ELIGIBLE: 409,
+        PAYOUT_SUPPORT_TICKET_ACTIVE: 409,
+        PAYOUT_REQUEST_NOT_FOUND: 404,
+        INVALID_PAYOUT_STATUS: 400,
+        INVALID_PAYOUT_REQUEST: 400,
+        PAYOUT_COMMISSION_NO_REMAINING_AMOUNT: 409,
+        PAYOUT_COMMISSION_STATE_CHANGED: 409,
+        PAYOUT_REQUEST_DUPLICATE: 409,
+        PAYOUT_SUPPORT_TICKET_ACTIVE: 409,
+        PAYOUT_COMMISSION_ALREADY_REQUESTED: 409,
         
     };
 
@@ -708,4 +763,149 @@ router.get("/buyer/orders/:id", async (req, res) => {
     }
 });
 
+
+// ==========================================
+// SELLER BANK ACCOUNTS
+// ==========================================
+
+router.get("/seller/bank-accounts", async (req, res) => {
+    try {
+        const result = await sellerBankService.getMyBankAccounts(req.user.id);
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.post("/seller/bank-accounts", async (req, res) => {
+    try {
+        const result = await sellerBankService.createBankAccount(
+            req.user.id,
+            req.body || {}
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "SELLER_BANK_ACCOUNT_CREATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.put("/seller/bank-accounts/:id", async (req, res) => {
+    try {
+        const result = await sellerBankService.updateBankAccount(
+            req.user.id,
+            req.params.id,
+            req.body || {}
+        );
+
+        return res.json({
+            success: true,
+            message: "SELLER_BANK_ACCOUNT_UPDATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.patch("/seller/bank-accounts/:id/default", async (req, res) => {
+    try {
+        const result = await sellerBankService.setDefaultBankAccount(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            message: "SELLER_BANK_ACCOUNT_DEFAULT_UPDATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.delete("/seller/bank-accounts/:id", async (req, res) => {
+    try {
+        const result = await sellerBankService.disableBankAccount(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            message: "SELLER_BANK_ACCOUNT_DISABLED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ==================== SELLER PAYOUT ====================
+
+// Lấy danh sách yêu cầu thanh toán
+router.get("/seller/payouts", async (req, res) => {
+  try {
+    const result = await payoutService.getMyPayouts(
+      req.user.id,
+      {
+        page: req.query.page,
+        limit: req.query.limit,
+        status: req.query.status
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
+
+// Lấy chi tiết yêu cầu thanh toán
+router.get("/seller/payouts/:id", async (req, res) => {
+  try {
+    const result = await payoutService.getMyPayoutDetail(
+      req.user.id,
+      req.params.id
+    );
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
+
+// Tạo yêu cầu thanh toán
+router.post("/seller/payouts", async (req, res) => {
+  try {
+    const result = await payoutService.createPayoutRequest(
+      req.user.id,
+      req.body,
+      getAuditInfo(req)
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: "PAYOUT_REQUEST_CREATED",
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
 module.exports = router;

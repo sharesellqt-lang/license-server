@@ -15,6 +15,7 @@ const commissionHoldAdminService = require("../services/marketplace.commission.h
 const dashboardService = require("../services/marketplace.admin.dashboard.service");
 const orderAdminService = require("../services/marketplace.admin.order.service");
 const deliveryAdminService = require("../services/marketplace.admin.delivery.service");
+const commissionAdminService = require("../services/marketplace.commission.admin.service");
 
 const canManageCommissions = requireContributorPermission(
     "marketplace.commission.manage"
@@ -47,47 +48,33 @@ function getAuditInfo(req) {
 }
 
 function handleError(res, error) {
-    const code = error.message || "MARKETPLACE_ADMIN_OPERATION_FAILED";
+    const code = error.message || "MARKETPLACE_PAYOUT_ADMIN_OPERATION_FAILED";
 
     const errorMap = {
+        INVALID_PAYOUT_ID: 400,
         INVALID_USER_ID: 400,
-        INVALID_SELLER_ID: 400,
-        INVALID_REVIEW_NOTE: 400,
-        SELLER_NOT_FOUND: 404,
-        TARGET_USER_NOT_FOUND: 404,
-        SELLER_STATUS_INVALID: 409,
-        SELLER_ALREADY_CLOSED: 409,
-        SELLER_CURRENT_AGREEMENT_NOT_ACCEPTED: 409,
-        MARKETPLACE_AGREEMENT_NOT_AVAILABLE: 503,
-        INVALID_PRODUCT_ID: 400,
-        INVALID_PRODUCT_TYPE: 400,
-        INVALID_PRODUCT_DECISION: 400,
-        INVALID_REVIEW_FEEDBACK: 400,
-        INVALID_REVIEW_CHECKLIST: 400,
-        PRODUCT_NOT_FOUND: 404,
-        PRODUCT_ALREADY_ARCHIVED: 409,
-        PRODUCT_NOT_IN_REVIEW: 409,
-        PRODUCT_CANNOT_BE_SUSPENDED: 409,
-        PRODUCT_NOT_APPROVED: 409,
-        INVALID_ID: 400,
-        INVALID_TICKET_STATUS: 400,
-        INVALID_TICKET_RESOLUTION: 400,
-        TICKET_RESOLUTION_REQUIRED: 400,
-        SUPPORT_TICKET_NOT_FOUND: 404,
-        SUPPORT_TICKET_ALREADY_CLOSED: 409,
-        INVALID_ID: 400,
-        INVALID_COMMISSION_HOLD_REASON: 400,
-        INVALID_COMMISSION_HOLD_RELEASE_NOTE: 400,
+        INVALID_PAYOUT_STATUS: 400,
+        PAYOUT_REQUEST_NOT_FOUND: 404,
+        PAYOUT_NOT_FOUND: 404,
+        PAYOUT_STATUS_INVALID: 409,
+        PAYOUT_STATUS_CHANGED: 409,
+        PAYOUT_ALREADY_PROCESSED: 409,
+        PAYOUT_COMMISSION_STATE_CHANGED: 409,
+        PAYOUT_COMMISSION_NOT_FOUND: 404,
+        PAYOUT_COMMISSION_NOT_ELIGIBLE: 409,
+        PAYOUT_COMMISSION_ON_HOLD: 409,
+        PAYOUT_COMMISSION_HAS_ACTIVE_TICKET: 409,
+        PAYOUT_ORDER_NOT_ELIGIBLE: 409,
+        PAYOUT_TRANSACTION_REFERENCE_REQUIRED: 400,
+        DUPLICATE_PAYOUT_TRANSACTION_REFERENCE: 409,
+        INVALID_PAYOUT_AMOUNT: 400,
+        PAYOUT_PROOF_REQUIRED: 400,
+        INVALID_PAYOUT_PROOF_FILE_TYPE: 400,
+        LIMIT_FILE_SIZE: 400,
+        LIMIT_FILE_COUNT: 400,
+        LIMIT_UNEXPECTED_FILE: 400,
+        INVALID_COMMISSION_ID: 400,
         COMMISSION_NOT_FOUND: 404,
-        COMMISSION_HOLD_NOT_FOUND: 404,
-        COMMISSION_NOT_HOLDABLE: 409,
-        COMMISSION_HOLD_NOT_ADMIN_OWNED: 409,
-        COMMISSION_HOLD_ALREADY_RELEASED: 409,
-        INVALID_ORDER_ID: 400,
-        ORDER_NOT_FOUND: 404,
-        INVALID_DELIVERY_ID: 400,
-        DELIVERY_NOT_FOUND: 404,
-
     };
 
     const status = errorMap[code] || (
@@ -95,18 +82,15 @@ function handleError(res, error) {
     );
 
     if (status === 500) {
-        console.error("[MARKETPLACE ADMIN ERROR]", error);
+        console.error("[MARKETPLACE PAYOUT ADMIN ERROR]", error);
     }
 
     return res.status(status).json({
         success: false,
         code,
-        message: status === 500
-            ? "Đã xảy ra lỗi hệ thống"
-            : code
+        message: status === 500 ? "Đã xảy ra lỗi hệ thống" : code
     });
 }
-
 // ========================================
 // MARKETPLACE ADMIN DASHBOARD
 // GET /api/marketplace/admin/dashboard
@@ -479,6 +463,72 @@ router.put("/support-tickets/:id/status", canManageSupport, async (req, res) => 
     }
 });
 
+// ========================================
+// COMMISSIONS ADMIN - READ ONLY
+// ========================================
+
+// Thống kê hoa hồng
+// GET /api/marketplace/admin/commissions/statistics
+router.get(
+    "/commissions/statistics",
+    canViewCommissions,
+    async (req, res) => {
+        try {
+            const result = await commissionAdminService.getCommissionStatistics(
+                req.query
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Danh sách hoa hồng
+// GET /api/marketplace/admin/commissions
+router.get(
+    "/commissions",
+    canViewCommissions,
+    async (req, res) => {
+        try {
+            const result = await commissionAdminService.getCommissions(
+                req.query
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
+// Chi tiết hoa hồng
+// GET /api/marketplace/admin/commissions/:id
+router.get(
+    "/commissions/:id",
+    canViewCommissions,
+    async (req, res) => {
+        try {
+            const result = await commissionAdminService.getCommissionDetail(
+                req.params.id
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
 // ========================================
 // COMMISSION HOLDS
 // ========================================
