@@ -17,6 +17,7 @@ const supportService = require("../services/marketplace.support.service");
 const orderService = require("../services/marketplace.order.service");
 const sellerBankService = require("../services/marketplace.seller.bank.service");
 const payoutService = require("../services/marketplace.payout.service");
+const sellerDashboardService = require("../services/marketplace.seller.dashboard.service");
 
 const router = express.Router();
 
@@ -245,6 +246,25 @@ router.get("/seller/me", async (req, res) => {
     }
 });
 
+// ========================================
+// SELLER: DASHBOARD
+// GET /api/marketplace/seller/dashboard
+// ========================================
+
+router.get("/seller/dashboard", async (req, res) => {
+    try {
+        const result = await sellerDashboardService.getSellerDashboard(
+            req.user.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 // ========================================
 // SELLER: ACCEPT CURRENT AGREEMENT
 // POST /api/marketplace/seller/accept-agreement
