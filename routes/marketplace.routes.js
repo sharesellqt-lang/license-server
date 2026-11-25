@@ -3,6 +3,16 @@
 
 const express = require("express");
 const auth = require("../middleware/auth");
+function requireAdmin(req, res, next) {
+    if (!req.user?.isAdmin) {
+        return res.status(403).json({
+            success: false,
+            error: "ADMIN_PERMISSION_REQUIRED"
+        });
+    }
+
+    next();
+}
 const sellerService = require("../services/marketplace.seller.service");
 const productService = require("../services/marketplace.product.service");
 const requireContributorPermission = require("../middleware/requireContributorPermission");
