@@ -126,19 +126,41 @@ async function updateSettings(actorUserId, data = {}, audit = {}) {
             }
         }
 
-        const merged = {};
-        for (const [key, row] of Object.entries(current)) {
-            merged[key] = key in input
-                ? validateValue(key, input[key])
-                : row.setting_value;
-        }
+       const merged = {};
 
-        const sellerRate = Number(merged.seller_commission_rate);
-        const platformRate = Number(merged.platform_commission_rate);
+for (const [key, row] of Object.entries(current)) {
+    merged[key] = key in input
+        ? validateValue(key, input[key])
+        : row.setting_value;
+}
 
-        if (Math.abs(sellerRate + platformRate - 100) > 0.000001) {
-            throw new Error("COMMISSION_RATES_MUST_EQUAL_100");
-        }
+const [commissionRows] = await conn.execute(
+    `SELECT setting_key, setting_value
+     FROM marketplace_settings
+     WHERE setting_key IN (?, ?)
+     FOR UPDATE`,
+    ["seller_commission_rate", "platform_commission_rate"]
+);
+
+const commission = Object.fromEntries(
+    commissionRows.map(row => [row.setting_key, row.setting_value])
+);
+
+const sellerRate = Number(
+    merged.seller_commission_rate ?? commission.seller_commission_rate
+);
+
+const platformRate = Number(
+    merged.platform_commission_rate ?? commission.platform_commission_rate
+);
+
+if (
+    !Number.isFinite(sellerRate) ||
+    !Number.isFinite(platformRate) ||
+    Math.abs(sellerRate + platformRate - 100) > 0.000001
+) {
+    throw new Error("COMMISSION_RATES_MUST_EQUAL_100");
+}
 
         const changes = [];
 
