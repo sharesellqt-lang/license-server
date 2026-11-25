@@ -670,25 +670,7 @@ router.get(
     }
 );
 
-// Buyer xem file demo của sản phẩm đã Published.
-router.get(
-    "/products/:id/demos/:demoId/file",
-    async (req, res) => {
-        try {
-            const file = await privateFileService.getPublicDemoFile(
-                req.params.id,
-                req.params.demoId
-            );
 
-            await privateFileService.sendPrivateFile(res, file, {
-                download: false
-            });
-        } catch (error) {
-            if (res.headersSent) return res.destroy();
-            handleError(res, error);
-        }
-    }
-);
 
 // Buyer tải file đã được gắn với lần giao hàng của chính mình.
 router.get(
@@ -772,39 +754,6 @@ router.post(
         }
     }
 );
-
-
-// ========================================
-// MARKETPLACE: PUBLIC PRODUCT CATALOG
-// ========================================
-
-router.get("/products", async (req, res) => {
-    try {
-        const result = await orderService.getPublishedProducts(req.query);
-
-        return res.json({
-            success: true,
-            data: result
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-});
-
-router.get("/products/:id", async (req, res) => {
-    try {
-        const result = await orderService.getPublishedProductDetail(
-            req.params.id
-        );
-
-        return res.json({
-            success: true,
-            data: result
-        });
-    } catch (error) {
-        return handleError(res, error);
-    }
-});
 
 // ========================================
 // BUYER: CHECKOUT
