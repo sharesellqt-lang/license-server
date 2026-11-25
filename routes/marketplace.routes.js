@@ -18,6 +18,7 @@ const orderService = require("../services/marketplace.order.service");
 const sellerBankService = require("../services/marketplace.seller.bank.service");
 const payoutService = require("../services/marketplace.payout.service");
 const sellerDashboardService = require("../services/marketplace.seller.dashboard.service");
+const deliveryService = require("../services/marketplace.delivery.service");
 
 const router = express.Router();
 
@@ -30,6 +31,33 @@ function getAuditInfo(req) {
     };
 }
 
+// Admin cấp quyền giao hàng cho một order item chưa thanh toán
+router.post("/admin/order-items/:orderItemId/delivery-authorization", requireAdmin, async (req, res) => {
+    try {
+        const result = await deliveryService.authorizeDelivery(
+            req.user.id,
+            req.params.orderItemId,
+            req.body.reason
+        );
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Admin thu hồi quyền giao hàng
+router.post("/admin/delivery-authorizations/:id/revoke", requireAdmin, async (req, res) => {
+    try {
+        const result = await deliveryService.revokeDeliveryAuthorization(
+            req.user.id,
+            req.params.id,
+            req.body.reason
+        );
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 function getSellerRegistrationErrorCode(status) {
     const codes = {
         pending: "SELLER_APPLICATION_PENDING",
@@ -209,6 +237,40 @@ function handleError(res, error) {
         SELLER_NOT_FOUND: 404,
         INVALID_ORDER_STATUS: 400,
         INVALID_SEARCH: 400,
+        // SELLER DELIVERIES
+        INVALID_DELIVERY_FILES: 400,
+        DUPLICATE_DELIVERY_FILES: 400,
+        DELIVERY_NOTE_TOO_LONG: 400,
+        ACCESS_URL_TOO_LONG: 400,
+        INSTRUCTIONS_TOO_LONG: 400,
+        DELIVERY_DATA_TOO_LONG: 400,
+        CHANGE_REASON_TOO_LONG: 400,
+        CHANGE_REASON_REQUIRED: 400,
+        REDELIVERY_REASON_REQUIRED: 400,
+        INVALID_DELIVERY_STATUS: 400,
+        INVALID_MARKETPLACE_SETTINGS: 500,
+        INVALID_MARKETPLACE_COMMISSION_SETTINGS: 500,
+        INVALID_COMMISSION_AMOUNT: 400,
+        INVALID_AUTHORIZATION_REASON: 400,
+        INVALID_REVOCATION_REASON: 400,
+        INVALID_CONFIRMATION_METHOD: 400,
+
+        DELIVERY_NOT_FOUND: 404,
+        ORDER_ITEM_NOT_FOUND: 404,
+
+        DELIVERY_ALREADY_EXISTS: 409,
+        DELIVERY_NOT_OWNED: 403,
+        ORDER_ITEM_NOT_OWNED: 403,
+        BUYER_NOT_AUTHORIZED: 403,
+        ORDER_NOT_PAID: 409,
+        ORDER_NOT_DELIVERABLE: 409,
+        DELIVERY_NOT_EDITABLE: 409,
+        DELIVERY_NOT_CONFIRMABLE: 409,
+        ACTIVE_SUPPORT_TICKET: 409,
+        AUTO_CONFIRM_NOT_DUE: 409,
+        DELIVERY_AUTHORIZATION_ALREADY_USED: 409,
+        ACTIVE_AUTHORIZATION_EXISTS: 409,
+        AUTHORIZATION_NOT_REVOCABLE: 409,
         
     };
 
@@ -958,4 +1020,123 @@ router.get("/seller/orders/:id", async (req, res) => {
         return handleError(res, error);
     }
 });
+
+
+// ========================================
+// SELLER: DELIVERIES
+// ========================================
+
+// Danh sách bàn giao
+router.get("/seller/deliveries", async (req, res) => {
+    try {
+        const result = await deliveryService.getSellerDeliveries(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Chi tiết bàn giao và lịch sử phiên bản
+router.get("/seller/deliveries/:id", async (req, res) => {
+    try {
+        const result = await deliveryService.getSellerDeliveryDetail(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Tạo bàn giao lần đầu cho order item
+router.post("/seller/order-items/:orderItemId/delivery", async (req, res) => {
+    try {
+        const result = await deliveryService.createDelivery(
+            req.user.id,
+            req.params.orderItemId,
+            req.body || {}
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "DELIVERY_CREATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Cập nhật nội dung bằng phiên bản mới
+router.put("/seller/deliveries/:id", async (req, res) => {
+    try {
+        const result = await deliveryService.updateDelivery(
+            req.user.id,
+            req.params.id,
+            req.body || {}
+        );
+
+        return res.json({
+            success: true,
+            message: "DELIVERY_VERSION_CREATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Bàn giao lại
+router.post("/seller/deliveries/:id/redeliver", async (req, res) => {
+    try {
+        const result = await deliveryService.redeliver(
+            req.user.id,
+            req.params.id,
+            req.body || {}
+        );
+
+        return res.json({
+            success: true,
+            message: "DELIVERY_REDELIVERED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// ========================================
+// BUYER: DELIVERY CONFIRMATION
+// ========================================
+
+router.post("/buyer/deliveries/:deliveryId/confirm", async (req, res) => {
+    try {
+        const result = await deliveryService.confirmDelivery(
+            req.params.deliveryId,
+            req.user.id,
+            "buyer"
+        );
+
+        return res.json({
+            success: true,
+            message: "DELIVERY_CONFIRMED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
 module.exports = router;

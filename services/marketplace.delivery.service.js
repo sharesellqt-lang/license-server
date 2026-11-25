@@ -157,15 +157,8 @@ async function assertNoActiveTicket(conn, orderId, orderItemId) {
 
 async function assertDeliverable(item) {
     if (
-        item.payment_status !== "paid" &&
-        item.payment_status !== "partially_refunded"
-    ) {
-        fail("ORDER_NOT_PAID");
-    }
-
-    if (
         ["cancelled", "disputed", "refunded"].includes(item.order_status) ||
-        item.payment_status === "partially_refunded"
+        ["cancelled", "refunded", "partially_refunded"].includes(item.payment_status)
     ) {
         fail("ORDER_NOT_DELIVERABLE");
     }
@@ -186,20 +179,16 @@ async function getAuthorizedException(conn, orderItemId) {
     return rows[0] || null;
 }
 
-async function consumeAuthorization(
-    conn,
-    authorizationId,
-    userId,
-    versionId
-) {
+async function consumeAuthorization(conn, authorizationId, userId, versionId) {
     const [result] = await conn.execute(
         `UPDATE marketplace_delivery_authorizations
          SET status = 'used',
              used_by_user_id = ?,
-             used_at = NOW()
+             used_at = NOW(),
+             used_delivery_version_id = ?
          WHERE id = ?
            AND status = 'authorized'`,
-        [userId, authorizationId]
+        [userId, versionId, authorizationId]
     );
 
     if (result.affectedRows !== 1) {
@@ -240,32 +229,36 @@ async function createVersion(
     conn,
     deliveryId,
     versionNumber,
+    changeType,
     userId,
     content,
     files
 ) {
-    const [result] = await conn.execute(
-        `INSERT INTO marketplace_delivery_versions (
-            delivery_id,
-            version_number,
-            delivery_note,
-            access_url,
-            instructions,
-            additional_data,
-            change_reason,
-            created_by_user_id
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            deliveryId,
-            versionNumber,
-            content.deliveryNote || null,
-            content.accessUrl || null,
-            content.instructions || null,
-            content.additionalData,
-            content.changeReason || null,
-            userId
-        ]
-    );
+
+const [result] = await conn.execute(
+    `INSERT INTO marketplace_delivery_versions (
+        delivery_id,
+        version_number,
+        change_type,
+        delivery_note,
+        access_url,
+        instructions,
+        additional_data,
+        change_reason,
+        created_by_user_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+        deliveryId,
+        versionNumber,
+        changeType,
+        content.deliveryNote || null,
+        content.accessUrl || null,
+        content.instructions || null,
+        content.additionalData,
+        content.changeReason || null,
+        userId
+    ]
+);
 
     const versionId = result.insertId;
 
@@ -478,6 +471,7 @@ async function createDelivery(userId, orderItemId, data = {}) {
             conn,
             deliveryId,
             1,
+            "initial",
             userId,
             content,
             files
@@ -494,76 +488,79 @@ async function createDelivery(userId, orderItemId, data = {}) {
             );
         }
 
-        // Commission chỉ tạo một lần cho mỗi order item.
-        const [[commission]] = await conn.execute(
-            `SELECT id
-             FROM marketplace_commissions
-             WHERE order_item_id = ?
-             LIMIT 1
-             FOR UPDATE`,
-            [orderItemId]
+   // Chỉ tạo commission khi đơn đã thanh toán.
+// Delivery được Admin cho phép trước thanh toán chưa phát sinh commission.
+if (item.payment_status === "paid") {
+    const [[commission]] = await conn.execute(
+        `SELECT id
+         FROM marketplace_commissions
+         WHERE order_item_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [orderItemId]
+    );
+
+    if (!commission) {
+        const commissionableAmount = Number(item.line_total);
+
+        if (
+            !Number.isFinite(commissionableAmount) ||
+            commissionableAmount < 0
+        ) {
+            fail("INVALID_COMMISSION_AMOUNT");
+        }
+
+        const sellerAmount = Math.round(
+            commissionableAmount * sellerRate / 100
         );
 
-        if (!commission) {
-            const commissionableAmount = Number(item.line_total);
+        const platformAmount = Math.round(
+            commissionableAmount * platformRate / 100
+        );
 
-            if (
-                !Number.isFinite(commissionableAmount) ||
-                commissionableAmount < 0
-            ) {
-                fail("INVALID_COMMISSION_AMOUNT");
-            }
-
-            const sellerAmount = Math.round(
-                commissionableAmount * sellerRate / 100
-            );
-
-            const platformAmount = Math.round(
-                commissionableAmount * platformRate / 100
-            );
-
-            await conn.execute(
-                `INSERT INTO marketplace_commissions (
-                    order_id,
-                    order_item_id,
-                    seller_id,
-                    seller_user_id,
-                    commissionable_amount,
-                    currency,
-                    seller_rate,
-                    platform_rate,
-                    seller_amount,
-                    platform_amount,
-                    protection_days,
-                    protection_started_at,
-                    protection_ends_at,
-                    eligible_at,
-                    status
-                 )
-                 SELECT
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    d.protection_started_at,
-                    d.protection_ends_at,
-                    d.protection_ends_at,
-                    'pending_protection'
-                 FROM marketplace_deliveries d
-                 WHERE d.id = ?`,
-                [
-                    item.order_id,
-                    orderItemId,
-                    item.seller_id,
-                    userId,
-                    commissionableAmount,
-                    item.currency,
-                    sellerRate,
-                    platformRate,
-                    sellerAmount,
-                    platformAmount,
-                    protectionDays,
-                    deliveryId
-                ]
-            );
-        }
+        await conn.execute(
+            `INSERT INTO marketplace_commissions (
+                order_id,
+                order_item_id,
+                seller_id,
+                seller_user_id,
+                commissionable_amount,
+                currency,
+                seller_rate,
+                platform_rate,
+                seller_amount,
+                platform_amount,
+                protection_days,
+                protection_started_at,
+                protection_ends_at,
+                eligible_at,
+                status
+             )
+             SELECT
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                d.protection_started_at,
+                d.protection_ends_at,
+                d.protection_ends_at,
+                'pending_protection'
+             FROM marketplace_deliveries d
+             WHERE d.id = ?`,
+            [
+                item.order_id,
+                orderItemId,
+                item.seller_id,
+                userId,
+                commissionableAmount,
+                item.currency,
+                sellerRate,
+                platformRate,
+                sellerAmount,
+                platformAmount,
+                protectionDays,
+                deliveryId
+            ]
+        );
+    }
+}
 
         const orderStatus = await updateOrderDeliveryStatus(
             conn,
@@ -593,6 +590,22 @@ async function createDelivery(userId, orderItemId, data = {}) {
 }
 
 async function updateDelivery(userId, deliveryId, data = {}) {
+    return saveDeliveryVersion(userId, deliveryId, data, "update");
+}
+
+async function redeliver(userId, deliveryId, data = {}) {
+    if (!String(data.changeReason || "").trim()) {
+        fail("REDELIVERY_REASON_REQUIRED");
+    }
+
+    return saveDeliveryVersion(userId, deliveryId, data, "redelivery");
+}
+async function saveDeliveryVersion(
+    userId,
+    deliveryId,
+    data = {},
+    changeType = "update"
+) {
     userId = validId(userId);
     deliveryId = validId(deliveryId);
 
@@ -616,13 +629,17 @@ async function updateDelivery(userId, deliveryId, data = {}) {
                 d.buyer_confirmed_at,
                 oi.order_id,
                 oi.product_id,
-                oi.seller_user_id
-             FROM marketplace_deliveries d
-             INNER JOIN marketplace_order_items oi
+                oi.seller_user_id,
+                o.payment_status,
+                o.order_status
+            FROM marketplace_deliveries d
+            INNER JOIN marketplace_order_items oi
                 ON oi.id = d.order_item_id
-             WHERE d.id = ?
-             LIMIT 1
-             FOR UPDATE`,
+            INNER JOIN marketplace_orders o
+                ON o.id = oi.order_id
+            WHERE d.id = ?
+            LIMIT 1
+            FOR UPDATE`,
             [deliveryId]
         );
 
@@ -638,6 +655,13 @@ async function updateDelivery(userId, deliveryId, data = {}) {
             fail("DELIVERY_NOT_EDITABLE");
         }
 
+        await assertDeliverable(delivery);
+
+        await assertNoActiveTicket(
+            conn,
+            delivery.order_id,
+            delivery.order_item_id
+        );
         await assertNoActiveTicket(
             conn,
             delivery.order_id,
@@ -660,10 +684,11 @@ async function updateDelivery(userId, deliveryId, data = {}) {
             fileIds
         );
 
-        const versionId = await createVersion(
+       const versionId = await createVersion(
             conn,
             deliveryId,
             nextVersion,
+            changeType,
             userId,
             content,
             files
@@ -695,21 +720,20 @@ async function updateDelivery(userId, deliveryId, data = {}) {
     }
 }
 
-async function redeliver(userId, deliveryId, data = {}) {
-    // Redelivery sử dụng cơ chế versioning.
-    // Lý do redelivery bắt buộc phải được cung cấp.
-    if (!String(data.changeReason || "").trim()) {
-        fail("REDELIVERY_REASON_REQUIRED");
-    }
-
-    return updateDelivery(userId, deliveryId, data);
-}
 
 async function getSellerDeliveries(userId, params = {}) {
     userId = validId(userId);
 
-    const page = Math.max(1, Number(params.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
+    const rawPage = Number(params.page ?? 1);
+    const rawLimit = Number(params.limit ?? 20);
+
+    const page = Number.isSafeInteger(rawPage) && rawPage > 0
+        ? rawPage
+        : 1;
+
+    const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0
+        ? Math.min(100, rawLimit)
+        : 20;
     const offset = (page - 1) * limit;
 
     const conditions = ["oi.seller_user_id = ?"];
@@ -1019,8 +1043,7 @@ async function authorizeDelivery(adminUserId, orderItemId, reason) {
 
         if (
             ["cancelled", "disputed", "refunded"].includes(item.order_status) ||
-            item.payment_status === "cancelled" ||
-            item.payment_status === "refunded"
+            ["cancelled", "refunded", "partially_refunded"].includes(item.payment_status)
         ) {
             fail("ORDER_NOT_DELIVERABLE");
         }
