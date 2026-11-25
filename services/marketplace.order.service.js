@@ -662,10 +662,203 @@ async function getBuyerOrderDetail(buyerUserId, orderId) {
     }
 }
 
+
+// ========================================
+// SELLER: LIST MY ORDERS
+// ========================================
+
+async function getSellerOrders(sellerUserId, params = {}) {
+    sellerUserId = validId(sellerUserId, "INVALID_USER_ID");
+
+    const conn = await db.getConnection();
+
+    try {
+        const { page, limit, offset } = pagination(params);
+        const conditions = ["oi.seller_user_id = ?"];
+        const values = [sellerUserId];
+
+        if (params.status) {
+            const status = String(params.status).trim();
+
+            if (!ORDER_STATUSES.includes(status)) {
+                fail("INVALID_ORDER_STATUS");
+            }
+
+            conditions.push("o.order_status = ?");
+            values.push(status);
+        }
+
+        const search = normalizeSearch(params.search);
+
+        if (search) {
+            conditions.push(`(
+                o.order_code LIKE ?
+                OR u.email LIKE ?
+                OR oi.product_title LIKE ?
+            )`);
+
+            const keyword = `%${search}%`;
+            values.push(keyword, keyword, keyword);
+        }
+
+        const where = conditions.join(" AND ");
+
+        const [countRows] = await conn.execute(
+            `SELECT COUNT(*) AS total
+             FROM (
+                 SELECT o.id
+                 FROM marketplace_orders o
+                 INNER JOIN marketplace_order_items oi
+                    ON oi.order_id = o.id
+                 INNER JOIN marketplace_sellers s
+                    ON s.id = oi.seller_id
+                 INNER JOIN users u
+                    ON u.id = o.buyer_user_id
+                 WHERE s.user_id = ?
+                   AND ${conditions.slice(1).join(" AND ")}
+                 GROUP BY o.id
+             ) seller_orders`,
+            [sellerUserId, ...values.slice(1)]
+        );
+
+        const [rows] = await conn.execute(
+            `SELECT
+                o.id,
+                o.order_code,
+                u.email AS buyer_email,
+                o.currency,
+                o.payment_status,
+                o.order_status,
+                o.payment_deadline_at,
+                o.paid_at,
+                o.created_at,
+                COUNT(DISTINCT oi.id) AS item_count,
+                SUM(oi.line_total) AS seller_total
+             FROM marketplace_orders o
+             INNER JOIN marketplace_order_items oi
+                ON oi.order_id = o.id
+             INNER JOIN marketplace_sellers s
+                ON s.id = oi.seller_id
+             INNER JOIN users u
+                ON u.id = o.buyer_user_id
+             WHERE s.user_id = ?
+               AND ${conditions.slice(1).join(" AND ")}
+             GROUP BY
+                o.id,
+                o.order_code,
+                u.email,
+                o.currency,
+                o.payment_status,
+                o.order_status,
+                o.payment_deadline_at,
+                o.paid_at,
+                o.created_at
+             ORDER BY o.created_at DESC, o.id DESC
+             LIMIT ? OFFSET ?`,
+            [sellerUserId, ...values.slice(1), limit, offset]
+        );
+
+        const total = Number(countRows[0]?.total || 0);
+
+        return {
+            items: rows,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit)
+            }
+        };
+    } finally {
+        conn.release();
+    }
+}
+
+// ========================================
+// SELLER: GET MY ORDER DETAIL
+// ========================================
+
+async function getSellerOrderDetail(sellerUserId, orderId) {
+    sellerUserId = validId(sellerUserId, "INVALID_USER_ID");
+    orderId = validId(orderId, "INVALID_ORDER_ID");
+
+    const conn = await db.getConnection();
+
+    try {
+        const [orders] = await conn.execute(
+            `SELECT
+                o.id,
+                o.order_code,
+                o.buyer_user_id,
+                u.email AS buyer_email,
+                o.currency,
+                o.payment_status,
+                o.order_status,
+                o.payment_deadline_at,
+                o.paid_at,
+                o.created_at
+             FROM marketplace_orders o
+             INNER JOIN marketplace_order_items oi
+                ON oi.order_id = o.id
+             INNER JOIN marketplace_sellers s
+                ON s.id = oi.seller_id
+             INNER JOIN users u
+                ON u.id = o.buyer_user_id
+             WHERE o.id = ?
+               AND s.user_id = ?
+             LIMIT 1`,
+            [orderId, sellerUserId]
+        );
+
+        if (!orders.length) fail("ORDER_NOT_FOUND");
+
+        const [items] = await conn.execute(
+            `SELECT
+                oi.id,
+                oi.product_id,
+                oi.product_title,
+                oi.product_version,
+                oi.product_type,
+                oi.unit_price,
+                oi.line_total,
+                oi.quantity,
+                oi.currency,
+                d.id AS delivery_id,
+                d.status AS delivery_status,
+                d.delivered_at,
+                d.buyer_confirmed_at,
+                d.protection_started_at,
+                d.protection_ends_at
+             FROM marketplace_order_items oi
+             INNER JOIN marketplace_sellers s
+                ON s.id = oi.seller_id
+             LEFT JOIN marketplace_deliveries d
+                ON d.order_item_id = oi.id
+             WHERE oi.order_id = ?
+               AND s.user_id = ?
+             ORDER BY oi.id ASC`,
+            [orderId, sellerUserId]
+        );
+
+        return {
+            ...orders[0],
+            items,
+            seller_total: items.reduce(
+                (sum, item) => sum + Number(item.line_total || 0),
+                0
+            ).toFixed(2)
+        };
+    } finally {
+        conn.release();
+    }
+}
+
 module.exports = {
     getPublishedProducts,
     getPublishedProductDetail,
     createOrder,
     getBuyerOrders,
-    getBuyerOrderDetail
+    getBuyerOrderDetail,
+    getSellerOrders,
+    getSellerOrderDetail
 };

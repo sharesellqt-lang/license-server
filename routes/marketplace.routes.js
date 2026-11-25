@@ -693,43 +693,6 @@ router.get(
     }
 );
 
-// Seller tải file của sản phẩm mình sở hữu.
-router.get(
-    "/seller/products/:id/files/:fileId/download",
-    canViewProducts,
-    async (req, res) => {
-        try {
-            const file = await privateFileService.getSellerProductFile(
-                req.user.id,
-                req.params.id,
-                req.params.fileId
-            );
-
-            await privateFileService.sendPrivateFile(res, file);
-        } catch (error) {
-            handleError(res, error);
-        }
-    }
-);
-
-// Buyer tải file giao hàng của đơn hàng mình đã thanh toán.
-router.get(
-    "/buyer/deliveries/:deliveryId/files/:fileId/download",
-    async (req, res) => {
-        try {
-            const file = await privateFileService.getBuyerDeliveryFile(
-                req.user.id,
-                req.params.deliveryId,
-                req.params.fileId
-            );
-
-            await privateFileService.sendPrivateFile(res, file);
-        } catch (error) {
-            handleError(res, error);
-        }
-    }
-);
-
 router.post(
     "/buyer/order-items/:orderItemId/support-tickets",
     async (req, res) => {
@@ -956,5 +919,41 @@ router.post("/seller/payouts", async (req, res) => {
   } catch (error) {
     return handleError(res, error);
   }
+});
+
+// ========================================
+// SELLER: MY ORDERS
+// ========================================
+
+router.get("/seller/orders", async (req, res) => {
+    try {
+        const result = await orderService.getSellerOrders(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+router.get("/seller/orders/:id", async (req, res) => {
+    try {
+        const result = await orderService.getSellerOrderDetail(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
 });
 module.exports = router;
