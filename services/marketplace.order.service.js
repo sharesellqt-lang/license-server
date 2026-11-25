@@ -663,6 +663,25 @@ async function getBuyerOrderDetail(buyerUserId, orderId) {
 }
 
 
+
+// ========================================
+// SELLER: GET SELLER ID
+// ========================================
+
+async function getSellerId(conn, sellerUserId) {
+    const [rows] = await conn.execute(
+        `SELECT id
+         FROM marketplace_sellers
+         WHERE user_id = ?
+         LIMIT 1`,
+        [sellerUserId]
+    );
+
+    if (!rows.length) fail("SELLER_NOT_FOUND");
+
+    return Number(rows[0].id);
+}
+
 // ========================================
 // SELLER: LIST MY ORDERS
 // ========================================
@@ -673,9 +692,11 @@ async function getSellerOrders(sellerUserId, params = {}) {
     const conn = await db.getConnection();
 
     try {
+        const sellerId = await getSellerId(conn, sellerUserId);
         const { page, limit, offset } = pagination(params);
-        const conditions = ["oi.seller_user_id = ?"];
-        const values = [sellerUserId];
+
+        const conditions = ["oi.seller_id = ?"];
+        const values = [sellerId];
 
         if (params.status) {
             const status = String(params.status).trim();
@@ -704,21 +725,14 @@ async function getSellerOrders(sellerUserId, params = {}) {
         const where = conditions.join(" AND ");
 
         const [countRows] = await conn.execute(
-            `SELECT COUNT(*) AS total
-             FROM (
-                 SELECT o.id
-                 FROM marketplace_orders o
-                 INNER JOIN marketplace_order_items oi
-                    ON oi.order_id = o.id
-                 INNER JOIN marketplace_sellers s
-                    ON s.id = oi.seller_id
-                 INNER JOIN users u
-                    ON u.id = o.buyer_user_id
-                 WHERE s.user_id = ?
-                   AND ${conditions.slice(1).join(" AND ")}
-                 GROUP BY o.id
-             ) seller_orders`,
-            [sellerUserId, ...values.slice(1)]
+            `SELECT COUNT(DISTINCT o.id) AS total
+             FROM marketplace_orders o
+             INNER JOIN marketplace_order_items oi
+                ON oi.order_id = o.id
+             INNER JOIN users u
+                ON u.id = o.buyer_user_id
+             WHERE ${where}`,
+            values
         );
 
         const [rows] = await conn.execute(
@@ -737,12 +751,9 @@ async function getSellerOrders(sellerUserId, params = {}) {
              FROM marketplace_orders o
              INNER JOIN marketplace_order_items oi
                 ON oi.order_id = o.id
-             INNER JOIN marketplace_sellers s
-                ON s.id = oi.seller_id
              INNER JOIN users u
                 ON u.id = o.buyer_user_id
-             WHERE s.user_id = ?
-               AND ${conditions.slice(1).join(" AND ")}
+             WHERE ${where}
              GROUP BY
                 o.id,
                 o.order_code,
@@ -755,7 +766,7 @@ async function getSellerOrders(sellerUserId, params = {}) {
                 o.created_at
              ORDER BY o.created_at DESC, o.id DESC
              LIMIT ? OFFSET ?`,
-            [sellerUserId, ...values.slice(1), limit, offset]
+            [...values, limit, offset]
         );
 
         const total = Number(countRows[0]?.total || 0);
@@ -785,6 +796,8 @@ async function getSellerOrderDetail(sellerUserId, orderId) {
     const conn = await db.getConnection();
 
     try {
+        const sellerId = await getSellerId(conn, sellerUserId);
+
         const [orders] = await conn.execute(
             `SELECT
                 o.id,
@@ -798,16 +811,17 @@ async function getSellerOrderDetail(sellerUserId, orderId) {
                 o.paid_at,
                 o.created_at
              FROM marketplace_orders o
-             INNER JOIN marketplace_order_items oi
-                ON oi.order_id = o.id
-             INNER JOIN marketplace_sellers s
-                ON s.id = oi.seller_id
              INNER JOIN users u
                 ON u.id = o.buyer_user_id
              WHERE o.id = ?
-               AND s.user_id = ?
+               AND EXISTS (
+                   SELECT 1
+                   FROM marketplace_order_items oi
+                   WHERE oi.order_id = o.id
+                     AND oi.seller_id = ?
+               )
              LIMIT 1`,
-            [orderId, sellerUserId]
+            [orderId, sellerId]
         );
 
         if (!orders.length) fail("ORDER_NOT_FOUND");
@@ -830,14 +844,12 @@ async function getSellerOrderDetail(sellerUserId, orderId) {
                 d.protection_started_at,
                 d.protection_ends_at
              FROM marketplace_order_items oi
-             INNER JOIN marketplace_sellers s
-                ON s.id = oi.seller_id
              LEFT JOIN marketplace_deliveries d
                 ON d.order_item_id = oi.id
              WHERE oi.order_id = ?
-               AND s.user_id = ?
+               AND oi.seller_id = ?
              ORDER BY oi.id ASC`,
-            [orderId, sellerUserId]
+            [orderId, sellerId]
         );
 
         return {
@@ -852,6 +864,7 @@ async function getSellerOrderDetail(sellerUserId, orderId) {
         conn.release();
     }
 }
+
 
 module.exports = {
     getPublishedProducts,

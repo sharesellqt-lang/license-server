@@ -207,6 +207,8 @@ function handleError(res, error) {
         SELLER_REOPEN_STATUS_INVALID: 409,
         SELLER_STATUS_INVALID: 409,
         SELLER_NOT_FOUND: 404,
+        INVALID_ORDER_STATUS: 400,
+        INVALID_SEARCH: 400,
         
     };
 
