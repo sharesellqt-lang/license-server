@@ -9,6 +9,11 @@ const db = require("../db");
 
 const productService = require("../services/affiliate.product.service");
 const trackingService = require("../services/affiliate.tracking.service");
+const contributorPermissionService =
+    require("../services/contributor.permission.service");
+
+const requireContributorPermission =
+    require("../middleware/requireContributorPermission");
 
 const ERROR_STATUS = {
     INVALID_USER_ID: 400,
@@ -163,12 +168,6 @@ router.get("/go/:clickCode", async (req, res) => {
     }
 });
 
-/* =====================================================
-   AUTHENTICATED ROUTES
-===================================================== */
-
-router.use(auth);
-
 /* GET CATEGORIES */
 
 router.get("/categories", async (req, res) => {
@@ -216,9 +215,38 @@ router.get("/products/:id", async (req, res) => {
     }
 });
 
+/* =====================================================
+   AUTHENTICATED ROUTES
+===================================================== */
+router.use(auth);
+
+/* GET CURRENT USER AFFILIATE PERMISSIONS */
+
+router.get("/permissions", async (req, res) => {
+    try {
+        const result =
+            await contributorPermissionService.getUserPermissions(
+                getAuthenticatedUserId(req)
+            );
+
+        return res.json({
+            success: true,
+            permissions: result.permissions,
+            isSuperAdmin: result.isSuperAdmin,
+            canCreateLink: result.permissions.includes(
+                "affiliate.link.create"
+            )
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
 /* CREATE SHARE LINK */
 
-router.post("/links", async (req, res) => {
+router.post(
+    "/links",
+    requireContributorPermission("affiliate.link.create"),
+    async (req, res) => {
     try {
         const result = await trackingService.createLink(
             getAuthenticatedUserId(req),
@@ -254,7 +282,10 @@ router.get("/links", async (req, res) => {
 
 /* LEGACY CLICK API - KEEP COMPATIBILITY */
 
-router.post("/click", async (req, res) => {
+router.post(
+    "/click",
+    requireContributorPermission("affiliate.link.create"),
+    async (req, res) => {
     try {
         const result = await trackingService.createClick(
             getAuthenticatedUserId(req),
