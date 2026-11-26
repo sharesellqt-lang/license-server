@@ -10,6 +10,9 @@ const requireContributorPermission = require("../middleware/requireContributorPe
 
 const { writeAudit } = require("../services/contributor.audit.service");
 const { sendReceiptFile } = require("../services/marketplace.receipt.service");
+const {
+    createCommissionForDeliveredItem
+} = require("../services/marketplace.commission.create.service");
 
 router.use(auth);
 router.use(requireContributorPermission("marketplace.payment.view"));
@@ -353,7 +356,7 @@ router.post(
             conn = await db.getConnection();
             await conn.beginTransaction();
 
-            // Find the order belonging to this payment.
+            // Resolve the order before locking.
             const [paymentRefs] = await conn.execute(
                 `SELECT order_id
                  FROM marketplace_order_payments
@@ -371,9 +374,9 @@ router.post(
                 });
             }
 
-            const orderId = paymentRefs[0].order_id;
+            const orderId = Number(paymentRefs[0].order_id);
 
-            // Lock order first to coordinate with expiration and receipt flows.
+            // Lock order first.
             const [orders] = await conn.execute(
                 `SELECT
                     id,
@@ -433,6 +436,9 @@ router.post(
                 );
             }
 
+            let finalOrderPaymentStatus = order.payment_status;
+            let finalOrderStatus = order.order_status;
+
             if (decision === "paid") {
                 if (payment.payment_method !== "bank_transfer") {
                     await conn.rollback();
@@ -456,7 +462,6 @@ router.post(
                     );
                 }
 
-                // Never revive a cancelled, refunded or disputed order.
                 if (
                     ["cancelled", "refunded", "disputed"].includes(order.order_status) ||
                     ["cancelled", "refunded", "partially_refunded"].includes(order.payment_status)
@@ -485,8 +490,8 @@ router.post(
                     );
                 }
 
-                // A late Finance review is allowed only when the buyer
-                // submitted the receipt on or before the deadline.
+                // Finance may review late, but the buyer must have submitted
+                // the receipt on or before the payment deadline.
                 if (
                     !order.payment_deadline_at ||
                     new Date(payment.submitted_at).getTime() >
@@ -521,7 +526,6 @@ router.post(
                     );
                 }
 
-                // Underpayment and overpayment must be handled separately.
                 if (
                     paymentAmount !== orderAmount ||
                     receivedAmount !== orderAmount
@@ -552,7 +556,7 @@ router.post(
                     );
                 }
 
-                // Check duplicate bank transaction.
+                // Duplicate transaction protection.
                 const [duplicates] = await conn.execute(
                     `SELECT id
                      FROM marketplace_order_payments
@@ -573,6 +577,7 @@ router.post(
                     );
                 }
 
+                // Mark this payment as paid.
                 await conn.execute(
                     `UPDATE marketplace_order_payments
                      SET status = 'paid',
@@ -581,7 +586,8 @@ router.post(
                          verified_by_user_id = ?,
                          verified_at = NOW(),
                          verification_note = ?,
-                         paid_at = NOW()
+                         paid_at = NOW(),
+                         updated_at = NOW()
                      WHERE id = ?`,
                     [
                         transactionId,
@@ -591,7 +597,7 @@ router.post(
                     ]
                 );
 
-                // Prevent any other payment attempt from remaining active.
+                // Cancel other payment attempts.
                 await conn.execute(
                     `UPDATE marketplace_order_payments
                      SET status = 'cancelled',
@@ -602,16 +608,132 @@ router.post(
                     [orderId, paymentId]
                 );
 
+                // Lock order items independently.
+                // Avoid locking the nullable side of a LEFT JOIN.
+                const [orderItems] = await conn.execute(
+                    `SELECT
+                        id,
+                        order_id,
+                        seller_id,
+                        seller_user_id,
+                        line_total,
+                        currency
+                     FROM marketplace_order_items
+                     WHERE order_id = ?
+                     ORDER BY id ASC
+                     FOR UPDATE`,
+                    [orderId]
+                );
+
+                if (!orderItems.length) {
+                    throw new Error("ORDER_ITEMS_NOT_FOUND");
+                }
+
+                // Create commissions for items delivered before payment.
+                // Commission values must come from Delivery snapshots.
+                for (const item of orderItems) {
+                    const [deliveries] = await conn.execute(
+                        `SELECT
+                            id,
+                            status,
+                            protection_days,
+                            protection_started_at,
+                            protection_ends_at,
+                            seller_rate,
+                            platform_rate
+                         FROM marketplace_deliveries
+                         WHERE order_item_id = ?
+                         LIMIT 1
+                         FOR UPDATE`,
+                        [item.id]
+                    );
+
+                    if (!deliveries.length) continue;
+
+                    const delivery = deliveries[0];
+
+                    if (!["delivered", "confirmed"].includes(delivery.status)) {
+                        continue;
+                    }
+
+                    await createCommissionForDeliveredItem(
+                        conn,
+                        {
+                            ...item,
+                            payment_status: "paid",
+                            order_status: order.order_status
+                        },
+                        delivery,
+                        actorUserId
+                    );
+                }
+
+                // Revoke unused authorizations.
+                // Used authorizations remain as audit history.
+                await conn.execute(
+                    `UPDATE marketplace_delivery_authorizations a
+                     INNER JOIN marketplace_order_items oi
+                        ON oi.id = a.order_item_id
+                     SET a.status = 'revoked',
+                         a.revoked_by = ?,
+                         a.revoked_at = NOW(),
+                         a.revocation_reason = 'Order payment confirmed',
+                         a.updated_at = NOW()
+                     WHERE oi.order_id = ?
+                       AND a.status = 'authorized'`,
+                    [actorUserId, orderId]
+                );
+
+                // Derive order status from actual delivery progress.
+                const [[deliveryCounts]] = await conn.execute(
+                    `SELECT
+                        COUNT(*) AS total_items,
+                        SUM(
+                            CASE
+                                WHEN d.status IN ('delivered', 'confirmed')
+                                THEN 1 ELSE 0
+                            END
+                        ) AS delivered_items,
+                        SUM(
+                            CASE
+                                WHEN d.status = 'confirmed'
+                                THEN 1 ELSE 0
+                            END
+                        ) AS confirmed_items
+                     FROM marketplace_order_items oi
+                     LEFT JOIN marketplace_deliveries d
+                        ON d.order_item_id = oi.id
+                     WHERE oi.order_id = ?`,
+                    [orderId]
+                );
+
+                const totalItems = Number(deliveryCounts.total_items || 0);
+                const deliveredItems = Number(deliveryCounts.delivered_items || 0);
+                const confirmedItems = Number(deliveryCounts.confirmed_items || 0);
+
+                if (totalItems > 0 && confirmedItems >= totalItems) {
+                    finalOrderStatus = "completed";
+                } else if (totalItems > 0 && deliveredItems >= totalItems) {
+                    finalOrderStatus = "delivered";
+                } else if (deliveredItems > 0) {
+                    finalOrderStatus = "partially_delivered";
+                } else {
+                    finalOrderStatus = "paid";
+                }
+
+                finalOrderPaymentStatus = "paid";
+
                 await conn.execute(
                     `UPDATE marketplace_orders
                      SET payment_status = 'paid',
-                         order_status = 'paid',
-                         paid_at = NOW(),
+                         order_status = ?,
+                         paid_at = COALESCE(paid_at, NOW()),
                          updated_at = NOW()
                      WHERE id = ?`,
-                    [orderId]
+                    [finalOrderStatus, orderId]
                 );
             } else {
+                // Reject only the current payment attempt.
                 await conn.execute(
                     `UPDATE marketplace_order_payments
                      SET status = 'failed',
@@ -623,32 +745,80 @@ router.post(
                     [actorUserId, note, paymentId]
                 );
 
-                // If the deadline has passed, close the order instead
-                // of reopening an order that cannot accept another attempt.
-                const [deadlineRows] = await conn.execute(
+                // Re-check all other active attempts after rejecting this one.
+                const [[activePayments]] = await conn.execute(
                     `SELECT
-                        (
-                            payment_deadline_at IS NOT NULL
-                            AND payment_deadline_at <= NOW()
-                        ) AS expired
+                        COUNT(*) AS active_count,
+                        SUM(
+                            CASE WHEN status = 'processing'
+                            THEN 1 ELSE 0 END
+                        ) AS processing_count
+                     FROM marketplace_order_payments
+                     WHERE order_id = ?
+                       AND status IN ('pending', 'processing')`,
+                    [orderId]
+                );
+
+                const activeCount = Number(activePayments.active_count || 0);
+                const processingCount = Number(activePayments.processing_count || 0);
+
+                const [[deadlineInfo]] = await conn.execute(
+                    `SELECT
+                        CASE
+                            WHEN payment_deadline_at IS NOT NULL
+                             AND payment_deadline_at <= NOW()
+                            THEN 1 ELSE 0
+                        END AS expired
                      FROM marketplace_orders
                      WHERE id = ?
                      LIMIT 1`,
                     [orderId]
                 );
 
-                const expired = Number(deadlineRows[0]?.expired) === 1;
+                const expired = Number(deadlineInfo?.expired || 0) === 1;
 
-                if (expired) {
+                if (processingCount > 0) {
+                    // Another receipt is still awaiting Finance review.
+                    // Never cancel the order while this attempt is processing.
+                    finalOrderPaymentStatus = "processing";
+                    finalOrderStatus = "processing";
+
+                    await conn.execute(
+                        `UPDATE marketplace_orders
+                         SET payment_status = 'processing',
+                             order_status = 'processing',
+                             updated_at = NOW()
+                         WHERE id = ?
+                           AND payment_status <> 'paid'`,
+                        [orderId]
+                    );
+                } else if (expired) {
+                    // No processing receipt remains and the deadline expired.
                     await conn.execute(
                         `UPDATE marketplace_order_payments
                          SET status = 'cancelled',
                              updated_at = NOW()
                          WHERE order_id = ?
-                           AND id <> ?
-                           AND status IN ('pending', 'processing')`,
-                        [orderId, paymentId]
+                           AND status = 'pending'`,
+                        [orderId]
                     );
+
+                    await conn.execute(
+                        `UPDATE marketplace_delivery_authorizations a
+                         INNER JOIN marketplace_order_items oi
+                            ON oi.id = a.order_item_id
+                         SET a.status = 'revoked',
+                             a.revoked_by = ?,
+                             a.revoked_at = NOW(),
+                             a.revocation_reason = 'Order payment deadline expired',
+                             a.updated_at = NOW()
+                         WHERE oi.order_id = ?
+                           AND a.status = 'authorized'`,
+                        [actorUserId, orderId]
+                    );
+
+                    finalOrderPaymentStatus = "cancelled";
+                    finalOrderStatus = "cancelled";
 
                     await conn.execute(
                         `UPDATE marketplace_orders
@@ -661,6 +831,11 @@ router.post(
                         [orderId]
                     );
                 } else {
+                    // No processing receipt remains.
+                    // Keep the order payable until its deadline.
+                    finalOrderPaymentStatus = "pending";
+                    finalOrderStatus = "pending_payment";
+
                     await conn.execute(
                         `UPDATE marketplace_orders
                          SET payment_status = 'pending',
@@ -687,14 +862,8 @@ router.post(
                 },
                 newData: {
                     paymentStatus: decision,
-                    orderPaymentStatus: decision === "paid"
-                        ? "paid"
-                        : (
-                            order.payment_deadline_at &&
-                            new Date(order.payment_deadline_at).getTime() <= Date.now()
-                                ? "cancelled"
-                                : "pending"
-                        ),
+                    orderPaymentStatus: finalOrderPaymentStatus,
+                    orderStatus: finalOrderStatus,
                     providerTransactionId: decision === "paid"
                         ? transactionId
                         : null,
@@ -716,14 +885,8 @@ router.post(
                     paymentId,
                     orderId,
                     paymentStatus: decision,
-                    orderPaymentStatus: decision === "paid"
-                        ? "paid"
-                        : (
-                            order.payment_deadline_at &&
-                            new Date(order.payment_deadline_at).getTime() <= Date.now()
-                                ? "cancelled"
-                                : "pending"
-                        )
+                    orderPaymentStatus: finalOrderPaymentStatus,
+                    orderStatus: finalOrderStatus
                 }
             });
         } catch (err) {
@@ -738,6 +901,14 @@ router.post(
                     success: false,
                     code: "DUPLICATE_BANK_TRANSACTION",
                     message: "Mã giao dịch ngân hàng đã được sử dụng."
+                });
+            }
+
+            if (err.code === "ORDER_ITEMS_NOT_FOUND") {
+                return res.status(409).json({
+                    success: false,
+                    code: "ORDER_ITEMS_NOT_FOUND",
+                    message: "Đơn hàng không có sản phẩm hợp lệ để xác minh."
                 });
             }
 

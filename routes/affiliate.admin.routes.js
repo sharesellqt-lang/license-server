@@ -180,6 +180,8 @@ function sendError(res, error) {
         "INVALID_AFFILIATE_PAYOUT",
         "INVALID_AFFILIATE_PAYOUT_PRECISION",
         "INVALID_AFFILIATE_COMMISSION_TOTAL",
+        "AFFILIATE_CATEGORY_INACTIVE",
+        "AFFILIATE_CATEGORY_AMBIGUOUS",
     ];
 
     const notFoundErrors = [
@@ -432,11 +434,18 @@ router.post(
     requireContributorPermission("affiliate.sync"),
     async (req, res) => {
         try {
-            if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-                throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
+            if (
+                !req.body ||
+                typeof req.body !== "object" ||
+                Array.isArray(req.body)
+            ) {
+                throw new Error("INVALID_PRODUCT_IMPORT_REQUEST");
             }
-  // KIỂM TRA ROWS TẠI ĐÂY
-            if (!Array.isArray(req.body.rows) || !req.body.rows.length) {
+
+            if (
+                !Array.isArray(req.body.rows) ||
+                !req.body.rows.length
+            ) {
                 throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
             }
 
@@ -444,7 +453,8 @@ router.post(
                 req.body.rows,
                 {
                     networkCode: req.body.networkCode,
-                    networkId: req.body.networkId
+                    networkId: req.body.networkId,
+                    categoryId: req.body.categoryId
                 }
             );
 
@@ -454,6 +464,7 @@ router.post(
         }
     }
 );
+
 
 router.post(
     "/products/import/commit",

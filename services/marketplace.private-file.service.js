@@ -126,6 +126,42 @@ async function getBuyerDeliveryFile(userId, deliveryId, fileId) {
     return rows[0];
 }
 
+
+// Buyer: tải file thuộc một phiên bản giao hàng cụ thể.
+async function getBuyerDeliveryVersionFile(userId, deliveryId, versionId, fileId) {
+    userId = validId(userId);
+    deliveryId = validId(deliveryId);
+    versionId = validId(versionId);
+    fileId = validId(fileId);
+
+    const [rows] = await db.execute(
+        `SELECT vf.id, vf.original_name, vf.storage_key,
+                vf.mime_type, vf.file_size
+         FROM marketplace_delivery_version_files vf
+         INNER JOIN marketplace_delivery_versions v
+            ON v.id = vf.version_id
+         INNER JOIN marketplace_deliveries d
+            ON d.id = v.delivery_id
+         INNER JOIN marketplace_order_items oi
+            ON oi.id = d.order_item_id
+         INNER JOIN marketplace_orders o
+            ON o.id = oi.order_id
+         WHERE o.buyer_user_id = ?
+           AND o.payment_status = 'paid'
+           AND o.order_status NOT IN ('cancelled', 'refunded', 'disputed')
+           AND d.id = ?
+           AND d.status IN ('delivered', 'confirmed')
+           AND v.id = ?
+           AND vf.id = ?
+         LIMIT 1`,
+        [userId, deliveryId, versionId, fileId]
+    );
+
+    if (!rows.length) fail("PRIVATE_FILE_NOT_FOUND");
+
+    return rows[0];
+}
+
 async function sendPrivateFile(res, file, options = {}) {
     const filePath = resolvePrivateFile(file.storage_key);
 
@@ -178,5 +214,6 @@ module.exports = {
     getSellerProductFile,
     getPublicDemoFile,
     getBuyerDeliveryFile,
-    sendPrivateFile
+    sendPrivateFile,
+    getBuyerDeliveryVersionFile,
 };

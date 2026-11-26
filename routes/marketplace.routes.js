@@ -47,7 +47,7 @@ router.post("/admin/order-items/:orderItemId/delivery-authorization", requireAdm
         const result = await deliveryService.authorizeDelivery(
             req.user.id,
             req.params.orderItemId,
-            req.body.reason
+            (req.body || {}).reason
         );
         return res.json({ success: true, data: result });
     } catch (error) {
@@ -281,6 +281,9 @@ function handleError(res, error) {
         DELIVERY_AUTHORIZATION_ALREADY_USED: 409,
         ACTIVE_AUTHORIZATION_EXISTS: 409,
         AUTHORIZATION_NOT_REVOCABLE: 409,
+        ORDER_ALREADY_PAID: 409,
+        ORDER_ALREADY_PAID: 409,
+        PRIVATE_FILE_NOT_FOUND: 404,
         
     };
 
@@ -1148,5 +1151,44 @@ router.post("/buyer/deliveries/:deliveryId/confirm", async (req, res) => {
         return handleError(res, error);
     }
 });
+
+
+// Buyer: xem chi tiết giao hàng và lịch sử phiên bản
+router.get("/buyer/deliveries/:deliveryId", async (req, res) => {
+    try {
+        const result = await deliveryService.getBuyerDeliveryDetail(
+            req.user.id,
+            req.params.deliveryId
+        );
+
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Buyer: tải file theo phiên bản giao hàng
+router.get(
+    "/buyer/deliveries/:deliveryId/versions/:versionId/files/:fileId/download",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getBuyerDeliveryVersionFile(
+                req.user.id,
+                req.params.deliveryId,
+                req.params.versionId,
+                req.params.fileId
+            );
+
+            return await privateFileService.sendPrivateFile(
+                res,
+                file,
+                { download: true }
+            );
+        } catch (error) {
+            if (res.headersSent) return;
+            return handleError(res, error);
+        }
+    }
+);
 
 module.exports = router;

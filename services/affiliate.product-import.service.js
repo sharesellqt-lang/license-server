@@ -26,6 +26,15 @@ function normalizeKey(value) {
         .replace(/[^a-z0-9]/g, "");
 }
 
+function normalizeCategoryPath(value) {
+    return String(value || "")
+        .trim()
+        .split(/\s*(?:>|\/)\s*/)
+        .map(part => normalizeKey(part))
+        .filter(Boolean)
+        .join(">");
+}
+
 function normalizeRow(row = {}) {
     const result = {};
 
@@ -69,7 +78,6 @@ function cleanText(value, maxLength = 500, field = "unknown") {
     return result;
 }
 
-
 function decodeHtmlEntities(value) {
     return String(value)
         .replace(/&nbsp;|&#160;/gi, " ")
@@ -80,12 +88,14 @@ function decodeHtmlEntities(value) {
         .replace(/&gt;/gi, ">")
         .replace(/&#(\d+);/g, (match, code) => {
             const number = Number(code);
+
             return number > 0 && number <= 0x10FFFF
                 ? String.fromCodePoint(number)
                 : " ";
         })
         .replace(/&#x([0-9a-f]+);/gi, (match, code) => {
             const number = parseInt(code, 16);
+
             return number > 0 && number <= 0x10FFFF
                 ? String.fromCodePoint(number)
                 : " ";
@@ -236,11 +246,9 @@ function createShortDescription(value, maxLength = 500, title = "") {
     return result.trim();
 }
 
-
 // =====================================================
 // PRICE NORMALIZATION
 // =====================================================
-
 
 function parsePrice(value, currency = "VND") {
     if (value === undefined || value === null || value === "") {
@@ -304,7 +312,6 @@ function parsePrice(value, currency = "VND") {
     return price;
 }
 
-
 // =====================================================
 // URL VALIDATION
 // =====================================================
@@ -334,7 +341,6 @@ function validHttpUrl(value, errorCode, required = false) {
 // PRODUCT NORMALIZATION
 // =====================================================
 
-
 function normalizeProductRow(row = {}) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
         throw new Error("INVALID_PRODUCT_IMPORT_ROW");
@@ -343,9 +349,9 @@ function normalizeProductRow(row = {}) {
     const data = normalizeRow(row);
 
     const productId = cleanText(
-    pick(data, "productId", "product_id"),
-    100,
-    "productId"
+        pick(data, "productId", "product_id"),
+        100,
+        "productId"
     );
 
     const skuId = cleanText(
@@ -360,22 +366,39 @@ function normalizeProductRow(row = {}) {
         "title"
     );
 
-  
-const rawDescription = pick(
-    data,
-    "shortDescription",
-    "short_description",
-    "description",
-    "productDescription",
-    "product_description"
-);
+    const rawCategory = pick(
+        data,
+        "category",
+        "categoryName",
+        "category_name",
+        "productCategory",
+        "product_category",
+        "categorySlug",
+        "category_slug",
+        "danhMuc",
+        "tenDanhMuc"
+    );
 
-const shortDescription = createShortDescription(
-    rawDescription,
-    500,
-    title
-);
+    const category = cleanText(
+        rawCategory,
+        500,
+        "category"
+    );
 
+    const rawDescription = pick(
+        data,
+        "shortDescription",
+        "short_description",
+        "description",
+        "productDescription",
+        "product_description"
+    );
+
+    const shortDescription = createShortDescription(
+        rawDescription,
+        500,
+        title
+    );
 
     const rawCurrency = cleanText(
         pick(data, "currency"),
@@ -426,6 +449,10 @@ const shortDescription = createShortDescription(
         title
     };
 
+    if (category !== null) {
+        result.category = category;
+    }
+
     if (rawCurrency) {
         result.currency = currency;
     }
@@ -462,7 +489,6 @@ const shortDescription = createShortDescription(
     return result;
 }
 
-
 // =====================================================
 // NETWORK
 // =====================================================
@@ -495,13 +521,222 @@ async function resolveNetwork(networkValue) {
 }
 
 // =====================================================
+// CATEGORY RESOLUTION
+// =====================================================
+
+async function loadImportCategories() {
+    const [rows] = await db.execute(
+        `SELECT id, name, slug, parent_id, status
+         FROM affiliate_categories
+         ORDER BY id ASC`
+    );
+
+    const categories = rows.map(item => ({
+        id: Number(item.id),
+        name: String(item.name || "").trim(),
+        slug: String(item.slug || "").trim(),
+        parentId: item.parent_id === null
+            ? null
+            : Number(item.parent_id),
+        status: String(item.status || "").toLowerCase()
+    }));
+
+    const byId = new Map(
+        categories.map(item => [item.id, item])
+    );
+
+    function getPath(category) {
+        const parts = [];
+        const visited = new Set();
+        let current = category;
+
+        while (current && !visited.has(current.id)) {
+            visited.add(current.id);
+            parts.unshift(current.name);
+
+            current = current.parentId
+                ? byId.get(current.parentId)
+                : null;
+        }
+
+        return parts.join(" > ");
+    }
+
+    return categories.map(category => {
+        const path = getPath(category);
+
+        return {
+            ...category,
+            path,
+            normalizedName: normalizeKey(category.name),
+            normalizedSlug: normalizeKey(category.slug),
+            normalizedPath: normalizeCategoryPath(path)
+        };
+    });
+}
+
+function validateDefaultCategory(categoryId, categories) {
+    if (
+        categoryId === undefined ||
+        categoryId === null ||
+        categoryId === ""
+    ) {
+        return null;
+    }
+
+    const id = Number(categoryId);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        throw new Error("INVALID_CATEGORY_ID");
+    }
+
+    const category = categories.find(item => item.id === id);
+
+    if (!category) {
+        throw new Error("AFFILIATE_CATEGORY_NOT_FOUND");
+    }
+
+    if (category.status !== "active") {
+        throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+    }
+
+    return category;
+}
+
+function resolveRowCategory(value, categories) {
+    const raw = String(value || "").trim();
+
+    if (!raw) return null;
+
+    const key = normalizeKey(raw);
+    const pathKey = normalizeCategoryPath(raw);
+
+    if (!key) return null;
+
+    // Ưu tiên slug vì slug được quản lý duy nhất trong hệ thống.
+    const slugMatches = categories.filter(
+        item => item.normalizedSlug === key
+    );
+
+    if (slugMatches.length === 1) {
+        const category = slugMatches[0];
+
+        if (category.status !== "active") {
+            throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+        }
+
+        return category;
+    }
+
+    if (slugMatches.length > 1) {
+        throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+    }
+
+    // Đối chiếu đường dẫn đầy đủ, ví dụ:
+    // Điện tử > Phụ kiện
+    // Điện tử/Phụ kiện
+    const pathMatches = categories.filter(
+        item => item.normalizedPath === pathKey
+    );
+
+    if (pathMatches.length === 1) {
+        const category = pathMatches[0];
+
+        if (category.status !== "active") {
+            throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+        }
+
+        return category;
+    }
+
+    if (pathMatches.length > 1) {
+        throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+    }
+
+    // Tìm theo tên danh mục.
+    const nameMatches = categories.filter(
+        item => item.normalizedName === key
+    );
+
+    if (!nameMatches.length) {
+        throw new Error("AFFILIATE_CATEGORY_NOT_FOUND");
+    }
+
+    if (nameMatches.length > 1) {
+        throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+    }
+
+    const category = nameMatches[0];
+
+    if (category.status !== "active") {
+        throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+    }
+
+    return category;
+}
+
+function resolveImportCategory(
+    product,
+    existing,
+    defaultCategory,
+    categories
+) {
+    // Danh mục trong từng dòng CSV có độ ưu tiên cao nhất.
+    if (product.category) {
+        const category = resolveRowCategory(
+            product.category,
+            categories
+        );
+
+        return {
+            categoryId: category.id,
+            categoryName: category.name,
+            categoryPath: category.path,
+            categorySource: "file"
+        };
+    }
+
+    // Nếu CSV không có danh mục thì dùng danh mục mặc định.
+    if (defaultCategory) {
+        return {
+            categoryId: defaultCategory.id,
+            categoryName: defaultCategory.name,
+            categoryPath: defaultCategory.path,
+            categorySource: "default"
+        };
+    }
+
+    // Không có lựa chọn mới: giữ nguyên danh mục sản phẩm cũ.
+    if (existing && existing.category_id) {
+        const category = categories.find(
+            item => item.id === Number(existing.category_id)
+        );
+
+        return {
+            categoryId: Number(existing.category_id),
+            categoryName: category?.name || null,
+            categoryPath: category?.path || null,
+            categorySource: "preserved"
+        };
+    }
+
+    return {
+        categoryId: null,
+        categoryName: null,
+        categoryPath: null,
+        categorySource: "none"
+    };
+}
+
+// =====================================================
 // EXISTING PRODUCT
 // =====================================================
 
 async function findExistingProduct(networkId, product) {
     const [rows] = await db.execute(
         `SELECT id, product_id, sku_id, title, price,
-                currency, image_url, affiliate_link, final_url
+                currency, image_url, affiliate_link, final_url,
+                category_id
          FROM affiliate_products
          WHERE network_id = ?
            AND product_id = ?
@@ -535,7 +770,6 @@ function validateProductData(product, isExisting) {
 // PREVIEW
 // =====================================================
 
-
 async function previewProductsImport(rows, options = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
@@ -547,6 +781,13 @@ async function previewProductsImport(rows, options = {}) {
 
     const network = await resolveNetwork(
         options.networkCode || options.networkId || "lazada"
+    );
+
+    const categories = await loadImportCategories();
+
+    const defaultCategory = validateDefaultCategory(
+        options.categoryId,
+        categories
     );
 
     const seen = new Set();
@@ -587,6 +828,13 @@ async function previewProductsImport(rows, options = {}) {
                 product
             );
 
+            const categoryInfo = resolveImportCategory(
+                product,
+                existing,
+                defaultCategory,
+                categories
+            );
+
             validateProductData(product, Boolean(existing));
 
             seen.add(identity);
@@ -622,6 +870,12 @@ async function previewProductsImport(rows, options = {}) {
                 existingId: existing ? existing.id : null,
                 price: product.price ?? existing?.price ?? null,
                 currency: product.currency || existing?.currency || "VND",
+
+                categoryId: categoryInfo.categoryId,
+                categoryName: categoryInfo.categoryName,
+                categoryPath: categoryInfo.categoryPath,
+                categorySource: categoryInfo.categorySource,
+
                 valid: true
             });
         } catch (error) {
@@ -691,7 +945,6 @@ async function finishSyncLog(syncId, data) {
 // COMMIT
 // =====================================================
 
-
 async function commitProductsImport(rows, options = {}) {
     if (!Array.isArray(rows) || !rows.length) {
         throw new Error("AFFILIATE_IMPORT_DATA_REQUIRED");
@@ -709,6 +962,14 @@ async function commitProductsImport(rows, options = {}) {
 
     const network = await resolveNetwork(
         options.networkCode || options.networkId || "lazada"
+    );
+
+    // Kiểm tra danh mục mặc định trước khi tạo Sync Log.
+    const categories = await loadImportCategories();
+
+    const defaultCategory = validateDefaultCategory(
+        options.categoryId,
+        categories
     );
 
     const syncId = await createSyncLog({
@@ -759,6 +1020,13 @@ async function commitProductsImport(rows, options = {}) {
                     product
                 );
 
+                const categoryInfo = resolveImportCategory(
+                    product,
+                    existing,
+                    defaultCategory,
+                    categories
+                );
+
                 validateProductData(product, Boolean(existing));
 
                 seen.add(identity);
@@ -785,6 +1053,16 @@ async function commitProductsImport(rows, options = {}) {
                         ) {
                             updateData[field] = product[field];
                         }
+                    }
+
+                    // Chỉ cập nhật category khi có lựa chọn mới.
+                    // Nếu không có category trong file và không có mặc định,
+                    // giữ nguyên category_id hiện tại.
+                    if (
+                        categoryInfo.categorySource === "file" ||
+                        categoryInfo.categorySource === "default"
+                    ) {
+                        updateData.categoryId = categoryInfo.categoryId;
                     }
 
                     if (Object.keys(updateData).length) {
@@ -816,7 +1094,7 @@ async function commitProductsImport(rows, options = {}) {
                             networkId: network.id,
                             sourceType: "import",
                             status: options.defaultStatus || "draft",
-                            categoryId: options.categoryId || null
+                            categoryId: categoryInfo.categoryId
                         },
                         options.createdBy,
                         options.audit || {}
@@ -864,7 +1142,7 @@ async function commitProductsImport(rows, options = {}) {
         });
 
         return result;
-        } catch (error) {
+    } catch (error) {
         try {
             await finishSyncLog(syncId, {
                 status: "failed",
