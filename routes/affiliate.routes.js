@@ -168,6 +168,38 @@ router.get("/go/:clickCode", async (req, res) => {
     }
 });
 
+/* =====================================================
+   PUBLIC BUY - DIRECT LAZADA REDIRECT
+   Không yêu cầu đăng nhập hoặc quyền tiếp thị.
+===================================================== */
+
+router.get("/buy/:productId", async (req, res) => {
+    try {
+        const destination =
+            await trackingService.getProductDestination(
+                req.params.productId
+            );
+
+        return res.redirect(302, destination);
+
+    } catch (error) {
+        const status = getErrorStatus(error);
+
+        if (status === 500) {
+            console.error("[AFFILIATE PUBLIC BUY]", error);
+        }
+
+        return res.status(status).send(
+            status === 404
+                ? "Sản phẩm không tồn tại."
+                : status === 409
+                    ? "Sản phẩm hiện không khả dụng."
+                    : status === 500
+                        ? "Không thể chuyển đến trang bán hàng."
+                        : "Thông tin sản phẩm không hợp lệ."
+        );
+    }
+});
 /* GET CATEGORIES */
 
 router.get("/categories", async (req, res) => {

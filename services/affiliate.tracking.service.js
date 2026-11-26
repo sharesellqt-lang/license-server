@@ -108,6 +108,16 @@ async function getActiveProduct(productId) {
 }
 
 /* =====================================================
+   PUBLIC BUY - DIRECT PRODUCT DESTINATION
+   Không tạo tracking link riêng, không ghi nhận click.
+===================================================== */
+
+async function getProductDestination(productId) {
+    const product = await getActiveProduct(productId);
+
+    return validateLazadaUrl(product.affiliate_link);
+}
+/* =====================================================
    CREATE SHARE LINK
    Không ghi nhận lượt click tại đây.
 ===================================================== */
@@ -353,5 +363,6 @@ module.exports = {
     createLink,
     createClick,
     getLinks,
-    getClickDestination
+    getClickDestination,
+    getProductDestination
 };
