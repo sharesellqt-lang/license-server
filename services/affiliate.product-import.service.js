@@ -21,6 +21,7 @@ function normalizeKey(value) {
     return String(value || "")
         .trim()
         .toLowerCase()
+        .replace(/đ/g, "d")
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z0-9]/g, "");
@@ -29,6 +30,7 @@ function normalizeKey(value) {
 function normalizeCategoryPath(value) {
     return String(value || "")
         .trim()
+        .replace(/[–—]/g, "-")
         .split(/\s*(?:>|\/)\s*/)
         .map(part => normalizeKey(part))
         .filter(Boolean)
@@ -177,7 +179,6 @@ function createShortDescription(value, maxLength = 500, title = "") {
             if (!key || seen.has(key)) return false;
             seen.add(key);
 
-            // Không lặp lại tiêu đề sản phẩm
             if (titleKey && key === titleKey) return false;
 
             return true;
@@ -191,7 +192,7 @@ function createShortDescription(value, maxLength = 500, title = "") {
         "form ", "kích thước", "size ", "trọng lượng",
         "thêu", "đính", "chống nước", "dung lượng",
         "công suất", "tính năng", "phù hợp",
-        "sử dụng", "chất liệu", "đường may"
+        "sử dụng", "đường may"
     ];
 
     const scored = sentences.map((sentence, index) => {
@@ -213,7 +214,6 @@ function createShortDescription(value, maxLength = 500, title = "") {
         return { sentence, index, score };
     });
 
-    // Ưu tiên thông tin thực tế, nhưng giữ thứ tự câu ban đầu
     const useful = scored.filter(item => item.score > 0);
     const candidates = useful.length ? useful : scored.slice(0, 2);
 
@@ -235,7 +235,6 @@ function createShortDescription(value, maxLength = 500, title = "") {
 
     let result = selected.map(item => item.sentence).join(" ");
 
-    // Trường hợp không có câu nào vừa giới hạn
     if (!result) {
         result = sentences[0].slice(0, maxLength);
         const lastSpace = result.lastIndexOf(" ");
@@ -379,11 +378,7 @@ function normalizeProductRow(row = {}) {
         "tenDanhMuc"
     );
 
-    const category = cleanText(
-        rawCategory,
-        500,
-        "category"
-    );
+    const category = cleanText(rawCategory, 500, "category");
 
     const rawDescription = pick(
         data,
@@ -449,13 +444,8 @@ function normalizeProductRow(row = {}) {
         title
     };
 
-    if (category !== null) {
-        result.category = category;
-    }
-
-    if (rawCurrency) {
-        result.currency = currency;
-    }
+    if (category !== null) result.category = category;
+    if (rawCurrency) result.currency = currency;
 
     if (shortDescription !== null) {
         result.shortDescription = shortDescription;
@@ -521,49 +511,41 @@ async function resolveNetwork(networkValue) {
 }
 
 // =====================================================
-// CATEGORY RESOLUTION
+// CATEGORY HELPERS
 // =====================================================
 
-async function loadImportCategories() {
-    const [rows] = await db.execute(
-        `SELECT id, name, slug, parent_id, status
-         FROM affiliate_categories
-         ORDER BY id ASC`
-    );
+function buildCategoryPath(categories, category) {
+    const byId = new Map(categories.map(item => [item.id, item]));
+    const parts = [];
+    const visited = new Set();
 
+    let current = category;
+
+    while (current && !visited.has(current.id)) {
+        visited.add(current.id);
+        parts.unshift(current.name);
+
+        current = current.parentId
+            ? byId.get(current.parentId)
+            : null;
+    }
+
+    return parts.join(" > ");
+}
+
+function mapImportCategories(rows) {
     const categories = rows.map(item => ({
         id: Number(item.id),
         name: String(item.name || "").trim(),
         slug: String(item.slug || "").trim(),
-        parentId: item.parent_id === null
+        parentId: item.parent_id == null
             ? null
             : Number(item.parent_id),
         status: String(item.status || "").toLowerCase()
     }));
 
-    const byId = new Map(
-        categories.map(item => [item.id, item])
-    );
-
-    function getPath(category) {
-        const parts = [];
-        const visited = new Set();
-        let current = category;
-
-        while (current && !visited.has(current.id)) {
-            visited.add(current.id);
-            parts.unshift(current.name);
-
-            current = current.parentId
-                ? byId.get(current.parentId)
-                : null;
-        }
-
-        return parts.join(" > ");
-    }
-
     return categories.map(category => {
-        const path = getPath(category);
+        const path = buildCategoryPath(categories, category);
 
         return {
             ...category,
@@ -573,6 +555,26 @@ async function loadImportCategories() {
             normalizedPath: normalizeCategoryPath(path)
         };
     });
+}
+
+async function loadImportCategories() {
+    const [rows] = await db.execute(
+        `SELECT id, name, slug, parent_id, status
+         FROM affiliate_categories
+         ORDER BY id ASC`
+    );
+
+    return mapImportCategories(rows);
+}
+
+async function refreshImportCategories(conn) {
+    const [rows] = await conn.execute(
+        `SELECT id, name, slug, parent_id, status
+         FROM affiliate_categories
+         ORDER BY id ASC`
+    );
+
+    return mapImportCategories(rows);
 }
 
 function validateDefaultCategory(categoryId, categories) {
@@ -603,6 +605,99 @@ function validateDefaultCategory(categoryId, categories) {
     return category;
 }
 
+function createCategorySlug(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/đ/g, "d")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 180);
+}
+
+function findCategoryByParentAndName(categories, name, parentId) {
+    const key = normalizeKey(name);
+
+    return categories.filter(item =>
+        item.parentId === parentId &&
+        item.normalizedName === key
+    );
+}
+
+function findCategoryBySlug(categories, slug) {
+    const key = normalizeKey(slug);
+
+    return categories.filter(item =>
+        item.normalizedSlug === key
+    );
+}
+
+function categorySegments(value) {
+    return String(value || "")
+        .trim()
+        .split(/\s*(?:>|\/)\s*/)
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+function categoryErrorCode(error) {
+    return error?.code || error?.message || "";
+}
+
+function isCategoryDuplicateError(error) {
+    return (
+        error?.code === "ER_DUP_ENTRY" ||
+        error?.code === "CATEGORY_SLUG_EXISTS"
+    );
+}
+
+function makeUniqueCategorySlug(categories, name, parentId) {
+    const base = createCategorySlug(name);
+
+    if (!base) {
+        throw new Error("INVALID_CATEGORY_NAME");
+    }
+
+    const used = new Set(
+        categories.map(item => String(item.slug || "").toLowerCase())
+    );
+
+    if (!used.has(base)) return base;
+
+    const parent = parentId
+        ? categories.find(item => item.id === parentId)
+        : null;
+
+    const parentSlug = parent
+        ? createCategorySlug(parent.slug || parent.name)
+        : "category";
+
+    const branchBase = `${base.slice(0, 180 - parentSlug.length - 1)}-${parentSlug}`;
+
+    if (!used.has(branchBase)) return branchBase;
+
+    for (let index = 2; index < 10000; index++) {
+        const suffix = `-${index}`;
+        const candidate = `${branchBase.slice(0, 180 - suffix.length)}${suffix}`;
+
+        if (!used.has(candidate)) return candidate;
+    }
+
+    throw new Error("AFFILIATE_CATEGORY_SLUG_GENERATION_FAILED");
+}
+
+function assertActiveCategory(category) {
+    if (category && category.status !== "active") {
+        throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+    }
+}
+
+// =====================================================
+// CATEGORY RESOLUTION - PREVIEW
+// =====================================================
+
 function resolveRowCategory(value, categories) {
     const raw = String(value || "").trim();
 
@@ -613,47 +708,30 @@ function resolveRowCategory(value, categories) {
 
     if (!key) return null;
 
-    // Ưu tiên slug vì slug được quản lý duy nhất trong hệ thống.
-    const slugMatches = categories.filter(
-        item => item.normalizedSlug === key
-    );
+    const slugMatches = findCategoryBySlug(categories, raw);
 
     if (slugMatches.length === 1) {
-        const category = slugMatches[0];
-
-        if (category.status !== "active") {
-            throw new Error("AFFILIATE_CATEGORY_INACTIVE");
-        }
-
-        return category;
+        assertActiveCategory(slugMatches[0]);
+        return slugMatches[0];
     }
 
     if (slugMatches.length > 1) {
         throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
     }
 
-    // Đối chiếu đường dẫn đầy đủ, ví dụ:
-    // Điện tử > Phụ kiện
-    // Điện tử/Phụ kiện
     const pathMatches = categories.filter(
         item => item.normalizedPath === pathKey
     );
 
     if (pathMatches.length === 1) {
-        const category = pathMatches[0];
-
-        if (category.status !== "active") {
-            throw new Error("AFFILIATE_CATEGORY_INACTIVE");
-        }
-
-        return category;
+        assertActiveCategory(pathMatches[0]);
+        return pathMatches[0];
     }
 
     if (pathMatches.length > 1) {
         throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
     }
 
-    // Tìm theo tên danh mục.
     const nameMatches = categories.filter(
         item => item.normalizedName === key
     );
@@ -666,14 +744,336 @@ function resolveRowCategory(value, categories) {
         throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
     }
 
-    const category = nameMatches[0];
+    assertActiveCategory(nameMatches[0]);
+    return nameMatches[0];
+}
 
-    if (category.status !== "active") {
-        throw new Error("AFFILIATE_CATEGORY_INACTIVE");
+/*
+ * Preview không ghi DB.
+ *
+ * Với đường dẫn Parent > Child:
+ * - Nếu Parent đã tồn tại và inactive: báo lỗi.
+ * - Nếu Parent tồn tại và active, Child chưa có: will_create.
+ * - Nếu Parent chưa có: đánh dấu will_create cho cả nhánh.
+ * - Nếu một cấp đã tồn tại nhưng inactive: không cho Preview giả định tạo mới.
+ */
+function previewImportCategory(value, categories) {
+    const raw = String(value || "").trim();
+
+    if (!raw) {
+        return {
+            categoryId: null,
+            categoryName: null,
+            categoryPath: null,
+            categorySource: "none",
+            categoryAction: "none"
+        };
     }
 
-    return category;
+    try {
+        const existing = resolveRowCategory(raw, categories);
+
+        return {
+            categoryId: existing.id,
+            categoryName: existing.name,
+            categoryPath: existing.path,
+            categorySource: "file",
+            categoryAction: "existing"
+        };
+    } catch (error) {
+        if (error.message !== "AFFILIATE_CATEGORY_NOT_FOUND") {
+            throw error;
+        }
+    }
+
+    const segments = categorySegments(raw);
+
+    if (!segments.length) {
+        throw new Error("INVALID_CATEGORY_NAME");
+    }
+
+    // Danh mục đơn: nếu cùng tên đã tồn tại duy nhất ở nhánh khác,
+    // commit sẽ dùng lại danh mục đó thay vì tạo bản sao.
+    if (segments.length === 1) {
+        const key = normalizeKey(segments[0]);
+
+        const sameName = categories.filter(
+            item => item.normalizedName === key
+        );
+
+        if (sameName.length > 1) {
+            throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+        }
+
+        if (sameName.length === 1) {
+            assertActiveCategory(sameName[0]);
+
+            return {
+                categoryId: sameName[0].id,
+                categoryName: sameName[0].name,
+                categoryPath: sameName[0].path,
+                categorySource: "file",
+                categoryAction: "existing"
+            };
+        }
+
+        return {
+            categoryId: null,
+            categoryName: segments[0],
+            categoryPath: segments[0],
+            categorySource: "file",
+            categoryAction: "will_create"
+        };
+    }
+
+    // Đường dẫn nhiều cấp: kiểm tra các cấp đã tồn tại theo đúng parent.
+    let parentId = null;
+    let missingParent = false;
+
+    for (let index = 0; index < segments.length; index++) {
+        const segment = segments[index];
+        const matches = findCategoryByParentAndName(
+            categories,
+            segment,
+            parentId
+        );
+
+        if (matches.length > 1) {
+            throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+        }
+
+        if (!matches.length) {
+            missingParent = true;
+            break;
+        }
+
+        assertActiveCategory(matches[0]);
+        parentId = matches[0].id;
+    }
+
+    const leaf = segments[segments.length - 1];
+
+    return {
+        categoryId: null,
+        categoryName: leaf,
+        categoryPath: segments.join(" > "),
+        categorySource: "file",
+        categoryAction: "will_create"
+    };
 }
+
+// =====================================================
+// CATEGORY RESOLUTION - COMMIT
+// =====================================================
+
+async function createImportCategory(
+    conn,
+    name,
+    parentId,
+    actorUserId,
+    audit = {},
+    categories
+) {
+    if (!name || name.length > 150) {
+        throw new Error("INVALID_CATEGORY_NAME");
+    }
+
+    /*
+     * Tối đa 5 lần thử:
+     * - Lần đầu dùng slug chưa tồn tại.
+     * - Nếu import khác vừa tạo cùng danh mục, dùng lại.
+     * - Nếu slug bị chiếm bởi danh mục khác, sinh slug mới.
+     */
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const refreshed = await refreshImportCategories(conn);
+
+        const sameName = findCategoryByParentAndName(
+            refreshed,
+            name,
+            parentId
+        );
+
+        if (sameName.length > 1) {
+            throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+        }
+
+        if (sameName.length === 1) {
+            assertActiveCategory(sameName[0]);
+            return {
+                category: sameName[0],
+                categories: refreshed
+            };
+        }
+
+        const slug = makeUniqueCategorySlug(
+            refreshed,
+            name,
+            parentId
+        );
+
+        try {
+            const created = await productService.createCategory(
+                {
+                    name,
+                    slug,
+                    parent_id: parentId,
+                    status: "active",
+                    sort_order: 0
+                },
+                actorUserId,
+                audit,
+                { connection: conn }
+            );
+
+            const updatedCategories = await refreshImportCategories(conn);
+            const createdCategory = updatedCategories.find(
+                item => item.id === Number(created.id)
+            );
+
+            if (!createdCategory) {
+                throw new Error("AFFILIATE_CATEGORY_CREATE_FAILED");
+            }
+
+            assertActiveCategory(createdCategory);
+
+            return {
+                category: createdCategory,
+                categories: updatedCategories
+            };
+        } catch (error) {
+            if (!isCategoryDuplicateError(error)) {
+                throw error;
+            }
+
+            const latest = await refreshImportCategories(conn);
+
+            const concurrentMatches = findCategoryByParentAndName(
+                latest,
+                name,
+                parentId
+            );
+
+            if (concurrentMatches.length > 1) {
+                throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+            }
+
+            if (concurrentMatches.length === 1) {
+                assertActiveCategory(concurrentMatches[0]);
+
+                return {
+                    category: concurrentMatches[0],
+                    categories: latest
+                };
+            }
+
+            // Slug bị chiếm bởi category khác: thử lại với slug mới.
+            categories = latest;
+        }
+    }
+
+    throw new Error("AFFILIATE_CATEGORY_CREATE_CONFLICT");
+}
+
+async function ensureImportCategory(
+    conn,
+    value,
+    actorUserId,
+    audit = {}
+) {
+    const segments = categorySegments(value);
+
+    if (!segments.length) return null;
+
+    let categories = await refreshImportCategories(conn);
+    let parentId = null;
+    let resolved = null;
+
+    for (let index = 0; index < segments.length; index++) {
+        const segment = segments[index];
+        const key = normalizeKey(segment);
+
+        if (!key || segment.length > 150) {
+            throw new Error("INVALID_CATEGORY_NAME");
+        }
+
+        let matches = findCategoryByParentAndName(
+            categories,
+            segment,
+            parentId
+        );
+
+        // Với danh mục đơn, hỗ trợ nhập slug thay cho tên.
+        if (segments.length === 1 && !matches.length) {
+            const slugMatches = findCategoryBySlug(categories, segment);
+
+            if (slugMatches.length > 1) {
+                throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+            }
+
+            if (slugMatches.length === 1) {
+                matches = slugMatches;
+            }
+        }
+
+        if (matches.length > 1) {
+            throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+        }
+
+        if (matches.length === 1) {
+            resolved = matches[0];
+            assertActiveCategory(resolved);
+            parentId = resolved.id;
+            continue;
+        }
+
+        /*
+         * Với danh mục đơn, nếu tên tồn tại duy nhất ở nhánh khác
+         * thì dùng lại danh mục đó, không tự tạo danh mục trùng tên.
+         */
+        if (segments.length === 1) {
+            const sameName = categories.filter(
+                item => item.normalizedName === key
+            );
+
+            if (sameName.length > 1) {
+                throw new Error("AFFILIATE_CATEGORY_AMBIGUOUS");
+            }
+
+            if (sameName.length === 1) {
+                assertActiveCategory(sameName[0]);
+                resolved = sameName[0];
+                break;
+            }
+        }
+
+        const createdResult = await createImportCategory(
+            conn,
+            segment,
+            parentId,
+            actorUserId,
+            audit,
+            categories
+        );
+
+        resolved = createdResult.category;
+        categories = createdResult.categories;
+        parentId = resolved.id;
+    }
+
+    if (!resolved) {
+        throw new Error("AFFILIATE_CATEGORY_NOT_FOUND");
+    }
+
+    return {
+        id: resolved.id,
+        name: resolved.name,
+        path: resolved.path || buildCategoryPath(categories, resolved)
+    };
+}
+
+// =====================================================
+// IMPORT CATEGORY PRIORITY
+// =====================================================
 
 function resolveImportCategory(
     product,
@@ -681,7 +1081,8 @@ function resolveImportCategory(
     defaultCategory,
     categories
 ) {
-    // Danh mục trong từng dòng CSV có độ ưu tiên cao nhất.
+    // CSV category > default category > preserve existing > NULL.
+
     if (product.category) {
         const category = resolveRowCategory(
             product.category,
@@ -696,7 +1097,6 @@ function resolveImportCategory(
         };
     }
 
-    // Nếu CSV không có danh mục thì dùng danh mục mặc định.
     if (defaultCategory) {
         return {
             categoryId: defaultCategory.id,
@@ -706,7 +1106,6 @@ function resolveImportCategory(
         };
     }
 
-    // Không có lựa chọn mới: giữ nguyên danh mục sản phẩm cũ.
     if (existing && existing.category_id) {
         const category = categories.find(
             item => item.id === Number(existing.category_id)
@@ -732,8 +1131,13 @@ function resolveImportCategory(
 // EXISTING PRODUCT
 // =====================================================
 
-async function findExistingProduct(networkId, product) {
-    const [rows] = await db.execute(
+async function findExistingProduct(
+    networkId,
+    product,
+    conn = db,
+    forUpdate = false
+) {
+    const [rows] = await conn.execute(
         `SELECT id, product_id, sku_id, title, price,
                 currency, image_url, affiliate_link, final_url,
                 category_id
@@ -741,7 +1145,8 @@ async function findExistingProduct(networkId, product) {
          WHERE network_id = ?
            AND product_id = ?
            AND sku_id = ?
-         LIMIT 1`,
+         LIMIT 1
+         ${forUpdate ? "FOR UPDATE" : ""}`,
         [
             networkId,
             product.productId,
@@ -828,12 +1233,25 @@ async function previewProductsImport(rows, options = {}) {
                 product
             );
 
-            const categoryInfo = resolveImportCategory(
-                product,
-                existing,
-                defaultCategory,
-                categories
-            );
+            let categoryInfo;
+
+            if (product.category) {
+                categoryInfo = previewImportCategory(
+                    product.category,
+                    categories
+                );
+            } else {
+                categoryInfo = resolveImportCategory(
+                    product,
+                    existing,
+                    defaultCategory,
+                    categories
+                );
+
+                categoryInfo.categoryAction = categoryInfo.categoryId
+                    ? "existing"
+                    : "none";
+            }
 
             validateProductData(product, Boolean(existing));
 
@@ -875,6 +1293,7 @@ async function previewProductsImport(rows, options = {}) {
                 categoryName: categoryInfo.categoryName,
                 categoryPath: categoryInfo.categoryPath,
                 categorySource: categoryInfo.categorySource,
+                categoryAction: categoryInfo.categoryAction,
 
                 valid: true
             });
@@ -964,7 +1383,7 @@ async function commitProductsImport(rows, options = {}) {
         options.networkCode || options.networkId || "lazada"
     );
 
-    // Kiểm tra danh mục mặc định trước khi tạo Sync Log.
+    // Kiểm tra category mặc định trước khi tạo Sync Log.
     const categories = await loadImportCategories();
 
     const defaultCategory = validateDefaultCategory(
@@ -1002,6 +1421,9 @@ async function commitProductsImport(rows, options = {}) {
 
     try {
         for (let index = 0; index < rows.length; index++) {
+            let conn = null;
+            let transactionStarted = false;
+
             try {
                 const product = normalizeProductRow(rows[index]);
 
@@ -1015,21 +1437,69 @@ async function commitProductsImport(rows, options = {}) {
                     throw new Error("AFFILIATE_IMPORT_DUPLICATE_ROW");
                 }
 
+                validateProductData(product, false);
+
+                conn = await db.getConnection();
+                await conn.beginTransaction();
+                transactionStarted = true;
+
+                /*
+                 * Tra cứu sản phẩm sau khi đã mở transaction.
+                 * FOR UPDATE giúp khóa bản ghi hiện tại trong lúc cập nhật.
+                 */
                 const existing = await findExistingProduct(
                     network.id,
-                    product
-                );
-
-                const categoryInfo = resolveImportCategory(
                     product,
-                    existing,
-                    defaultCategory,
-                    categories
+                    conn,
+                    true
                 );
 
                 validateProductData(product, Boolean(existing));
 
+                /*
+                 * Đánh dấu identity sau khi kiểm tra trùng và trước xử lý.
+                 * Nếu ghi DB thất bại, dòng tiếp theo cùng identity vẫn
+                 * được xem là dòng trùng trong cùng file import.
+                 */
                 seen.add(identity);
+
+                // Luôn tải danh mục mới trong transaction.
+                const currentCategories = await refreshImportCategories(conn);
+
+                const currentDefaultCategory =
+                    options.categoryId !== undefined &&
+                    options.categoryId !== null &&
+                    options.categoryId !== ""
+                        ? validateDefaultCategory(
+                            options.categoryId,
+                            currentCategories
+                        )
+                        : defaultCategory;
+
+                let categoryInfo;
+
+                if (product.category) {
+                    const resolved = await ensureImportCategory(
+                        conn,
+                        product.category,
+                        options.createdBy,
+                        options.audit || {}
+                    );
+
+                    categoryInfo = {
+                        categoryId: resolved.id,
+                        categoryName: resolved.name,
+                        categoryPath: resolved.path,
+                        categorySource: "file"
+                    };
+                } else {
+                    categoryInfo = resolveImportCategory(
+                        product,
+                        existing,
+                        currentDefaultCategory,
+                        currentCategories
+                    );
+                }
 
                 if (existing) {
                     const updateData = {};
@@ -1055,9 +1525,8 @@ async function commitProductsImport(rows, options = {}) {
                         }
                     }
 
-                    // Chỉ cập nhật category khi có lựa chọn mới.
-                    // Nếu không có category trong file và không có mặc định,
-                    // giữ nguyên category_id hiện tại.
+                    // CSV hoặc default mới được phép thay category.
+                    // Nếu không có hai nguồn này thì giữ category hiện tại.
                     if (
                         categoryInfo.categorySource === "file" ||
                         categoryInfo.categorySource === "default"
@@ -1070,21 +1539,36 @@ async function commitProductsImport(rows, options = {}) {
                             existing.id,
                             updateData,
                             options.createdBy,
-                            options.audit || {}
+                            options.audit || {},
+                            { connection: conn }
                         );
+
+                        await conn.commit();
+                        transactionStarted = false;
 
                         result.summary.updated++;
                     } else {
+                        await conn.rollback();
+                        transactionStarted = false;
+
                         result.summary.skipped++;
                     }
                 } else {
-                    const [productRows] = await db.execute(
+                    /*
+                     * Kiểm tra product_id đã có SKU khác chưa.
+                     * Truy vấn trong transaction để phân biệt newSku/newProduct.
+                     */
+                    const [productRows] = await conn.execute(
                         `SELECT id
                          FROM affiliate_products
                          WHERE network_id = ?
                            AND product_id = ?
-                         LIMIT 1`,
-                        [network.id, product.productId]
+                         LIMIT 1
+                         FOR UPDATE`,
+                        [
+                            network.id,
+                            product.productId
+                        ]
                     );
 
                     await productService.createProduct(
@@ -1097,8 +1581,12 @@ async function commitProductsImport(rows, options = {}) {
                             categoryId: categoryInfo.categoryId
                         },
                         options.createdBy,
-                        options.audit || {}
+                        options.audit || {},
+                        { connection: conn }
                     );
+
+                    await conn.commit();
+                    transactionStarted = false;
 
                     if (productRows.length) {
                         result.summary.newSkus++;
@@ -1107,14 +1595,30 @@ async function commitProductsImport(rows, options = {}) {
                     }
                 }
             } catch (error) {
+                if (conn && transactionStarted) {
+                    try {
+                        await conn.rollback();
+                    } catch (rollbackError) {
+                        error.rollbackError =
+                            rollbackError.message || String(rollbackError);
+                    }
+
+                    transactionStarted = false;
+                }
+
                 result.summary.failed++;
 
                 result.errors.push({
                     row: index + 1,
-                    code: error.message === "AFFILIATE_PRODUCT_ALREADY_EXISTS"
-                        ? "AFFILIATE_IMPORT_DUPLICATE_PRODUCT"
-                        : error.message || "AFFILIATE_IMPORT_ROW_FAILED"
+                    code:
+                        error.message === "AFFILIATE_PRODUCT_ALREADY_EXISTS"
+                            ? "AFFILIATE_IMPORT_DUPLICATE_PRODUCT"
+                            : error.message || "AFFILIATE_IMPORT_ROW_FAILED"
                 });
+            } finally {
+                if (conn) {
+                    conn.release();
+                }
             }
         }
 

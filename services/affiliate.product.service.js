@@ -342,17 +342,67 @@ async function getCategories(query = {}) {
     return categories;
 }
 
+async function getProductDetailWithConnection(conn, productId) {
+    const id = positiveId(productId);
+
+    const [rows] = await conn.execute(
+        `SELECT
+            p.id,
+            p.network_id,
+            n.code AS network_code,
+            n.name AS network_name,
+            n.status AS network_status,
+            p.category_id,
+            c.name AS category_name,
+            p.product_id,
+            p.sku_id,
+            p.title,
+            p.short_description,
+            p.price,
+            p.currency,
+            p.image_url,
+            p.affiliate_link,
+            p.final_url,
+            p.source_type,
+            p.status,
+            p.created_by,
+            p.last_synced_at,
+            p.created_at,
+            p.updated_at
+         FROM affiliate_products p
+         INNER JOIN affiliate_networks n ON n.id = p.network_id
+         LEFT JOIN affiliate_categories c ON c.id = p.category_id
+         WHERE p.id = ?
+         LIMIT 1`,
+        [id]
+    );
+
+    if (!rows.length) {
+        throw new Error("AFFILIATE_PRODUCT_NOT_FOUND");
+    }
+
+    return rows[0];
+}
 // =========================
 // ADMIN: CREATE PRODUCT
 // =========================
 
-async function createProduct(data = {}, actorUserId, audit = {}) {
+async function createProduct(
+    data = {},
+    actorUserId,
+    audit = {},
+    options = {}
+) {
     const actor = auditInfo(actorUserId, audit);
     const product = normalizeProductInput(data);
-    const conn = await db.getConnection();
+
+    const externalConnection = Boolean(options.connection);
+    const conn = options.connection || await db.getConnection();
 
     try {
-        await conn.beginTransaction();
+        if (!externalConnection) {
+            await conn.beginTransaction();
+        }
 
         const network = await resolveNetwork(
             conn,
@@ -426,11 +476,17 @@ async function createProduct(data = {}, actorUserId, audit = {}) {
             }
         });
 
-        await conn.commit();
+        if (!externalConnection) {
+            await conn.commit();
+        }
 
-        return getProductDetail(productId, { includeInactive: true });
+        return externalConnection
+            ? await getProductDetailWithConnection(conn, productId)
+            : await getProductDetail(productId, { includeInactive: true });
     } catch (err) {
-        await conn.rollback();
+        if (!externalConnection) {
+            await conn.rollback();
+        }
 
         if (err.code === "ER_DUP_ENTRY") {
             throw new Error("AFFILIATE_PRODUCT_ALREADY_EXISTS");
@@ -438,7 +494,9 @@ async function createProduct(data = {}, actorUserId, audit = {}) {
 
         throw err;
     } finally {
-        conn.release();
+        if (!externalConnection) {
+            conn.release();
+        }
     }
 }
 
@@ -446,10 +504,18 @@ async function createProduct(data = {}, actorUserId, audit = {}) {
 // ADMIN: UPDATE PRODUCT
 // =========================
 
-async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
+async function updateProduct(
+    productId,
+    data = {},
+    actorUserId,
+    audit = {},
+    options = {}
+) {
     const id = positiveId(productId);
     const actor = auditInfo(actorUserId, audit);
-    const conn = await db.getConnection();
+
+    const externalConnection = Boolean(options.connection);
+    const conn = options.connection || await db.getConnection();
 
     const fields = {
         categoryId: "category_id",
@@ -472,7 +538,9 @@ async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
     };
 
     try {
-        await conn.beginTransaction();
+        if (!externalConnection) {
+            await conn.beginTransaction();
+        }
 
         const [rows] = await conn.execute(
             `SELECT *
@@ -483,14 +551,18 @@ async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
             [id]
         );
 
-        if (!rows.length) throw new Error("AFFILIATE_PRODUCT_NOT_FOUND");
+        if (!rows.length) {
+            throw new Error("AFFILIATE_PRODUCT_NOT_FOUND");
+        }
 
         const oldProduct = rows[0];
         const updates = {};
         const newData = {};
 
         for (const [inputKey, column] of Object.entries(fields)) {
-            if (!Object.prototype.hasOwnProperty.call(data, inputKey)) continue;
+            if (!Object.prototype.hasOwnProperty.call(data, inputKey)) {
+                continue;
+            }
 
             let value = data[inputKey];
 
@@ -548,11 +620,17 @@ async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
             newData
         });
 
-        await conn.commit();
+        if (!externalConnection) {
+            await conn.commit();
+        }
 
-        return getProductDetail(id, { includeInactive: true });
+        return externalConnection
+            ? await getProductDetailWithConnection(conn, id)
+            : await getProductDetail(id, { includeInactive: true });
     } catch (err) {
-        await conn.rollback();
+        if (!externalConnection) {
+            await conn.rollback();
+        }
 
         if (err.code === "ER_DUP_ENTRY") {
             throw new Error("AFFILIATE_PRODUCT_ALREADY_EXISTS");
@@ -560,10 +638,11 @@ async function updateProduct(productId, data = {}, actorUserId, audit = {}) {
 
         throw err;
     } finally {
-        conn.release();
+        if (!externalConnection) {
+            conn.release();
+        }
     }
 }
-
 // =========================
 // ADMIN: CHANGE STATUS
 // =========================
@@ -1060,7 +1139,12 @@ async function ensureCategoryParent(conn, parentId, currentId = null) {
     return Number(parentId);
 }
 
-async function createCategory(data = {}, actorUserId, audit = {}) {
+async function createCategory(
+    data = {},
+    actorUserId,
+    audit = {},
+    options = {}
+) {
     const name = String(data.name || "").trim();
     const slug = categorySlug(data.slug || name);
     const parentId = data.parent_id ? categoryId(data.parent_id) : null;
@@ -1081,10 +1165,13 @@ async function createCategory(data = {}, actorUserId, audit = {}) {
         throw categoryError("Trạng thái danh mục không hợp lệ.", "INVALID_CATEGORY_STATUS");
     }
 
-    const conn = await db.getConnection();
+    const externalConnection = Boolean(options.connection);
+    const conn = options.connection || await db.getConnection();
 
     try {
-        await conn.beginTransaction();
+        if (!externalConnection) {
+            await conn.beginTransaction();
+        }
 
         await ensureCategoryParent(conn, parentId);
         await ensureCategorySlug(conn, slug);
@@ -1097,7 +1184,9 @@ async function createCategory(data = {}, actorUserId, audit = {}) {
         );
 
         const [rows] = await conn.execute(
-            "SELECT id, name, slug, parent_id, status, sort_order, created_at FROM affiliate_categories WHERE id = ?",
+            `SELECT id, name, slug, parent_id, status, sort_order, created_at
+             FROM affiliate_categories
+             WHERE id = ?`,
             [result.insertId]
         );
 
@@ -1110,13 +1199,21 @@ async function createCategory(data = {}, actorUserId, audit = {}) {
             newData: rows[0]
         });
 
-        await conn.commit();
+        if (!externalConnection) {
+            await conn.commit();
+        }
+
         return rows[0];
     } catch (error) {
-        await conn.rollback();
+        if (!externalConnection) {
+            await conn.rollback();
+        }
+
         throw error;
     } finally {
-        conn.release();
+        if (!externalConnection) {
+            conn.release();
+        }
     }
 }
 
