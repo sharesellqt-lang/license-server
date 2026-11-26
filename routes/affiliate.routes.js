@@ -9,6 +9,7 @@ const db = require("../db");
 
 const productService = require("../services/affiliate.product.service");
 const trackingService = require("../services/affiliate.tracking.service");
+const applicationService = require("../services/affiliate.application.service");
 const contributorPermissionService =
     require("../services/contributor.permission.service");
 
@@ -41,7 +42,24 @@ const ERROR_STATUS = {
     AFFILIATE_NETWORK_INACTIVE: 409,
     AFFILIATE_CLICK_NOT_ELIGIBLE: 409,
     UNSUPPORTED_AFFILIATE_NETWORK: 409,
-    AFFILIATE_CLICK_DESTINATION_MISMATCH: 409
+    AFFILIATE_CLICK_DESTINATION_MISMATCH: 409,
+    AFFILIATE_APPLICATION_ALREADY_APPROVED: 409,
+    // AFFILIATE APPLICATION
+    INVALID_APPLICATION_DATA: 400,
+    INVALID_APPLICATION_FULL_NAME: 400,
+    INVALID_APPLICATION_PHONE: 400,
+    INVALID_APPLICATION_EMAIL: 400,
+    INVALID_APPLICATION_CHANNEL_TYPE: 400,
+    INVALID_APPLICATION_CHANNEL_URL: 400,
+    INVALID_APPLICATION_AUDIENCE_SIZE: 400,
+    INVALID_APPLICATION_PROMOTION_METHOD: 400,
+    INVALID_APPLICATION_EXPERIENCE: 400,
+    INVALID_APPLICATION_MOTIVATION: 400,
+
+    AFFILIATE_APPLICATION_ALREADY_PENDING: 409,
+    AFFILIATE_APPLICATION_ALREADY_APPROVED: 409,
+
+    USER_NOT_FOUND: 404,
 };
 
 function getErrorStatus(error) {
@@ -251,6 +269,54 @@ router.get("/products/:id", async (req, res) => {
    AUTHENTICATED ROUTES
 ===================================================== */
 router.use(auth);
+
+
+/* =====================================================
+   AFFILIATE APPLICATION - USER
+===================================================== */
+
+// SUBMIT APPLICATION
+router.post("/applications", async (req, res) => {
+    try {
+        const userId = getAuthenticatedUserId(req);
+
+        const result = await applicationService.createApplication(
+            userId,
+            req.body,
+            {
+                ipAddress: req.ip,
+                userAgent: req.get("user-agent") || null
+            }
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Đã gửi hồ sơ đăng ký tiếp thị Affiliate",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// GET MY APPLICATIONS
+router.get("/applications/me", async (req, res) => {
+    try {
+        const userId = getAuthenticatedUserId(req);
+
+        const applications = await applicationService.getMyApplications(
+            userId
+        );
+
+        return res.json({
+            success: true,
+            applications
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
 
 /* GET CURRENT USER AFFILIATE PERMISSIONS */
 

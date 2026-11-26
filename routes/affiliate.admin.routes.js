@@ -13,8 +13,115 @@ const reportService = require("../services/affiliate.report.service");
 const attributionService = require("../services/affiliate.attribution.service");
 const productImportService = require("../services/affiliate.product-import.service");
 const carouselService = require("../services/affiliate.carousel.service");
+const applicationService = require("../services/affiliate.application.service");
 
 router.use(auth);
+
+// =====================================================
+// AFFILIATE APPLICATIONS
+// Chỉ Admin có affiliate.manage được quản lý hồ sơ.
+// =====================================================
+
+// GET /applications
+router.get(
+    "/applications",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await applicationService.getApplications(
+                req.query
+            );
+
+            return res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// GET /applications/:id
+router.get(
+    "/applications/:id",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const application =
+                await applicationService.getApplicationDetail(
+                    req.params.id
+                );
+
+            return res.json({
+                success: true,
+                application
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// POST /applications/:id/approve
+router.post(
+    "/applications/:id/approve",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await applicationService.approveApplication(
+                req.params.id,
+                req.user.id,
+                req.body?.adminNote ?? null,
+                auditInfo(req)
+            );
+
+            // Quyền tạo link bị xung đột với quyền đã tồn tại.
+            // Không tự động ghi đè quyền thủ công.
+            if (result.permissionGrantStatus === "manual_conflict") {
+                return res.status(409).json({
+                    success: false,
+                    code: "AFFILIATE_PERMISSION_MANUAL_CONFLICT",
+                    message: "Không thể cấp quyền tự động do xung đột với quyền hiện có. Vui lòng kiểm tra và xử lý quyền của tài khoản.",
+                    ...result
+                });
+            }
+
+            return res.json({
+                success: true,
+                message: "Đã duyệt hồ sơ đăng ký tiếp thị Affiliate",
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
+
+// POST /applications/:id/reject
+router.post(
+    "/applications/:id/reject",
+    requireContributorPermission("affiliate.manage"),
+    async (req, res) => {
+        try {
+            const result = await applicationService.rejectApplication(
+                req.params.id,
+                req.user.id,
+                req.body?.rejectionReason,
+                req.body?.adminNote ?? null,
+                auditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã từ chối hồ sơ đăng ký tiếp thị Affiliate",
+                ...result
+            });
+        } catch (error) {
+            return sendError(res, error);
+        }
+    }
+);
 
 // =====================================================
 // HELPERS
@@ -182,6 +289,12 @@ function sendError(res, error) {
         "INVALID_AFFILIATE_COMMISSION_TOTAL",
         "AFFILIATE_CATEGORY_INACTIVE",
         "AFFILIATE_CATEGORY_AMBIGUOUS",
+        "INVALID_APPLICATION_STATUS",
+        "INVALID_APPLICATION_SEARCH",
+        "INVALID_APPLICATION_ID",
+        "INVALID_USER_ID",
+        "INVALID_APPLICATION_ADMIN_NOTE",
+        "APPLICATION_REJECTION_REASON_REQUIRED",
     ];
 
     const notFoundErrors = [
@@ -194,6 +307,7 @@ function sendError(res, error) {
         "CATEGORY_NOT_FOUND",
         "NETWORK_NOT_FOUND",
         "CAROUSEL_PRODUCT_NOT_FOUND",
+        "AFFILIATE_APPLICATION_NOT_FOUND",
     ];
 
     const conflictErrors = [
@@ -212,6 +326,7 @@ function sendError(res, error) {
         "AFFILIATE_COMMISSION_NOT_CONFIRMED",
         "UNSUPPORTED_AFFILIATE_CURRENCY",
         "AFFILIATE_COMMISSION_EVENT_DUPLICATE",
+        "AFFILIATE_APPLICATION_NOT_PENDING",
     ];
 
     const status = badRequestErrors.includes(code)
