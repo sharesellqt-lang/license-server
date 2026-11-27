@@ -10,7 +10,6 @@ const { uploadDir, allowedTypes } = require("../middleware/marketplace.product.u
 const { writeAudit } = require("./contributor.audit.service");
 
 const FILE_ROLES = [
-    "thumbnail",
     "preview",
     "documentation",
     "delivery",
@@ -71,6 +70,109 @@ async function removeFile(filename) {
         }
     }
 }
+
+
+async function validateSignature(file) {
+    if (!file?.path || !file?.mimetype || !file.size) {
+        return false;
+    }
+
+    const signatures = {
+        "image/jpeg": {
+            bytes: [0xFF, 0xD8, 0xFF],
+            offset: 0
+        },
+        "image/png": {
+            bytes: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+            offset: 0
+        },
+        "application/pdf": {
+            bytes: [0x25, 0x50, 0x44, 0x46, 0x2D],
+            offset: 0
+        },
+        "application/zip": {
+            bytes: [0x50, 0x4B, 0x03, 0x04],
+            offset: 0
+        },
+        "application/x-zip-compressed": {
+            bytes: [0x50, 0x4B, 0x03, 0x04],
+            offset: 0
+        },
+        "video/mp4": {
+            bytes: [0x66, 0x74, 0x79, 0x70],
+            offset: 4
+        }
+    };
+
+    try {
+        if (file.mimetype === "image/webp") {
+            const handle = await fs.promises.open(file.path, "r");
+
+            try {
+                const buffer = Buffer.alloc(12);
+                const { bytesRead } = await handle.read(buffer, 0, 12, 0);
+
+                return bytesRead === 12 &&
+                    buffer.toString("ascii", 0, 4) === "RIFF" &&
+                    buffer.toString("ascii", 8, 12) === "WEBP";
+            } finally {
+                await handle.close();
+            }
+        }
+
+        if (file.mimetype === "text/plain") {
+            const decoder = new TextDecoder("utf-8", { fatal: true });
+            const stream = fs.createReadStream(file.path);
+
+            try {
+                for await (const chunk of stream) {
+                    if (chunk.includes(0)) return false;
+                    decoder.decode(chunk, { stream: true });
+                }
+
+                decoder.decode();
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        const signature = signatures[file.mimetype];
+
+        if (!signature) return false;
+
+        const handle = await fs.promises.open(file.path, "r");
+
+        try {
+            const buffer = Buffer.alloc(
+                signature.offset + signature.bytes.length
+            );
+
+            const { bytesRead } = await handle.read(
+                buffer,
+                0,
+                buffer.length,
+                0
+            );
+
+            if (bytesRead < buffer.length) return false;
+
+            return signature.bytes.every(
+                (byte, index) =>
+                    buffer[signature.offset + index] === byte
+            );
+        } finally {
+            await handle.close();
+        }
+    } catch (error) {
+        console.error(
+            "MARKETPLACE FILE SIGNATURE ERROR:",
+            error.message
+        );
+        return false;
+    }
+}
+
 async function validateThumbnail(file) {
     if (!file) fail("PRODUCT_FILE_REQUIRED");
 
