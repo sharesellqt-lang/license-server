@@ -1029,11 +1029,13 @@ router.get("/seller/bank-accounts", async (req, res) => {
     }
 });
 
+
 router.post("/seller/bank-accounts", async (req, res) => {
     try {
         const result = await sellerBankService.createBankAccount(
             req.user.id,
-            req.body || {}
+            req.body || {},
+            getAuditInfo(req)
         );
 
         return res.status(201).json({
@@ -1051,7 +1053,8 @@ router.put("/seller/bank-accounts/:id", async (req, res) => {
         const result = await sellerBankService.updateBankAccount(
             req.user.id,
             req.params.id,
-            req.body || {}
+            req.body || {},
+            getAuditInfo(req)
         );
 
         return res.json({
@@ -1068,7 +1071,8 @@ router.patch("/seller/bank-accounts/:id/default", async (req, res) => {
     try {
         const result = await sellerBankService.setDefaultBankAccount(
             req.user.id,
-            req.params.id
+            req.params.id,
+            getAuditInfo(req)
         );
 
         return res.json({
@@ -1085,7 +1089,8 @@ router.delete("/seller/bank-accounts/:id", async (req, res) => {
     try {
         const result = await sellerBankService.disableBankAccount(
             req.user.id,
-            req.params.id
+            req.params.id,
+            getAuditInfo(req)
         );
 
         return res.json({
