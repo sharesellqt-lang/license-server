@@ -48,19 +48,29 @@ async function removeFile(filename) {
     if (!filename) return;
 
     const safeName = path.basename(filename);
-    const filePath = path.resolve(uploadDir, safeName);
+    const baseDir = path.resolve(uploadDir);
+    const filePath = path.resolve(baseDir, safeName);
+    const relativePath = path.relative(baseDir, filePath);
 
-    if (!filePath.startsWith(uploadDir + path.sep)) return;
+    if (
+        !relativePath ||
+        relativePath.startsWith("..") ||
+        path.isAbsolute(relativePath)
+    ) {
+        return;
+    }
 
     try {
         await fs.promises.unlink(filePath);
     } catch (error) {
         if (error.code !== "ENOENT") {
-            console.error("MARKETPLACE FILE CLEANUP ERROR:", error.message);
+            console.error(
+                "MARKETPLACE FILE CLEANUP ERROR:",
+                error.message
+            );
         }
     }
 }
-
 async function validateThumbnail(file) {
     if (!file) fail("PRODUCT_FILE_REQUIRED");
 
