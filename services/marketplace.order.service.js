@@ -70,6 +70,7 @@ function normalizeSearch(value) {
 // PUBLIC: LIST PUBLISHED PRODUCTS
 // ========================================
 
+
 async function getPublishedProducts(params = {}) {
     const conn = await db.getConnection();
 
@@ -129,7 +130,25 @@ async function getPublishedProducts(params = {}) {
                 p.version,
                 p.requirements,
                 p.compatibility,
-                p.published_at
+                p.published_at,
+                (
+                    SELECT CONCAT(
+                        '/api/marketplace/products/',
+                        p.id,
+                        '/thumbnail'
+                    )
+                    FROM marketplace_product_files pf
+                    WHERE pf.product_id = p.id
+                      AND pf.file_role = 'thumbnail'
+                      AND pf.is_active = 1
+                      AND pf.mime_type IN (
+                          'image/jpeg',
+                          'image/png',
+                          'image/webp'
+                      )
+                    ORDER BY pf.id DESC
+                    LIMIT 1
+                ) AS thumbnail_url
              FROM marketplace_products p
              INNER JOIN marketplace_sellers s ON s.id = p.seller_id
              WHERE ${where}
@@ -158,6 +177,7 @@ async function getPublishedProducts(params = {}) {
 // PUBLIC: GET PUBLISHED PRODUCT DETAIL
 // ========================================
 
+
 async function getPublishedProductDetail(productId) {
     productId = validId(productId, "PRODUCT_NOT_FOUND");
 
@@ -184,7 +204,25 @@ async function getPublishedProductDetail(productId) {
                 p.support_policy,
                 p.update_policy,
                 p.refund_policy,
-                p.published_at
+                p.published_at,
+                (
+                    SELECT CONCAT(
+                        '/api/marketplace/products/',
+                        p.id,
+                        '/thumbnail'
+                    )
+                    FROM marketplace_product_files pf
+                    WHERE pf.product_id = p.id
+                      AND pf.file_role = 'thumbnail'
+                      AND pf.is_active = 1
+                      AND pf.mime_type IN (
+                          'image/jpeg',
+                          'image/png',
+                          'image/webp'
+                      )
+                    ORDER BY pf.id DESC
+                    LIMIT 1
+                ) AS thumbnail_url
              FROM marketplace_products p
              INNER JOIN marketplace_sellers s ON s.id = p.seller_id
              WHERE p.id = ?
@@ -236,6 +274,7 @@ async function getPublishedProductDetail(productId) {
         conn.release();
     }
 }
+
 
 // ========================================
 // BUYER: CREATE ORDER + ITEMS + PAYMENT

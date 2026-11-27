@@ -6,10 +6,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 
-const uploadDir = path.resolve(
-    __dirname,
-    "../private_uploads/marketplace/products"
-);
+const uploadDir = path.resolve(__dirname, "../private_uploads/marketplace/products");
 
 fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -23,6 +20,12 @@ const allowedTypes = {
     "video/mp4": ".mp4",
     "text/plain": ".txt"
 };
+
+const THUMBNAIL_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+];
 
 const storage = multer.diskStorage({
     destination(req, file, cb) {
@@ -40,6 +43,7 @@ const storage = multer.diskStorage({
     }
 });
 
+// Upload file sản phẩm thông thường.
 const fileFilter = (req, file, cb) => {
     if (!allowedTypes[file.mimetype]) {
         return cb(new Error("INVALID_PRODUCT_FILE_TYPE"));
@@ -57,8 +61,25 @@ const upload = multer({
     }
 });
 
+// Upload ảnh thumbnail riêng.
+const thumbnailUpload = multer({
+    storage,
+    fileFilter(req, file, cb) {
+        if (!THUMBNAIL_TYPES.includes(file.mimetype)) {
+            return cb(new Error("INVALID_PRODUCT_THUMBNAIL_TYPE"));
+        }
+
+        cb(null, true);
+    },
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1
+    }
+});
+
 module.exports = {
     upload,
+    thumbnailUpload,
     uploadDir,
     allowedTypes
 };

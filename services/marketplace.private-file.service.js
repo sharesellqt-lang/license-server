@@ -11,9 +11,9 @@ function fail(code) {
     throw error;
 }
 
-function validId(value) {
+function validId(value, code = "INVALID_FILE_ID") {
     const id = Number(value);
-    if (!Number.isSafeInteger(id) || id <= 0) fail("INVALID_FILE_ID");
+    if (!Number.isSafeInteger(id) || id <= 0) fail(code);
     return id;
 }
 
@@ -64,6 +64,41 @@ async function getSellerProductFile(userId, productId, fileId) {
     return rows[0];
 }
 
+async function getPublicProductThumbnail(productId) {
+   productId = validId(productId, "INVALID_PRODUCT_ID");
+
+    const [rows] = await db.execute(
+        `SELECT
+            f.id,
+            f.original_name,
+            f.storage_key,
+            f.mime_type,
+            f.file_size,
+            f.file_role
+         FROM marketplace_product_files f
+         INNER JOIN marketplace_products p
+            ON p.id = f.product_id
+         INNER JOIN marketplace_sellers s
+            ON s.id = p.seller_id
+         WHERE p.id = ?
+           AND p.status = 'published'
+           AND s.status = 'active'
+           AND f.file_role = 'thumbnail'
+           AND f.is_active = 1
+           AND f.mime_type IN (
+               'image/jpeg',
+               'image/png',
+               'image/webp'
+           )
+         ORDER BY f.id DESC
+         LIMIT 1`,
+        [productId]
+    );
+
+    if (!rows.length) fail("PRIVATE_FILE_NOT_FOUND");
+
+    return rows[0];
+}
 // Buyer: chỉ xem file preview được gắn với demo đang hoạt động
 // của sản phẩm đã Published.
 async function getPublicDemoFile(productId, demoId) {
@@ -260,16 +295,23 @@ async function sendPrivateFile(res, file, options = {}) {
 
     const disposition = options.download ? "attachment" : "inline";
 
-    res.set({
+    const headers = {
         "Content-Type": mimeType,
         "Content-Length": stat.size,
         "Content-Disposition":
             `${disposition}; filename="${encodeURIComponent(safeName)}"`,
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "private, no-store, no-cache, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0"
-    });
+        "X-Content-Type-Options": "nosniff"
+    };
+
+    if (options.publicCache === true) {
+        headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=3600";
+    } else {
+        headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate";
+        headers["Pragma"] = "no-cache";
+        headers["Expires"] = "0";
+    }
+
+    res.set(headers);
 
     return new Promise((resolve, reject) => {
         const stream = fs.createReadStream(filePath);
@@ -291,6 +333,7 @@ async function sendPrivateFile(res, file, options = {}) {
 module.exports = {
     getSellerProductFile,
     getPublicDemoFile,
+    getPublicProductThumbnail,
     getBuyerDeliveryFile,
     getBuyerDeliveryVersionFile,
     getSellerDeliveryFile,

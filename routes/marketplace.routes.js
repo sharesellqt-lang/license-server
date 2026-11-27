@@ -22,7 +22,10 @@ const canEditProduct = requireContributorPermission("marketplace.product.edit");
 const canSubmitProduct = requireContributorPermission("marketplace.product.submit");
 const productAssetService = require("../services/marketplace.product.asset.service");
 const privateFileService = require("../services/marketplace.private-file.service");
-const { upload } = require("../middleware/marketplace.product.upload");
+const {
+    upload,
+    thumbnailUpload
+} = require("../middleware/marketplace.product.upload");
 const supportService = require("../services/marketplace.support.service");
 const orderService = require("../services/marketplace.order.service");
 const sellerBankService = require("../services/marketplace.seller.bank.service");
@@ -138,7 +141,7 @@ function handleError(res, error) {
         PRODUCT_FILE_NOT_FOUND: 404,
         PRODUCT_DEMO_NOT_FOUND: 404,
         PRODUCT_FILE_IN_USE_BY_DEMO: 409,
-        PRODUCT_FILES_NOT_EDITABLE: 409,
+        PRODUCT_FILES_NOT_EDITABLE: 400,
         PRODUCT_DEMOS_NOT_EDITABLE: 409,
         PRODUCT_FILE_TOO_LARGE: 400,
         INVALID_FILE_ID: 400,
@@ -303,6 +306,12 @@ function handleError(res, error) {
         INVALID_COMMISSION_PAYOUT_METHOD: 400,
         INVALID_COMMISSION_DATE_FILTER: 400,
         COMMISSION_NOT_FOUND: 404,
+        INVALID_PRODUCT_THUMBNAIL_TYPE: 400,
+        PRODUCT_THUMBNAIL_TOO_LARGE: 400,
+        PRODUCT_FILE_SIGNATURE_INVALID: 400,
+        PRODUCT_THUMBNAIL_NOT_FOUND: 404,
+        USE_PRODUCT_THUMBNAIL_ENDPOINT: 400,
+        PRODUCT_FILES_NOT_EDITABLE: 400,
                 
     };
 
@@ -346,6 +355,27 @@ function uploadProductFile(req, res, next) {
     });
 }
 
+function uploadProductThumbnail(req, res, next) {
+    thumbnailUpload.single("file")(req, res, error => {
+        if (!error) return next();
+
+        const code = error.code === "LIMIT_FILE_SIZE"
+            ? "PRODUCT_THUMBNAIL_TOO_LARGE"
+            : error.message === "INVALID_PRODUCT_THUMBNAIL_TYPE"
+                ? "INVALID_PRODUCT_THUMBNAIL_TYPE"
+                : "PRODUCT_UPLOAD_FAILED";
+
+        const status = code === "PRODUCT_UPLOAD_FAILED" ? 500 : 400;
+
+        return res.status(status).json({
+            success: false,
+            code,
+            message: status === 500
+                ? "Không thể tải ảnh thumbnail lên"
+                : code
+        });
+    });
+}
 // ========================================
 // SELLER: REGISTER
 // POST /api/marketplace/seller/register
@@ -706,6 +736,61 @@ router.post("/seller/products/:id/archive", canEditProduct, async (req, res) => 
     }
 });
 
+// ========================================
+// SELLER: PRODUCT THUMBNAIL
+// ========================================
+
+// Upload hoặc thay thế ảnh thumbnail.
+router.post(
+    "/seller/products/:id/thumbnail",
+    canEditProduct,
+    uploadProductThumbnail,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.replaceProductThumbnail(
+                req.user.id,
+                req.params.id,
+                req.file,
+                getAuditInfo(req)
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "Đã cập nhật ảnh thumbnail sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            if (req.file) {
+                await productAssetService.removeFile(req.file.filename);
+            }
+
+            return handleError(res, error);
+        }
+    }
+);
+
+// Xóa ảnh thumbnail hiện tại.
+router.delete(
+    "/seller/products/:id/thumbnail",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productAssetService.deleteProductThumbnail(
+                req.user.id,
+                req.params.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã xóa ảnh thumbnail sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
 // ========================================
 // SELLER: PRODUCT FILES
 // ========================================

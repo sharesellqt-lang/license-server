@@ -17,6 +17,7 @@ function handlePublicError(res, error) {
         PRODUCT_DEMO_NOT_FOUND: 404,
         PRIVATE_FILE_NOT_FOUND: 404,
         PRODUCT_FILE_NOT_FOUND: 404
+        
     };
 
     const status = errorMap[code] || 500;
@@ -52,6 +53,26 @@ router.get("/payment/bank-account", async (req, res) => {
     }
 });
 
+// ========================================
+// PUBLIC: PRODUCT THUMBNAIL
+// GET /api/marketplace/products/:id/thumbnail
+// ========================================
+
+router.get("/products/:id/thumbnail", async (req, res) => {
+    try {
+        const file = await privateFileService.getPublicProductThumbnail(
+            req.params.id
+        );
+
+        await privateFileService.sendPrivateFile(res, file, {
+            download: false,
+            publicCache: true
+        });
+    } catch (error) {
+        if (res.headersSent) return res.destroy();
+        return handlePublicError(res, error);
+    }
+});
 // ========================================
 // PUBLIC: PRODUCT DEMO FILE
 // GET /api/marketplace/products/:id/demos/:demoId/file
