@@ -732,121 +732,153 @@ router.post(
                      WHERE id = ?`,
                     [finalOrderStatus, orderId]
                 );
-            } else {
-                // Reject only the current payment attempt.
-                await conn.execute(
-                    `UPDATE marketplace_order_payments
-                     SET status = 'failed',
-                         verified_by_user_id = ?,
-                         verified_at = NOW(),
-                         verification_note = ?,
-                         updated_at = NOW()
-                     WHERE id = ?`,
-                    [actorUserId, note, paymentId]
-                );
+         
+} else {
+    // Reject only the current payment attempt.
+    await conn.execute(
+        `UPDATE marketplace_order_payments
+         SET status = 'failed',
+             verified_by_user_id = ?,
+             verified_at = NOW(),
+             verification_note = ?,
+             updated_at = NOW()
+         WHERE id = ?`,
+        [actorUserId, note, paymentId]
+    );
 
-                // Re-check all other active attempts after rejecting this one.
-                const [[activePayments]] = await conn.execute(
-                    `SELECT
-                        COUNT(*) AS active_count,
-                        SUM(
-                            CASE WHEN status = 'processing'
-                            THEN 1 ELSE 0 END
-                        ) AS processing_count
-                     FROM marketplace_order_payments
-                     WHERE order_id = ?
-                       AND status IN ('pending', 'processing')`,
-                    [orderId]
-                );
+    // Check whether another payment is still awaiting Finance review.
+    const [[activePayments]] = await conn.execute(
+        `SELECT
+            SUM(
+                CASE WHEN status = 'processing'
+                THEN 1 ELSE 0 END
+            ) AS processing_count
+         FROM marketplace_order_payments
+         WHERE order_id = ?
+           AND status IN ('pending', 'processing')`,
+        [orderId]
+    );
 
-                const activeCount = Number(activePayments.active_count || 0);
-                const processingCount = Number(activePayments.processing_count || 0);
+    const processingCount = Number(
+        activePayments.processing_count || 0
+    );
 
-                const [[deadlineInfo]] = await conn.execute(
-                    `SELECT
-                        CASE
-                            WHEN payment_deadline_at IS NOT NULL
-                             AND payment_deadline_at <= NOW()
-                            THEN 1 ELSE 0
-                        END AS expired
-                     FROM marketplace_orders
-                     WHERE id = ?
-                     LIMIT 1`,
-                    [orderId]
-                );
+    const [[orderState]] = await conn.execute(
+        `SELECT
+            CASE
+                WHEN payment_deadline_at IS NOT NULL
+                 AND payment_deadline_at <= NOW()
+                THEN 1 ELSE 0
+            END AS expired,
+            EXISTS (
+                SELECT 1
+                FROM marketplace_order_items oi
+                INNER JOIN marketplace_deliveries d
+                    ON d.order_item_id = oi.id
+                WHERE oi.order_id = marketplace_orders.id
+            ) AS has_delivery
+         FROM marketplace_orders
+         WHERE id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [orderId]
+    );
 
-                const expired = Number(deadlineInfo?.expired || 0) === 1;
+    const expired = Number(orderState?.expired || 0) === 1;
+    const hasDelivery = Number(orderState?.has_delivery || 0) === 1;
 
-                if (processingCount > 0) {
-                    // Another receipt is still awaiting Finance review.
-                    // Never cancel the order while this attempt is processing.
-                    finalOrderPaymentStatus = "processing";
-                    finalOrderStatus = "processing";
+    if (processingCount > 0) {
+        // Another payment is still awaiting Finance review.
+        // Preserve the existing Order delivery progress.
+        finalOrderPaymentStatus = "processing";
+        finalOrderStatus = order.order_status;
 
-                    await conn.execute(
-                        `UPDATE marketplace_orders
-                         SET payment_status = 'processing',
-                             order_status = 'processing',
-                             updated_at = NOW()
-                         WHERE id = ?
-                           AND payment_status <> 'paid'`,
-                        [orderId]
-                    );
-                } else if (expired) {
-                    // No processing receipt remains and the deadline expired.
-                    await conn.execute(
-                        `UPDATE marketplace_order_payments
-                         SET status = 'cancelled',
-                             updated_at = NOW()
-                         WHERE order_id = ?
-                           AND status = 'pending'`,
-                        [orderId]
-                    );
+        await conn.execute(
+            `UPDATE marketplace_orders
+             SET payment_status = 'processing',
+                 updated_at = NOW()
+             WHERE id = ?
+               AND payment_status IN ('pending', 'processing')`,
+            [orderId]
+        );
 
-                    await conn.execute(
-                        `UPDATE marketplace_delivery_authorizations a
-                         INNER JOIN marketplace_order_items oi
-                            ON oi.id = a.order_item_id
-                         SET a.status = 'revoked',
-                             a.revoked_by = ?,
-                             a.revoked_at = NOW(),
-                             a.revocation_reason = 'Order payment deadline expired',
-                             a.updated_at = NOW()
-                         WHERE oi.order_id = ?
-                           AND a.status = 'authorized'`,
-                        [actorUserId, orderId]
-                    );
+    } else if (expired && hasDelivery) {
+        // An Admin-authorized Delivery already exists.
+        // Do not cancel the Order or revoke its remaining authorization.
+        // Preserve the current Order state for manual resolution.
+        finalOrderPaymentStatus = order.payment_status;
+        finalOrderStatus = order.order_status;
 
-                    finalOrderPaymentStatus = "cancelled";
-                    finalOrderStatus = "cancelled";
+    } else if (expired) {
+        // Expired and no Delivery exists: safe to cancel.
+        await conn.execute(
+            `UPDATE marketplace_order_payments
+             SET status = 'cancelled',
+                 updated_at = NOW()
+             WHERE order_id = ?
+               AND status = 'pending'`,
+            [orderId]
+        );
 
-                    await conn.execute(
-                        `UPDATE marketplace_orders
-                         SET payment_status = 'cancelled',
-                             order_status = 'cancelled',
-                             cancelled_at = COALESCE(cancelled_at, NOW()),
-                             updated_at = NOW()
-                         WHERE id = ?
-                           AND payment_status <> 'paid'`,
-                        [orderId]
-                    );
-                } else {
-                    // No processing receipt remains.
-                    // Keep the order payable until its deadline.
-                    finalOrderPaymentStatus = "pending";
-                    finalOrderStatus = "pending_payment";
+        await conn.execute(
+            `UPDATE marketplace_delivery_authorizations a
+             INNER JOIN marketplace_order_items oi
+                ON oi.id = a.order_item_id
+             SET a.status = 'revoked',
+                 a.revoked_by = ?,
+                 a.revoked_at = NOW(),
+                 a.revocation_reason = 'Order payment deadline expired',
+                 a.updated_at = NOW()
+             WHERE oi.order_id = ?
+               AND a.status = 'authorized'`,
+            [actorUserId, orderId]
+        );
 
-                    await conn.execute(
-                        `UPDATE marketplace_orders
-                         SET payment_status = 'pending',
-                             order_status = 'pending_payment',
-                             updated_at = NOW()
-                         WHERE id = ?
-                           AND payment_status <> 'paid'`,
-                        [orderId]
-                    );
-                }
-            }
+        finalOrderPaymentStatus = "cancelled";
+        finalOrderStatus = "cancelled";
+
+        await conn.execute(
+            `UPDATE marketplace_orders
+             SET payment_status = 'cancelled',
+                 order_status = 'cancelled',
+                 cancelled_at = COALESCE(cancelled_at, NOW()),
+                 updated_at = NOW()
+             WHERE id = ?
+               AND payment_status IN ('pending', 'processing')
+               AND order_status IN ('pending_payment', 'processing')
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM marketplace_order_items oi
+                   INNER JOIN marketplace_deliveries d
+                       ON d.order_item_id = oi.id
+                   WHERE oi.order_id = marketplace_orders.id
+               )`,
+            [orderId]
+        );
+
+    } else {
+        // No processing payment remains and the deadline has not expired.
+        // Keep existing delivery progress if a Delivery exists.
+        finalOrderPaymentStatus = "pending";
+        finalOrderStatus = hasDelivery
+            ? order.order_status
+            : "pending_payment";
+
+        await conn.execute(
+            `UPDATE marketplace_orders
+             SET payment_status = 'pending',
+                 order_status = ?,
+                 updated_at = NOW()
+             WHERE id = ?
+               AND payment_status IN ('pending', 'processing')
+               AND order_status NOT IN (
+                    'cancelled', 'disputed', 'refunded'
+               )`,
+            [finalOrderStatus, orderId]
+        );
+    }
+}
+
 
             await writeAudit(conn, {
                 actorUserId,

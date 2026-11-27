@@ -324,229 +324,32 @@ async function replaceCurrentFiles(conn, deliveryId, files) {
 }
 
 
-async function createCommissionForPaidDelivery(conn, orderItemId) {
-    orderItemId = validId(orderItemId);
-
-    const [rows] = await conn.execute(
-        `SELECT
-            oi.id AS order_item_id,
-            oi.order_id,
-            oi.seller_id,
-            oi.seller_user_id,
-            oi.line_total,
-            oi.currency,
-            o.payment_status,
-            o.order_status,
-            d.id AS delivery_id,
-            d.seller_rate,
-            d.platform_rate,
-            d.protection_started_at,
-            d.protection_ends_at,
-            TIMESTAMPDIFF(
-                DAY,
-                d.protection_started_at,
-                d.protection_ends_at
-            ) AS protection_days
-         FROM marketplace_order_items oi
-         INNER JOIN marketplace_orders o ON o.id = oi.order_id
-         INNER JOIN marketplace_deliveries d
-            ON d.order_item_id = oi.id
-         WHERE oi.id = ?
-         LIMIT 1
-         FOR UPDATE`,
-        [orderItemId]
-    );
-
-    if (!rows.length) return null;
-
-    const item = rows[0];
-
-    if (item.payment_status !== "paid") return null;
-
-    if (
-        ["cancelled", "disputed", "refunded"].includes(item.order_status)
-    ) {
-        fail("ORDER_NOT_COMMISSIONABLE");
-    }
-
-    const sellerRate = Number(item.seller_rate);
-    const platformRate = Number(item.platform_rate);
-    const protectionDays = Number(item.protection_days);
-    const commissionableAmount = Number(item.line_total);
-
-    if (
-        item.seller_rate == null ||
-        item.platform_rate == null ||
-        !Number.isFinite(sellerRate) ||
-        !Number.isFinite(platformRate) ||
-        sellerRate < 0 ||
-        platformRate < 0 ||
-        Math.round((sellerRate + platformRate) * 100) !== 10000 ||
-        !Number.isInteger(protectionDays) ||
-        protectionDays < 0 ||
-        !item.protection_started_at ||
-        !item.protection_ends_at ||
-        !Number.isFinite(commissionableAmount) ||
-        commissionableAmount < 0
-    ) {
-        fail("INVALID_DELIVERY_COMMISSION_SNAPSHOT");
-    }
-
-    let [commissions] = await conn.execute(
-        `SELECT id, status
-         FROM marketplace_commissions
-         WHERE order_item_id = ?
-         LIMIT 1
-         FOR UPDATE`,
-        [orderItemId]
-    );
-
-    let commission = commissions[0] || null;
-
-    if (!commission) {
-        const sellerAmount = Math.round(
-            commissionableAmount * sellerRate
-        ) / 100;
-
-        const platformAmount = Math.round(
-            commissionableAmount * platformRate
-        ) / 100;
-
-        const [result] = await conn.execute(
-            `INSERT INTO marketplace_commissions (
-                order_id,
-                order_item_id,
-                seller_id,
-                seller_user_id,
-                commissionable_amount,
-                currency,
-                seller_rate,
-                platform_rate,
-                seller_amount,
-                platform_amount,
-                protection_days,
-                protection_started_at,
-                protection_ends_at,
-                eligible_at,
-                status
-             ) VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, 'pending_protection'
-             )`,
-            [
-                item.order_id,
-                orderItemId,
-                item.seller_id,
-                item.seller_user_id,
-                commissionableAmount,
-                item.currency,
-                sellerRate,
-                platformRate,
-                sellerAmount,
-                platformAmount,
-                protectionDays,
-                item.protection_started_at,
-                item.protection_ends_at,
-                item.protection_ends_at
-            ]
-        );
-
-        commission = {
-            id: result.insertId,
-            status: "pending_protection"
-        };
-    }
-
-    // Nếu có Support Ticket đang hoạt động, tạo Hold tương ứng.
-    const [tickets] = await conn.execute(
-        `SELECT
-            id,
-            buyer_user_id,
-            category,
-            subject
-         FROM marketplace_support_tickets
-         WHERE order_id = ?
-           AND status IN (?, ?, ?, ?)
-           AND (
-                order_item_id = ?
-                OR order_item_id IS NULL
-           )
-         ORDER BY id ASC
-         FOR UPDATE`,
-        [
-            item.order_id,
-            ...ACTIVE_TICKET_STATUSES,
-            orderItemId
-        ]
-    );
-
-    if (
-        tickets.length &&
-        ["pending_protection", "available", "on_hold", "payout_requested"]
-            .includes(commission.status)
-    ) {
-        for (const ticket of tickets) {
-            const [existingHolds] = await conn.execute(
-                `SELECT id
-                 FROM marketplace_commission_holds
-                 WHERE commission_id = ?
-                   AND hold_type = 'support_ticket'
-                   AND reference_type = 'support_ticket'
-                   AND reference_id = ?
-                   AND status = 'active'
-                 LIMIT 1
-                 FOR UPDATE`,
-                [commission.id, String(ticket.id)]
-            );
-
-            if (existingHolds.length) continue;
-
-            await conn.execute(
-                `INSERT INTO marketplace_commission_holds (
-                    commission_id,
-                    hold_type,
-                    reference_type,
-                    reference_id,
-                    reason,
-                    status,
-                    created_by_user_id
-                 ) VALUES (
-                    ?, 'support_ticket', 'support_ticket',
-                    ?, ?, 'active', ?
-                 )`,
-                [
-                    commission.id,
-                    String(ticket.id),
-                    `${ticket.category}: ${ticket.subject}`,
-                    ticket.buyer_user_id
-                ]
-            );
-        }
-
-        // Không đổi payout_requested vì payout đã được yêu cầu.
-        if (
-            ["pending_protection", "available"].includes(commission.status)
-        ) {
-            await conn.execute(
-                `UPDATE marketplace_commissions
-                 SET status = 'on_hold'
-                 WHERE id = ?
-                   AND status IN ('pending_protection', 'available')`,
-                [commission.id]
-            );
-
-            commission.status = "on_hold";
-        }
-    }
-
-    return {
-        commissionId: commission.id,
-        status: commission.status,
-        created: commissions.length === 0
-    };
-}
-
 async function updateOrderDeliveryStatus(conn, orderId) {
+    const [orders] = await conn.execute(
+        `SELECT payment_status, order_status
+         FROM marketplace_orders
+         WHERE id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [orderId]
+    );
+
+    if (!orders.length) fail("ORDER_NOT_FOUND");
+
+    const order = orders[0];
+
+    // Delivery được Admin cho phép trước thanh toán:
+    // không thay đổi trạng thái Order và trả về đúng trạng thái hiện tại.
+    if (order.payment_status !== "paid") {
+        return order.order_status;
+    }
+
+    if (
+        ["cancelled", "disputed", "refunded"].includes(order.order_status)
+    ) {
+        return order.order_status;
+    }
+
     const [[counts]] = await conn.execute(
         `SELECT
             COUNT(*) AS total_items,
@@ -557,8 +360,10 @@ async function updateOrderDeliveryStatus(conn, orderId) {
                 END
             ) AS delivered_items,
             SUM(
-                CASE WHEN d.status = 'confirmed'
-                THEN 1 ELSE 0 END
+                CASE
+                    WHEN d.status = 'confirmed'
+                    THEN 1 ELSE 0
+                END
             ) AS confirmed_items
          FROM marketplace_order_items oi
          LEFT JOIN marketplace_deliveries d
@@ -571,7 +376,7 @@ async function updateOrderDeliveryStatus(conn, orderId) {
     const delivered = Number(counts.delivered_items || 0);
     const confirmed = Number(counts.confirmed_items || 0);
 
-    let status = "paid";
+    let status = order.order_status;
 
     if (total > 0 && confirmed >= total) {
         status = "completed";
@@ -579,11 +384,14 @@ async function updateOrderDeliveryStatus(conn, orderId) {
         status = "delivered";
     } else if (delivered > 0) {
         status = "partially_delivered";
+    } else if (order.order_status !== "processing") {
+        status = "paid";
     }
 
     await conn.execute(
         `UPDATE marketplace_orders
-         SET order_status = ?
+         SET order_status = ?,
+             updated_at = NOW()
          WHERE id = ?
            AND payment_status = 'paid'
            AND order_status NOT IN ('cancelled', 'disputed', 'refunded')`,
@@ -703,15 +511,16 @@ async function createDelivery(userId, orderItemId, data = {}) {
         const [deliveryRows] = await conn.execute(
             `SELECT
                 id,
+                status,
                 protection_days,
                 protection_started_at,
                 protection_ends_at,
                 seller_rate,
                 platform_rate
-             FROM marketplace_deliveries
-             WHERE id = ?
-             LIMIT 1
-             FOR UPDATE`,
+            FROM marketplace_deliveries
+            WHERE id = ?
+            LIMIT 1
+            FOR UPDATE`,
             [deliveryId]
         );
 
@@ -856,6 +665,18 @@ async function saveDeliveryVersion(
             delivery.order_item_id
         );
 
+        // Redelivery khi Order chưa thanh toán phải có Admin Authorization mới.
+            let authorization = null;
+
+            if (changeType === "redelivery" && delivery.payment_status !== "paid") {
+                authorization = await getAuthorizedException(
+                    conn,
+                    delivery.order_item_id
+                );
+
+                if (!authorization) fail("ORDER_NOT_PAID");
+            }
+
         const [versions] = await conn.execute(
             `SELECT COALESCE(MAX(version_number), 0) AS current_version
              FROM marketplace_delivery_versions
@@ -882,6 +703,14 @@ async function saveDeliveryVersion(
             files
         );
 
+        if (authorization) {
+            await consumeAuthorization(
+                conn,
+                authorization.id,
+                userId,
+                versionId
+            );
+        }
         await conn.execute(
             `UPDATE marketplace_deliveries
              SET delivery_note = ?
@@ -1098,7 +927,7 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
         fail("INVALID_CONFIRMATION_METHOD");
     }
 
-    if (method !== "automatic") {
+    if (method === "buyer") {
         actorUserId = validId(actorUserId);
     }
 
@@ -1115,7 +944,9 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
                 d.buyer_confirmed_at,
                 d.buyer_confirmation_deadline_at,
                 oi.order_id,
-                o.buyer_user_id
+                o.buyer_user_id,
+                o.payment_status,
+                o.order_status
              FROM marketplace_deliveries d
              INNER JOIN marketplace_order_items oi
                 ON oi.id = d.order_item_id
@@ -1131,21 +962,42 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
 
         const delivery = rows[0];
 
-        if (delivery.status !== "delivered" || delivery.buyer_confirmed_at) {
+        if (
+            delivery.status !== "delivered" ||
+            delivery.buyer_confirmed_at
+        ) {
             fail("DELIVERY_NOT_CONFIRMABLE");
         }
 
-        if (method === "buyer" &&
-            Number(delivery.buyer_user_id) !== actorUserId) {
+        if (
+            delivery.payment_status !== "paid"
+        ) {
+            fail("ORDER_NOT_PAID");
+        }
+
+        if (
+            ["cancelled", "disputed", "refunded"].includes(
+                delivery.order_status
+            )
+        ) {
+            fail("ORDER_NOT_DELIVERABLE");
+        }
+
+        if (
+            method === "buyer" &&
+            Number(delivery.buyer_user_id) !== actorUserId
+        ) {
             fail("BUYER_NOT_AUTHORIZED");
         }
 
         if (method === "automatic") {
             const [deadline] = await conn.execute(
                 `SELECT
-                    buyer_confirmation_deadline_at <= NOW() AS is_due
+                    buyer_confirmation_deadline_at IS NOT NULL
+                    AND buyer_confirmation_deadline_at <= NOW() AS is_due
                  FROM marketplace_deliveries
-                 WHERE id = ?`,
+                 WHERE id = ?
+                 LIMIT 1`,
                 [deliveryId]
             );
 
@@ -1160,7 +1012,7 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
             delivery.order_item_id
         );
 
-        await conn.execute(
+        const [result] = await conn.execute(
             `UPDATE marketplace_deliveries
              SET status = 'confirmed',
                  buyer_confirmed_at = NOW(),
@@ -1170,6 +1022,10 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
                AND buyer_confirmed_at IS NULL`,
             [method, deliveryId]
         );
+
+        if (result.affectedRows !== 1) {
+            fail("DELIVERY_NOT_CONFIRMABLE");
+        }
 
         const orderStatus = await updateOrderDeliveryStatus(
             conn,
@@ -1185,7 +1041,10 @@ async function confirmDelivery(deliveryId, actorUserId = null, method = "buyer")
             orderStatus
         };
     } catch (error) {
-        await conn.rollback();
+        try {
+            await conn.rollback();
+        } catch (_) {}
+
         throw error;
     } finally {
         conn.release();
@@ -1214,7 +1073,8 @@ async function authorizeDelivery(adminUserId, orderItemId, reason) {
                 o.payment_status,
                 o.order_status
              FROM marketplace_order_items oi
-             INNER JOIN marketplace_orders o ON o.id = oi.order_id
+             INNER JOIN marketplace_orders o
+                ON o.id = oi.order_id
              WHERE oi.id = ?
              LIMIT 1
              FOR UPDATE`,
@@ -1229,15 +1089,13 @@ async function authorizeDelivery(adminUserId, orderItemId, reason) {
             fail("ORDER_ALREADY_PAID");
         }
 
-        if (
-            ["cancelled", "disputed", "refunded"].includes(item.order_status) ||
-            ["cancelled", "refunded", "partially_refunded"].includes(item.payment_status)
-        ) {
-            fail("ORDER_NOT_DELIVERABLE");
-        }
+        await assertDeliverable(item);
 
-        const [existingDelivery] = await conn.execute(
-            `SELECT id
+        const [deliveries] = await conn.execute(
+            `SELECT
+                id,
+                status,
+                buyer_confirmed_at
              FROM marketplace_deliveries
              WHERE order_item_id = ?
              LIMIT 1
@@ -1245,8 +1103,17 @@ async function authorizeDelivery(adminUserId, orderItemId, reason) {
             [orderItemId]
         );
 
-        if (existingDelivery.length) {
-            fail("DELIVERY_ALREADY_EXISTS");
+        // Nếu đã có Delivery, chỉ cho phép cấp quyền Redelivery
+        // khi Delivery vẫn delivered và Buyer chưa xác nhận.
+        if (deliveries.length) {
+            const delivery = deliveries[0];
+
+            if (
+                delivery.status !== "delivered" ||
+                delivery.buyer_confirmed_at
+            ) {
+                fail("DELIVERY_ALREADY_EXISTS");
+            }
         }
 
         const [existingAuthorization] = await conn.execute(
@@ -1279,10 +1146,16 @@ async function authorizeDelivery(adminUserId, orderItemId, reason) {
         return {
             authorizationId: result.insertId,
             orderItemId,
-            status: "authorized"
+            status: "authorized",
+            authorizationType: deliveries.length
+                ? "redelivery"
+                : "initial"
         };
     } catch (error) {
-        await conn.rollback();
+        try {
+            await conn.rollback();
+        } catch (_) {}
+
         throw error;
     } finally {
         conn.release();
@@ -1307,20 +1180,58 @@ async function revokeDeliveryAuthorization(
     try {
         await conn.beginTransaction();
 
-        const [result] = await conn.execute(
+        const [refs] = await conn.execute(
+            `SELECT order_item_id
+             FROM marketplace_delivery_authorizations
+             WHERE id = ?
+             LIMIT 1`,
+            [authorizationId]
+        );
+
+        if (!refs.length) fail("AUTHORIZATION_NOT_REVOCABLE");
+
+        const orderItemId = Number(refs[0].order_item_id);
+
+        // Lock Order Item trước, thống nhất thứ tự với luồng Seller.
+        const [items] = await conn.execute(
+            `SELECT id
+             FROM marketplace_order_items
+             WHERE id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [orderItemId]
+        );
+
+        if (!items.length) fail("AUTHORIZATION_NOT_REVOCABLE");
+
+        const [authorizations] = await conn.execute(
+            `SELECT id, status
+             FROM marketplace_delivery_authorizations
+             WHERE id = ?
+               AND order_item_id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [authorizationId, orderItemId]
+        );
+
+        if (
+            !authorizations.length ||
+            authorizations[0].status !== "authorized"
+        ) {
+            fail("AUTHORIZATION_NOT_REVOCABLE");
+        }
+
+        await conn.execute(
             `UPDATE marketplace_delivery_authorizations
              SET status = 'revoked',
                  revoked_by = ?,
                  revoked_at = NOW(),
-                 revocation_reason = ?
+                 revocation_reason = ?,
+                 updated_at = NOW()
              WHERE id = ?
                AND status = 'authorized'`,
             [adminUserId, reason, authorizationId]
         );
-
-        if (result.affectedRows !== 1) {
-            fail("AUTHORIZATION_NOT_REVOCABLE");
-        }
 
         await conn.commit();
 
@@ -1329,13 +1240,15 @@ async function revokeDeliveryAuthorization(
             status: "revoked"
         };
     } catch (error) {
-        await conn.rollback();
+        try {
+            await conn.rollback();
+        } catch (_) {}
+
         throw error;
     } finally {
         conn.release();
     }
 }
-
 
 async function getBuyerDeliveryDetail(userId, deliveryId) {
     userId = validId(userId);
@@ -1425,6 +1338,54 @@ async function getBuyerDeliveryDetail(userId, deliveryId) {
     };
 }
 
+async function getDueDeliveryIds(limit = 50) {
+    limit = Number(limit);
+
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+        limit = 50;
+    }
+
+    limit = Math.min(limit, 200);
+
+    const [rows] = await db.execute(
+        `SELECT d.id
+         FROM marketplace_deliveries d
+         INNER JOIN marketplace_order_items oi
+            ON oi.id = d.order_item_id
+         INNER JOIN marketplace_orders o
+            ON o.id = oi.order_id
+         WHERE d.status = 'delivered'
+           AND d.buyer_confirmed_at IS NULL
+           AND d.buyer_confirmation_deadline_at IS NOT NULL
+           AND d.buyer_confirmation_deadline_at <= NOW()
+           AND o.payment_status = 'paid'
+           AND o.order_status NOT IN (
+                'cancelled',
+                'disputed',
+                'refunded'
+           )
+           AND NOT EXISTS (
+                SELECT 1
+                FROM marketplace_support_tickets st
+                WHERE st.order_id = oi.order_id
+                  AND (
+                      st.order_item_id = oi.id
+                      OR st.order_item_id IS NULL
+                  )
+                  AND st.status IN (
+                      'open',
+                      'waiting_seller',
+                      'waiting_buyer',
+                      'under_review'
+                  )
+           )
+         ORDER BY d.buyer_confirmation_deadline_at ASC, d.id ASC
+         LIMIT ?`,
+        [limit]
+    );
+
+    return rows.map(row => Number(row.id));
+}
 module.exports = {
     createDelivery,
     updateDelivery,
@@ -1435,4 +1396,5 @@ module.exports = {
     authorizeDelivery,
     revokeDeliveryAuthorization,
     getBuyerDeliveryDetail,
+    getDueDeliveryIds
 };

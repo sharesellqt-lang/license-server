@@ -47,7 +47,6 @@ async function cancelExpiredOrders() {
         conn = await db.getConnection();
         await conn.beginTransaction();
 
-        // Check automatic cancellation setting.
         const enabled = await isAutoCancelEnabled(conn);
 
         if (!enabled) {
@@ -62,12 +61,14 @@ async function cancelExpiredOrders() {
             };
         }
 
-        // Lock expired orders.
+        // Select expired orders.
         //
-        // IMPORTANT:
-        // Do not cancel an order if the buyer submitted a receipt
-        // before or at the payment deadline and Finance has not
-        // completed verification.
+        // Never cancel an order when:
+        // 1. Any payment attempt is still processing.
+        // 2. Any delivery has already been created.
+        //
+        // Receipt submission time is intentionally not used here.
+        // A processing payment must be resolved by Finance first.
         const [orders] = await conn.execute(
             `SELECT o.id
              FROM marketplace_orders o
@@ -75,15 +76,22 @@ async function cancelExpiredOrders() {
                AND o.payment_deadline_at <= NOW()
                AND o.payment_status IN ('pending', 'processing')
                AND o.order_status IN ('pending_payment', 'processing')
+
                AND NOT EXISTS (
                    SELECT 1
                    FROM marketplace_order_payments p
                    WHERE p.order_id = o.id
                      AND p.status = 'processing'
-                     AND p.receipt_storage_key IS NOT NULL
-                     AND p.submitted_at IS NOT NULL
-                     AND p.submitted_at <= o.payment_deadline_at
                )
+
+               AND NOT EXISTS (
+                   SELECT 1
+                   FROM marketplace_order_items oi
+                   INNER JOIN marketplace_deliveries d
+                       ON d.order_item_id = oi.id
+                   WHERE oi.order_id = o.id
+               )
+
              ORDER BY o.payment_deadline_at ASC, o.id ASC
              LIMIT ?
              FOR UPDATE`,
@@ -101,33 +109,91 @@ async function cancelExpiredOrders() {
             };
         }
 
-        const orderIds = orders.map(order => Number(order.id));
-        const placeholders = orderIds.map(() => "?").join(",");
+        const cancelledOrderIds = [];
 
-        // Cancel remaining active payment attempts.
+        // Recheck eligibility for each locked order before cancellation.
+        for (const order of orders) {
+            const orderId = Number(order.id);
+
+            const [result] = await conn.execute(
+                `UPDATE marketplace_orders o
+                 SET o.payment_status = 'cancelled',
+                     o.order_status = 'cancelled',
+                     o.cancelled_at = COALESCE(o.cancelled_at, NOW()),
+                     o.updated_at = NOW()
+                 WHERE o.id = ?
+                   AND o.payment_deadline_at IS NOT NULL
+                   AND o.payment_deadline_at <= NOW()
+                   AND o.payment_status IN ('pending', 'processing')
+                   AND o.order_status IN ('pending_payment', 'processing')
+
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM marketplace_order_payments p
+                       WHERE p.order_id = o.id
+                         AND p.status = 'processing'
+                   )
+
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM marketplace_order_items oi
+                       INNER JOIN marketplace_deliveries d
+                           ON d.order_item_id = oi.id
+                       WHERE oi.order_id = o.id
+                   )`,
+                [orderId]
+            );
+
+            if (result.affectedRows > 0) {
+                cancelledOrderIds.push(orderId);
+            }
+        }
+
+        if (!cancelledOrderIds.length) {
+            await conn.commit();
+            committed = true;
+
+            return {
+                success: true,
+                cancelledCount: 0,
+                orderIds: []
+            };
+        }
+
+        const placeholders = cancelledOrderIds.map(() => "?").join(",");
+
+        // Cancel active payment attempts only after the corresponding
+        // orders have successfully transitioned to cancelled.
         await conn.execute(
-            `UPDATE marketplace_order_payments
-             SET status = 'cancelled',
-                 updated_at = NOW()
-             WHERE order_id IN (${placeholders})
-               AND status IN ('pending', 'processing')`,
-            orderIds
+            `UPDATE marketplace_order_payments p
+             INNER JOIN marketplace_orders o
+                 ON o.id = p.order_id
+             SET p.status = 'cancelled',
+                 p.updated_at = NOW()
+             WHERE p.order_id IN (${placeholders})
+               AND p.status IN ('pending', 'processing')
+               AND o.payment_status = 'cancelled'
+               AND o.order_status = 'cancelled'`,
+            cancelledOrderIds
         );
 
-        // Cancel expired orders.
-        // Repeat conditions to protect against unexpected state changes.
-        const [result] = await conn.execute(
-            `UPDATE marketplace_orders
-             SET payment_status = 'cancelled',
-                 order_status = 'cancelled',
-                 cancelled_at = COALESCE(cancelled_at, NOW()),
-                 updated_at = NOW()
-             WHERE id IN (${placeholders})
-               AND payment_status IN ('pending', 'processing')
-               AND order_status IN ('pending_payment', 'processing')
-               AND payment_deadline_at IS NOT NULL
-               AND payment_deadline_at <= NOW()`,
-            orderIds
+        // Revoke unused delivery authorizations.
+        // Used authorizations are retained as historical records.
+        await conn.execute(
+            `UPDATE marketplace_delivery_authorizations a
+             INNER JOIN marketplace_order_items oi
+                 ON oi.id = a.order_item_id
+             SET a.status = 'revoked',
+                 a.revoked_by = NULL,
+                 a.revoked_at = NOW(),
+                 a.revocation_reason = ?,
+                 a.updated_at = NOW()
+             WHERE oi.order_id IN (${placeholders})
+               AND a.status = 'authorized'`,
+            [
+                "Order tự động hủy do quá hạn thanh toán",
+                ...cancelledOrderIds
+            ]
         );
 
         await conn.commit();
@@ -135,8 +201,8 @@ async function cancelExpiredOrders() {
 
         return {
             success: true,
-            cancelledCount: result.affectedRows || 0,
-            orderIds
+            cancelledCount: cancelledOrderIds.length,
+            orderIds: cancelledOrderIds
         };
 
     } catch (err) {

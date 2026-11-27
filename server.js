@@ -443,6 +443,11 @@ require("./jobs/rewards.scheduler");
 // AUTO SYNC AIRDROP METRICS - EVERY 6 HOURS
 require("./services/airdrop.metrics.auto");
 
+// REWARDS SCHEDULER - EVERY 5 MINUTES
+require("./jobs/rewards.scheduler");
+
+// MARKETPLACE DELIVERY AUTO-CONFIRM - EVERY 5 MINUTES
+require("./jobs/marketplace.delivery.scheduler");
 // =========================
 // REDEEM KEY (FIX SAFE - PLAN INTEGRATION)
 // =========================
