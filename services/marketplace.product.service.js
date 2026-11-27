@@ -302,6 +302,7 @@ async function createProduct(userId, data, audit = {}) {
 // ========================================
 
 
+
 async function getMyProducts(userId, params = {}) {
     const conn = await db.getConnection();
 
@@ -336,38 +337,48 @@ async function getMyProducts(userId, params = {}) {
         );
 
         const [rows] = await conn.execute(
-            `SELECT p.id, p.title, p.slug, p.short_description,
-                    p.product_type, p.price, p.currency, p.version,
-                    p.status, p.review_note, p.published_at,
-                    p.created_at, p.updated_at,
-                    (
-                        SELECT f.id
-                        FROM marketplace_product_files f
-                        WHERE f.product_id = p.id
-                          AND f.file_role = 'thumbnail'
-                          AND f.is_active = 1
-                          AND f.mime_type IN (
-                              'image/jpeg',
-                              'image/png',
-                              'image/webp'
-                          )
-                        ORDER BY f.id DESC
-                        LIMIT 1
-                    ) AS thumbnail_file_id,
-                    (
-                        SELECT f.mime_type
-                        FROM marketplace_product_files f
-                        WHERE f.product_id = p.id
-                          AND f.file_role = 'thumbnail'
-                          AND f.is_active = 1
-                          AND f.mime_type IN (
-                              'image/jpeg',
-                              'image/png',
-                              'image/webp'
-                          )
-                        ORDER BY f.id DESC
-                        LIMIT 1
-                    ) AS thumbnail_mime_type
+            `SELECT
+                p.id,
+                p.title,
+                p.slug,
+                p.short_description,
+                p.product_type,
+                p.price,
+                p.currency,
+                p.version,
+                p.status,
+                p.review_note,
+                p.published_at,
+                p.created_at,
+                p.updated_at,
+                (
+                    SELECT f.id
+                    FROM marketplace_product_files f
+                    WHERE f.product_id = p.id
+                      AND f.file_role = 'thumbnail'
+                      AND f.is_active = 1
+                      AND f.mime_type IN (
+                          'image/jpeg',
+                          'image/png',
+                          'image/webp'
+                      )
+                    ORDER BY f.id DESC
+                    LIMIT 1
+                ) AS thumbnail_file_id,
+                (
+                    SELECT f.mime_type
+                    FROM marketplace_product_files f
+                    WHERE f.product_id = p.id
+                      AND f.file_role = 'thumbnail'
+                      AND f.is_active = 1
+                      AND f.mime_type IN (
+                          'image/jpeg',
+                          'image/png',
+                          'image/webp'
+                      )
+                    ORDER BY f.id DESC
+                    LIMIT 1
+                ) AS thumbnail_mime_type
              FROM marketplace_products p
              WHERE ${where}
              ORDER BY p.updated_at DESC, p.id DESC
@@ -390,6 +401,7 @@ async function getMyProducts(userId, params = {}) {
         conn.release();
     }
 }
+
 
 // ========================================
 // SELLER: GET MY PRODUCT DETAIL
