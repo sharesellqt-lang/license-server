@@ -4,6 +4,7 @@
 const express = require("express");
 const orderService = require("../services/marketplace.order.service");
 const privateFileService = require("../services/marketplace.private-file.service");
+const settingsAdminService = require("../services/marketplace.settings.admin.service");
 
 const router = express.Router();
 
@@ -32,6 +33,24 @@ function handlePublicError(res, error) {
             : code
     });
 }
+
+// ========================================
+// PUBLIC: PAYMENT BANK ACCOUNT
+// GET /api/marketplace/payment/bank-account
+// ========================================
+
+router.get("/payment/bank-account", async (req, res) => {
+    try {
+        const result = await settingsAdminService.getPublicPaymentBankAccount();
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handlePublicError(res, error);
+    }
+});
 
 // ========================================
 // PUBLIC: PRODUCT DEMO FILE
