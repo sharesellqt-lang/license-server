@@ -284,6 +284,7 @@ function handleError(res, error) {
         ORDER_ALREADY_PAID: 409,
         ORDER_ALREADY_PAID: 409,
         PRIVATE_FILE_NOT_FOUND: 404,
+        INVALID_FILE_ID: 400,
         
     };
 
@@ -1190,5 +1191,54 @@ router.get(
         }
     }
 );
+
+
+// Seller tải file thuộc lần bàn giao hiện tại.
+router.get(
+    "/seller/deliveries/:deliveryId/files/:fileId/download",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getSellerDeliveryFile(
+                req.user.id,
+                req.params.deliveryId,
+                req.params.fileId
+            );
+
+            return await privateFileService.sendPrivateFile(
+                res,
+                file,
+                { download: true }
+            );
+        } catch (error) {
+            if (res.headersSent) return res.destroy();
+            return handleError(res, error);
+        }
+    }
+);
+
+// Seller tải file thuộc một phiên bản bàn giao.
+router.get(
+    "/seller/deliveries/:deliveryId/versions/:versionId/files/:fileId/download",
+    async (req, res) => {
+        try {
+            const file = await privateFileService.getSellerDeliveryVersionFile(
+                req.user.id,
+                req.params.deliveryId,
+                req.params.versionId,
+                req.params.fileId
+            );
+
+            return await privateFileService.sendPrivateFile(
+                res,
+                file,
+                { download: true }
+            );
+        } catch (error) {
+            if (res.headersSent) return res.destroy();
+            return handleError(res, error);
+        }
+    }
+);
+
 
 module.exports = router;

@@ -162,6 +162,83 @@ async function getBuyerDeliveryVersionFile(userId, deliveryId, versionId, fileId
     return rows[0];
 }
 
+
+// Seller: tải file thuộc lần bàn giao hiện tại của sản phẩm mình.
+async function getSellerDeliveryFile(userId, deliveryId, fileId) {
+    userId = validId(userId);
+    deliveryId = validId(deliveryId);
+    fileId = validId(fileId);
+
+    const [rows] = await db.execute(
+        `SELECT
+            f.id,
+            f.original_name,
+            f.storage_key,
+            f.mime_type,
+            f.file_size,
+            f.file_role
+         FROM marketplace_delivery_files df
+         INNER JOIN marketplace_deliveries d
+            ON d.id = df.delivery_id
+         INNER JOIN marketplace_order_items oi
+            ON oi.id = d.order_item_id
+         INNER JOIN marketplace_product_files f
+            ON f.id = df.product_file_id
+         WHERE oi.seller_user_id = ?
+           AND d.id = ?
+           AND d.status IN ('delivered', 'confirmed')
+           AND f.id = ?
+           AND f.product_id = oi.product_id
+           AND f.file_role = 'delivery'
+           AND f.is_active = 1
+         LIMIT 1`,
+        [userId, deliveryId, fileId]
+    );
+
+    if (!rows.length) fail("PRIVATE_FILE_NOT_FOUND");
+
+    return rows[0];
+}
+
+// Seller: tải file thuộc một phiên bản bàn giao cụ thể.
+async function getSellerDeliveryVersionFile(
+    userId,
+    deliveryId,
+    versionId,
+    fileId
+) {
+    userId = validId(userId);
+    deliveryId = validId(deliveryId);
+    versionId = validId(versionId);
+    fileId = validId(fileId);
+
+    const [rows] = await db.execute(
+        `SELECT
+            vf.id,
+            vf.original_name,
+            vf.storage_key,
+            vf.mime_type,
+            vf.file_size
+         FROM marketplace_delivery_version_files vf
+         INNER JOIN marketplace_delivery_versions v
+            ON v.id = vf.version_id
+         INNER JOIN marketplace_deliveries d
+            ON d.id = v.delivery_id
+         INNER JOIN marketplace_order_items oi
+            ON oi.id = d.order_item_id
+         WHERE oi.seller_user_id = ?
+           AND d.id = ?
+           AND v.id = ?
+           AND vf.id = ?
+         LIMIT 1`,
+        [userId, deliveryId, versionId, fileId]
+    );
+
+    if (!rows.length) fail("PRIVATE_FILE_NOT_FOUND");
+
+    return rows[0];
+}
+
 async function sendPrivateFile(res, file, options = {}) {
     const filePath = resolvePrivateFile(file.storage_key);
 
@@ -210,10 +287,13 @@ async function sendPrivateFile(res, file, options = {}) {
     });
 }
 
+
 module.exports = {
     getSellerProductFile,
     getPublicDemoFile,
     getBuyerDeliveryFile,
-    sendPrivateFile,
     getBuyerDeliveryVersionFile,
+    getSellerDeliveryFile,
+    getSellerDeliveryVersionFile,
+    sendPrivateFile
 };
