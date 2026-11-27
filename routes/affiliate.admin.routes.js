@@ -295,6 +295,8 @@ function sendError(res, error) {
         "INVALID_USER_ID",
         "INVALID_APPLICATION_ADMIN_NOTE",
         "APPLICATION_REJECTION_REASON_REQUIRED",
+        "INVALID_SYNC_DATE",
+        "INVALID_SYNC_DATE_RANGE",
     ];
 
     const notFoundErrors = [
@@ -747,13 +749,12 @@ router.post(
             });
 
             return res.json(result);
-
-            return res.json(result);
         } catch (error) {
             return sendError(res, error);
         }
     }
 );
+
 
 // =====================================================
 // SYNC HISTORY
@@ -765,7 +766,6 @@ router.get(
     async (req, res) => {
         try {
             const { page, limit, offset } = pagination(req.query);
-
             const conditions = [];
             const params = [];
 
@@ -786,6 +786,47 @@ router.get(
                 "INVALID_SYNC_DATA_TYPE"
             );
 
+            const syncType = optionalEnum(
+                req.query.syncType,
+                ["manual_import", "csv_import", "excel_import", "api_sync"],
+                "INVALID_AFFILIATE_SYNC_TYPE"
+            );
+
+            const search = optionalText(
+                req.query.search,
+                150,
+                "INVALID_SEARCH_KEYWORD"
+            );
+
+            const fromDate = optionalText(
+                req.query.fromDate,
+                10,
+                "INVALID_SYNC_DATE"
+            );
+
+            const toDate = optionalText(
+                req.query.toDate,
+                10,
+                "INVALID_SYNC_DATE"
+            );
+
+            const isValidDate = value => {
+                if (!value) return true;
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+                const date = new Date(`${value}T00:00:00.000Z`);
+                return !Number.isNaN(date.getTime()) &&
+                    date.toISOString().slice(0, 10) === value;
+            };
+
+            if (!isValidDate(fromDate) || !isValidDate(toDate)) {
+                throw new Error("INVALID_SYNC_DATE");
+            }
+
+            if (fromDate && toDate && fromDate > toDate) {
+                throw new Error("INVALID_SYNC_DATE_RANGE");
+            }
+
             if (networkId) {
                 conditions.push("l.network_id = ?");
                 params.push(networkId);
@@ -799,6 +840,32 @@ router.get(
             if (dataType) {
                 conditions.push("l.data_type = ?");
                 params.push(dataType);
+            }
+
+            if (syncType) {
+                conditions.push("l.sync_type = ?");
+                params.push(syncType);
+            }
+
+            if (fromDate) {
+                conditions.push("l.started_at >= ?");
+                params.push(`${fromDate} 00:00:00`);
+            }
+
+            if (toDate) {
+                conditions.push("l.started_at < DATE_ADD(?, INTERVAL 1 DAY)");
+                params.push(toDate);
+            }
+
+            if (search) {
+                conditions.push(`(
+                    CAST(l.id AS CHAR) LIKE ?
+                    OR n.code LIKE ?
+                    OR n.name LIKE ?
+                )`);
+
+                const keyword = `%${search}%`;
+                params.push(keyword, keyword, keyword);
             }
 
             const where = conditions.length
@@ -834,20 +901,59 @@ router.get(
             const [countRows] = await db.execute(
                 `SELECT COUNT(*) AS total
                  FROM affiliate_sync_logs l
+                 JOIN affiliate_networks n
+                    ON n.id = l.network_id
                  ${where}`,
                 params
             );
 
-            const total = Number(countRows[0].total || 0);
+            const [statRows] = await db.execute(
+                `SELECT
+                    COUNT(*) AS total,
+                    COALESCE(SUM(l.status = 'running'), 0) AS running,
+                    COALESCE(SUM(l.status = 'success'), 0) AS success,
+                    COALESCE(SUM(l.status = 'partial'), 0) AS partial,
+                    COALESCE(SUM(l.status = 'failed'), 0) AS failed,
+                    COALESCE(SUM(l.total_rows), 0) AS totalRows,
+                    COALESCE(SUM(l.success_rows), 0) AS successRows,
+                    COALESCE(SUM(l.failed_rows), 0) AS failedRows
+                 FROM affiliate_sync_logs l
+                 JOIN affiliate_networks n
+                    ON n.id = l.network_id
+                 ${where}`,
+                params
+            );
+
+            const total = Number(countRows[0]?.total || 0);
+            const stats = statRows[0] || {};
 
             return res.json({
                 success: true,
                 logs: rows,
+                statistics: {
+                    total: Number(stats.total || 0),
+                    running: Number(stats.running || 0),
+                    success: Number(stats.success || 0),
+                    partial: Number(stats.partial || 0),
+                    failed: Number(stats.failed || 0),
+                    totalRows: Number(stats.totalRows || 0),
+                    successRows: Number(stats.successRows || 0),
+                    failedRows: Number(stats.failedRows || 0)
+                },
                 pagination: {
                     page,
                     limit,
                     total,
                     totalPages: Math.ceil(total / limit)
+                },
+                filters: {
+                    networkId,
+                    status,
+                    dataType,
+                    syncType,
+                    search,
+                    fromDate,
+                    toDate
                 }
             });
         } catch (error) {
