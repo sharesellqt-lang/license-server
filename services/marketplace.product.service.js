@@ -301,6 +301,7 @@ async function createProduct(userId, data, audit = {}) {
 // SELLER: LIST MY PRODUCTS
 // ========================================
 
+
 async function getMyProducts(userId, params = {}) {
     const conn = await db.getConnection();
 
@@ -311,48 +312,78 @@ async function getMyProducts(userId, params = {}) {
         const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
         const offset = (page - 1) * limit;
 
-        const conditions = ["seller_id = ?"];
+        const conditions = ["p.seller_id = ?"];
         const values = [seller.id];
 
         if (params.status) {
-            conditions.push("status = ?");
+            conditions.push("p.status = ?");
             values.push(String(params.status));
         }
 
         if (params.search) {
-            conditions.push("(title LIKE ? OR slug LIKE ?)");
-            values.push(`%${String(params.search).trim()}%`);
-            values.push(`%${String(params.search).trim()}%`);
+            const search = `%${String(params.search).trim()}%`;
+            conditions.push("(p.title LIKE ? OR p.slug LIKE ?)");
+            values.push(search, search);
         }
 
         const where = conditions.join(" AND ");
 
         const [countRows] = await conn.execute(
             `SELECT COUNT(*) AS total
-             FROM marketplace_products
+             FROM marketplace_products p
              WHERE ${where}`,
             values
         );
 
         const [rows] = await conn.execute(
-            `SELECT id, title, slug, short_description,
-                    product_type, price, currency, version,
-                    status, review_note, published_at,
-                    created_at, updated_at
-             FROM marketplace_products
+            `SELECT p.id, p.title, p.slug, p.short_description,
+                    p.product_type, p.price, p.currency, p.version,
+                    p.status, p.review_note, p.published_at,
+                    p.created_at, p.updated_at,
+                    (
+                        SELECT f.id
+                        FROM marketplace_product_files f
+                        WHERE f.product_id = p.id
+                          AND f.file_role = 'thumbnail'
+                          AND f.is_active = 1
+                          AND f.mime_type IN (
+                              'image/jpeg',
+                              'image/png',
+                              'image/webp'
+                          )
+                        ORDER BY f.id DESC
+                        LIMIT 1
+                    ) AS thumbnail_file_id,
+                    (
+                        SELECT f.mime_type
+                        FROM marketplace_product_files f
+                        WHERE f.product_id = p.id
+                          AND f.file_role = 'thumbnail'
+                          AND f.is_active = 1
+                          AND f.mime_type IN (
+                              'image/jpeg',
+                              'image/png',
+                              'image/webp'
+                          )
+                        ORDER BY f.id DESC
+                        LIMIT 1
+                    ) AS thumbnail_mime_type
+             FROM marketplace_products p
              WHERE ${where}
-             ORDER BY updated_at DESC, id DESC
+             ORDER BY p.updated_at DESC, p.id DESC
              LIMIT ? OFFSET ?`,
             [...values, limit, offset]
         );
+
+        const total = Number(countRows[0].total);
 
         return {
             items: rows,
             pagination: {
                 page,
                 limit,
-                total: Number(countRows[0].total),
-                totalPages: Math.ceil(Number(countRows[0].total) / limit)
+                total,
+                totalPages: Math.ceil(total / limit)
             }
         };
     } finally {
