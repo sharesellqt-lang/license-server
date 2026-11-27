@@ -285,6 +285,19 @@ function handleError(res, error) {
         ORDER_ALREADY_PAID: 409,
         PRIVATE_FILE_NOT_FOUND: 404,
         INVALID_FILE_ID: 400,
+        // MARKETPLACE SUPPORT
+        INVALID_TICKET_STATUS: 400,
+        INVALID_TICKET_MESSAGE: 400,
+        INVALID_TICKET_MESSAGE_TYPE: 400,
+        INVALID_TICKET_RESOLUTION: 400,
+        SUPPORT_TICKET_NOT_FOUND: 404,
+        SUPPORT_TICKET_NOT_OWNED: 403,
+        SUPPORT_TICKET_ALREADY_CLOSED: 409,
+        SUPPORT_TICKET_STATUS_INVALID: 409,
+        SUPPORT_TICKET_MESSAGE_NOT_ALLOWED: 409,
+        INVALID_TICKET_MESSAGE: 400,
+        SUPPORT_TICKET_NOT_FOUND: 404,
+        SUPPORT_TICKET_MESSAGE_NOT_ALLOWED: 409,
         
     };
 
@@ -444,6 +457,146 @@ router.post("/seller/accept-agreement", async (req, res) => {
         return handleError(res, error);
     }
 });
+
+// ========================================
+// SELLER: CUSTOMER SUPPORT
+// ========================================
+
+// Danh sách ticket của Seller
+router.get("/seller/support-tickets", async (req, res) => {
+    try {
+        const result = await supportService.getSellerTickets(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Chi tiết ticket và hội thoại
+router.get("/seller/support-tickets/:id", async (req, res) => {
+    try {
+        const result = await supportService.getSellerTicketDetail(
+            req.user.id,
+            req.params.id
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Seller phản hồi hoặc ghi chú nội bộ
+router.post("/seller/support-tickets/:id/messages", async (req, res) => {
+    try {
+        const result = await supportService.createSellerMessage(
+            req.user.id,
+            req.params.id,
+            req.body || {},
+            getAuditInfo(req)
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "SUPPORT_MESSAGE_CREATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Seller tiếp nhận hoặc chuyển ticket sang chờ Buyer
+router.put("/seller/support-tickets/:id/status", async (req, res) => {
+    try {
+        const result = await supportService.updateSellerTicketStatus(
+            req.user.id,
+            req.params.id,
+            req.body || {},
+            getAuditInfo(req)
+        );
+
+        return res.json({
+            success: true,
+            message: "SUPPORT_TICKET_UPDATED",
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+
+router.get(
+    "/buyer/support-tickets",
+    async (req, res) => {
+        try {
+            const result = await supportService.getBuyerTickets(
+                req.user.id,
+                req.query
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
+
+router.get(
+    "/buyer/support-tickets/:id",
+    async (req, res) => {
+        try {
+            const result = await supportService.getBuyerTicketDetail(
+                req.user.id,
+                req.params.id
+            );
+
+            return res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
+
+router.post(
+    "/buyer/support-tickets/:id/messages",
+    async (req, res) => {
+        try {
+            const result = await supportService.createBuyerMessage(
+                req.user.id,
+                req.params.id,
+                {
+                    message: req.body?.message
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "SUPPORT_MESSAGE_CREATED",
+                data: result
+            });
+        } catch (error) {
+            handleError(res, error);
+        }
+    }
+);
 
 // ========================================
 // SELLER: PRODUCTS

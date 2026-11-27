@@ -29,6 +29,7 @@ const canViewDeliveries = requireContributorPermission("marketplace.delivery.vie
 const settingsAdminService = require("../services/marketplace.settings.admin.service");
 const canViewSettings = requireContributorPermission("marketplace.settings.view");
 const canManageSettings = requireContributorPermission("marketplace.settings.manage");
+const supportService = require("../services/marketplace.support.service");
 
 const router = express.Router();
 
@@ -102,8 +103,11 @@ function handleError(res, error) {
         COMMISSION_RATES_MUST_EQUAL_100: 400,
         INVALID_REVIEW_NOTE: 400,
         SELLER_REOPEN_STATUS_INVALID: 409,
-
-        ER_DUP_ENTRY: 409
+        ER_DUP_ENTRY: 409,
+        INVALID_TICKET_MESSAGE: 400,
+        INVALID_TICKET_MESSAGE_TYPE: 400,
+        SUPPORT_TICKET_NOT_FOUND: 404,
+        SUPPORT_TICKET_MESSAGE_NOT_ALLOWED: 409,
     };
 
     const status = errorMap[code] || 500;
@@ -682,6 +686,33 @@ router.put("/settings", canManageSettings, async (req, res) => {
         return handleError(res, error);
     }
 });
+
+
+router.post(
+    "/support-tickets/:id/messages",
+    canManageSupport,
+    async (req, res) => {
+        try {
+            const result = await supportService.createAdminMessage(
+                req.user.id,
+                req.params.id,
+                {
+                    message: req.body?.message,
+                    message_type: req.body?.message_type
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "SUPPORT_MESSAGE_CREATED",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+
 // ========================================
 // PAYOUTS ADMIN
 // ========================================
