@@ -27,6 +27,7 @@ const supportService = require("../services/marketplace.support.service");
 const orderService = require("../services/marketplace.order.service");
 const sellerBankService = require("../services/marketplace.seller.bank.service");
 const payoutService = require("../services/marketplace.payout.service");
+const commissionSellerService = require("../services/marketplace.commission.seller.service");
 const sellerDashboardService = require("../services/marketplace.seller.dashboard.service");
 const deliveryService = require("../services/marketplace.delivery.service");
 
@@ -298,7 +299,11 @@ function handleError(res, error) {
         INVALID_TICKET_MESSAGE: 400,
         SUPPORT_TICKET_NOT_FOUND: 404,
         SUPPORT_TICKET_MESSAGE_NOT_ALLOWED: 409,
-        
+        INVALID_COMMISSION_STATUS: 400,
+        INVALID_COMMISSION_PAYOUT_METHOD: 400,
+        INVALID_COMMISSION_DATE_FILTER: 400,
+        COMMISSION_NOT_FOUND: 404,
+                
     };
 
     const status = errorMap[code] || (
@@ -1092,6 +1097,68 @@ router.delete("/seller/bank-accounts/:id", async (req, res) => {
         return handleError(res, error);
     }
 });
+
+
+// ==================== SELLER COMMISSIONS ====================
+
+// Thống kê hoa hồng của Seller đang đăng nhập
+router.get("/seller/commissions/statistics", async (req, res) => {
+  try {
+    const result = await commissionSellerService.getCommissionStatistics(
+      req.user.id
+    );
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
+
+// Lấy danh sách hoa hồng của Seller đang đăng nhập
+router.get("/seller/commissions", async (req, res) => {
+  try {
+    const result = await commissionSellerService.getCommissions(
+      req.user.id,
+      {
+        page: req.query.page,
+        limit: req.query.limit,
+        status: req.query.status,
+        payout_method: req.query.payout_method,
+        date_from: req.query.date_from,
+        date_to: req.query.date_to,
+        search: req.query.search
+      }
+    );
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
+
+// Lấy chi tiết hoa hồng của Seller đang đăng nhập
+router.get("/seller/commissions/:id", async (req, res) => {
+  try {
+    const result = await commissionSellerService.getCommissionDetail(
+      req.user.id,
+      req.params.id
+    );
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+});
+
 
 // ==================== SELLER PAYOUT ====================
 
