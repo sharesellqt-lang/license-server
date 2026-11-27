@@ -33,26 +33,35 @@ function positiveId(value, error = "INVALID_ID") {
     const id = Number(value);
 
     if (!Number.isSafeInteger(id) || id <= 0) {
-        throw new Error(error);
+        const err = new Error(error);
+        err.code = error;
+        throw err;
     }
 
     return id;
 }
 
 function toCents(value) {
-    const number = Number(value);
+    const text = String(value ?? "").trim();
 
-    if (!Number.isFinite(number) || number < 0) {
-        throw new Error("INVALID_PAYOUT_AMOUNT");
+    if (!/^\d{1,13}(?:\.\d{1,2})?$/.test(text)) {
+        const error = new Error("INVALID_PAYOUT_AMOUNT");
+        error.code = "INVALID_PAYOUT_AMOUNT";
+        throw error;
     }
 
-    const cents = Math.round(number * 100);
+    const [whole, fraction = ""] = text.split(".");
+    const cents =
+        BigInt(whole) * 100n +
+        BigInt(fraction.padEnd(2, "0"));
 
-    if (!Number.isSafeInteger(cents)) {
-        throw new Error("INVALID_PAYOUT_AMOUNT");
+    if (cents > BigInt(Number.MAX_SAFE_INTEGER)) {
+        const error = new Error("INVALID_PAYOUT_AMOUNT");
+        error.code = "INVALID_PAYOUT_AMOUNT";
+        throw error;
     }
 
-    return cents;
+    return Number(cents);
 }
 
 function formatAmount(cents) {
@@ -142,11 +151,15 @@ async function getSeller(conn, userId, lock = false) {
     );
 
     if (!rows.length) {
-        throw new Error("SELLER_NOT_FOUND");
+        const error = new Error("SELLER_NOT_FOUND");
+        error.code = "SELLER_NOT_FOUND";
+        throw error;
     }
 
     if (rows[0].status !== "active") {
-        throw new Error("SELLER_NOT_ACTIVE");
+        const error = new Error("SELLER_NOT_ACTIVE");
+        error.code = "SELLER_NOT_ACTIVE";
+        throw error;
     }
 
     return rows[0];
@@ -155,15 +168,16 @@ async function getSeller(conn, userId, lock = false) {
 async function getMyPayouts(userId, options = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
 
-    const page = Math.max(
-        1,
-        Number.parseInt(options.page, 10) || 1
-    );
+    const requestedPage = Number.parseInt(options.page, 10);
+    const requestedLimit = Number.parseInt(options.limit, 10);
 
-    const limit = Math.min(
-        50,
-        Math.max(1, Number.parseInt(options.limit, 10) || 20)
-    );
+    const page = Number.isSafeInteger(requestedPage) && requestedPage > 0
+        ? Math.min(requestedPage, 1000000)
+        : 1;
+
+    const limit = Number.isSafeInteger(requestedLimit) && requestedLimit > 0
+        ? Math.min(requestedLimit, 50)
+        : 20;
 
     const offset = (page - 1) * limit;
 
@@ -172,11 +186,13 @@ async function getMyPayouts(userId, options = {}) {
         : null;
 
     if (status && !ALLOWED_PAYOUT_STATUSES.includes(status)) {
-        throw new Error("INVALID_PAYOUT_STATUS");
+        const error = new Error("INVALID_PAYOUT_STATUS");
+        error.code = "INVALID_PAYOUT_STATUS";
+        throw error;
     }
 
     const [sellers] = await db.execute(
-        `SELECT id, status
+        `SELECT id
          FROM marketplace_sellers
          WHERE user_id = ?
          LIMIT 1`,
@@ -184,13 +200,12 @@ async function getMyPayouts(userId, options = {}) {
     );
 
     if (!sellers.length) {
-        throw new Error("SELLER_NOT_FOUND");
+        const error = new Error("SELLER_NOT_FOUND");
+        error.code = "SELLER_NOT_FOUND";
+        throw error;
     }
 
-    if (sellers[0].status !== "active") {
-        throw new Error("SELLER_NOT_ACTIVE");
-    }
-
+    // Seller đã bị suspended/closed vẫn được xem lịch sử Payout.
     const sellerId = sellers[0].id;
 
     const statusCondition = status
@@ -215,8 +230,8 @@ async function getMyPayouts(userId, options = {}) {
          WHERE seller_id = ?
          ${statusCondition}
          ORDER BY requested_at DESC, id DESC
-         LIMIT ${limit} OFFSET ${offset}`,
-        queryParams
+         LIMIT ? OFFSET ?`,
+        [...queryParams, limit, offset]
     );
 
     const total = Number(countRows[0].total || 0);
@@ -237,7 +252,7 @@ async function getMyPayoutDetail(userId, payoutId) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
 
     const [sellers] = await db.execute(
-        `SELECT id, status
+        `SELECT id
          FROM marketplace_sellers
          WHERE user_id = ?
          LIMIT 1`,
@@ -245,13 +260,12 @@ async function getMyPayoutDetail(userId, payoutId) {
     );
 
     if (!sellers.length) {
-        throw new Error("SELLER_NOT_FOUND");
+        const error = new Error("SELLER_NOT_FOUND");
+        error.code = "SELLER_NOT_FOUND";
+        throw error;
     }
 
-    if (sellers[0].status !== "active") {
-        throw new Error("SELLER_NOT_ACTIVE");
-    }
-
+    // Seller đã bị suspended/closed vẫn được xem chi tiết Payout.
     const [rows] = await db.execute(
         `SELECT *
          FROM marketplace_payout_requests
@@ -262,7 +276,9 @@ async function getMyPayoutDetail(userId, payoutId) {
     );
 
     if (!rows.length) {
-        throw new Error("PAYOUT_REQUEST_NOT_FOUND");
+        const error = new Error("PAYOUT_REQUEST_NOT_FOUND");
+        error.code = "PAYOUT_REQUEST_NOT_FOUND";
+        throw error;
     }
 
     const payout = safePayout(rows[0]);
@@ -332,11 +348,15 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
     userId = positiveId(userId, "INVALID_USER_ID");
 
     if (!Array.isArray(data.commissionIds) || !data.commissionIds.length) {
-        throw new Error("PAYOUT_COMMISSION_IDS_REQUIRED");
+        const error = new Error("PAYOUT_COMMISSION_IDS_REQUIRED");
+        error.code = "PAYOUT_COMMISSION_IDS_REQUIRED";
+        throw error;
     }
 
     if (data.commissionIds.length > 100) {
-        throw new Error("PAYOUT_TOO_MANY_COMMISSIONS");
+        const error = new Error("PAYOUT_TOO_MANY_COMMISSIONS");
+        error.code = "PAYOUT_TOO_MANY_COMMISSIONS";
+        throw error;
     }
 
     const commissionIds = [
@@ -348,7 +368,9 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
     ];
 
     if (commissionIds.length !== data.commissionIds.length) {
-        throw new Error("DUPLICATE_PAYOUT_COMMISSION");
+        const error = new Error("DUPLICATE_PAYOUT_COMMISSION");
+        error.code = "DUPLICATE_PAYOUT_COMMISSION";
+        throw error;
     }
 
     const requestedBankAccountId =
@@ -365,7 +387,7 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
         await conn.beginTransaction();
         transactionStarted = true;
 
-        // Serialize payout and bank-account operations for this Seller.
+        // Lock Seller to serialize payout and bank-account operations.
         const seller = await getSeller(conn, userId, true);
 
         let bankRows;
@@ -395,14 +417,119 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
         }
 
         if (!bankRows.length) {
-            throw new Error("SELLER_BANK_ACCOUNT_NOT_FOUND");
+            const error = new Error("SELLER_BANK_ACCOUNT_NOT_FOUND");
+            error.code = "SELLER_BANK_ACCOUNT_NOT_FOUND";
+            throw error;
         }
 
         const bank = bankRows[0];
-
         const placeholders = commissionIds.map(() => "?").join(",");
 
-        // Lock all selected commissions before validating their eligibility.
+        /*
+         * Bước 1: Đọc tham chiếu Commission không khóa.
+         * Chỉ dùng để xác định các Order và Order Item cần khóa.
+         * Dữ liệu nghiệp vụ sẽ được đọc lại sau khi khóa Commission.
+         */
+        const [commissionRefs] = await conn.execute(
+            `SELECT id, order_id, order_item_id
+             FROM marketplace_commissions
+             WHERE id IN (${placeholders})
+               AND seller_id = ?
+               AND seller_user_id = ?
+             ORDER BY id ASC`,
+            [...commissionIds, seller.id, userId]
+        );
+
+        if (commissionRefs.length !== commissionIds.length) {
+            const error = new Error("PAYOUT_COMMISSION_NOT_FOUND");
+            error.code = "PAYOUT_COMMISSION_NOT_FOUND";
+            throw error;
+        }
+
+        if (commissionRefs.some(row =>
+            !Number.isSafeInteger(Number(row.order_id)) ||
+            Number(row.order_id) <= 0 ||
+            !Number.isSafeInteger(Number(row.order_item_id)) ||
+            Number(row.order_item_id) <= 0
+        )) {
+            const error = new Error("PAYOUT_COMMISSION_RELATION_INVALID");
+            error.code = "PAYOUT_COMMISSION_RELATION_INVALID";
+            throw error;
+        }
+
+        /*
+         * Bước 2: Khóa tất cả Order theo ID tăng dần.
+         */
+        const orderIds = [
+            ...new Set(commissionRefs.map(row => Number(row.order_id)))
+        ].sort((a, b) => a - b);
+
+        const orderPlaceholders = orderIds.map(() => "?").join(",");
+
+        const [orders] = await conn.execute(
+            `SELECT id, payment_status, order_status
+             FROM marketplace_orders
+             WHERE id IN (${orderPlaceholders})
+             ORDER BY id ASC
+             FOR UPDATE`,
+            orderIds
+        );
+
+        if (orders.length !== orderIds.length) {
+            const error = new Error("PAYOUT_ORDER_NOT_FOUND");
+            error.code = "PAYOUT_ORDER_NOT_FOUND";
+            throw error;
+        }
+
+        const orderMap = new Map(
+            orders.map(row => [Number(row.id), row])
+        );
+
+        /*
+         * Bước 3: Khóa tất cả Order Item theo ID tăng dần.
+         */
+        const orderItemIds = [
+            ...new Set(commissionRefs.map(row => Number(row.order_item_id)))
+        ].sort((a, b) => a - b);
+
+        const itemPlaceholders = orderItemIds.map(() => "?").join(",");
+
+        const [orderItems] = await conn.execute(
+            `SELECT id, order_id
+             FROM marketplace_order_items
+             WHERE id IN (${itemPlaceholders})
+             ORDER BY id ASC
+             FOR UPDATE`,
+            orderItemIds
+        );
+
+        if (orderItems.length !== orderItemIds.length) {
+            const error = new Error("PAYOUT_ORDER_ITEM_NOT_FOUND");
+            error.code = "PAYOUT_ORDER_ITEM_NOT_FOUND";
+            throw error;
+        }
+
+        const orderItemMap = new Map(
+            orderItems.map(row => [Number(row.id), row])
+        );
+
+        for (const ref of commissionRefs) {
+            const orderItem = orderItemMap.get(Number(ref.order_item_id));
+
+            if (
+                !orderItem ||
+                Number(orderItem.order_id) !== Number(ref.order_id)
+            ) {
+                const error = new Error("PAYOUT_COMMISSION_RELATION_INVALID");
+                error.code = "PAYOUT_COMMISSION_RELATION_INVALID";
+                throw error;
+            }
+        }
+
+        /*
+         * Bước 4: Khóa Commission theo ID tăng dần.
+         * Đây mới là dữ liệu chính thức để xác thực và tính tiền.
+         */
         const [commissions] = await conn.execute(
             `SELECT *
              FROM marketplace_commissions
@@ -415,7 +542,9 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
         );
 
         if (commissions.length !== commissionIds.length) {
-            throw new Error("PAYOUT_COMMISSION_NOT_FOUND");
+            const error = new Error("PAYOUT_COMMISSION_NOT_FOUND");
+            error.code = "PAYOUT_COMMISSION_NOT_FOUND";
+            throw error;
         }
 
         const commissionMap = new Map(
@@ -427,19 +556,31 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
         for (const commissionId of commissionIds) {
             const commission = commissionMap.get(commissionId);
 
+            if (!commission) {
+                const error = new Error("PAYOUT_COMMISSION_NOT_FOUND");
+                error.code = "PAYOUT_COMMISSION_NOT_FOUND";
+                throw error;
+            }
+
             if (commission.status !== "available") {
-                throw new Error("PAYOUT_COMMISSION_NOT_AVAILABLE");
+                const error = new Error("PAYOUT_COMMISSION_NOT_AVAILABLE");
+                error.code = "PAYOUT_COMMISSION_NOT_AVAILABLE";
+                throw error;
             }
 
             if (
                 !commission.eligible_at ||
                 new Date(commission.eligible_at).getTime() > Date.now()
             ) {
-                throw new Error("PAYOUT_COMMISSION_NOT_ELIGIBLE");
+                const error = new Error("PAYOUT_COMMISSION_NOT_ELIGIBLE");
+                error.code = "PAYOUT_COMMISSION_NOT_ELIGIBLE";
+                throw error;
             }
 
             if (commission.currency !== "VND") {
-                throw new Error("PAYOUT_CURRENCY_NOT_SUPPORTED");
+                const error = new Error("PAYOUT_CURRENCY_NOT_SUPPORTED");
+                error.code = "PAYOUT_CURRENCY_NOT_SUPPORTED";
+                throw error;
             }
 
             const sellerAmount = toCents(commission.seller_amount);
@@ -450,131 +591,179 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
                 sellerAmount - paidAmount - reversedAmount;
 
             if (remainingAmount <= 0) {
-                throw new Error("PAYOUT_COMMISSION_NO_REMAINING_AMOUNT");
+                const error = new Error("PAYOUT_COMMISSION_NO_REMAINING_AMOUNT");
+                error.code = "PAYOUT_COMMISSION_NO_REMAINING_AMOUNT";
+                throw error;
             }
 
             commission._payoutAmountCents = remainingAmount;
             totalCents += remainingAmount;
 
             if (!Number.isSafeInteger(totalCents)) {
-                throw new Error("INVALID_PAYOUT_AMOUNT");
+                const error = new Error("INVALID_PAYOUT_AMOUNT");
+                error.code = "INVALID_PAYOUT_AMOUNT";
+                throw error;
             }
         }
 
         if (totalCents <= 0) {
-            throw new Error("INVALID_PAYOUT_AMOUNT");
+            const error = new Error("INVALID_PAYOUT_AMOUNT");
+            error.code = "INVALID_PAYOUT_AMOUNT";
+            throw error;
         }
 
-        // Lock and validate all related orders.
-        const orderIds = [
-            ...new Set(commissions.map(row => Number(row.order_id)))
-        ];
-
-        const orderPlaceholders = orderIds.map(() => "?").join(",");
-
-        const [orders] = await conn.execute(
-            `SELECT id, payment_status, order_status
-             FROM marketplace_orders
-             WHERE id IN (${orderPlaceholders})
-             FOR UPDATE`,
-            orderIds
-        );
-
-        const orderMap = new Map(
-            orders.map(row => [Number(row.id), row])
-        );
-
+        /*
+         * Bước 5: Kiểm tra trạng thái Order đã khóa.
+         */
         for (const commission of commissions) {
             const order = orderMap.get(Number(commission.order_id));
 
             if (!order) {
-                throw new Error("PAYOUT_ORDER_NOT_FOUND");
+                const error = new Error("PAYOUT_ORDER_NOT_FOUND");
+                error.code = "PAYOUT_ORDER_NOT_FOUND";
+                throw error;
             }
 
-           if (
+            if (
                 order.payment_status !== "paid" ||
-                ["cancelled", "disputed", "refunded", "partially_refunded"].includes(order.order_status)
+                [
+                    "cancelled",
+                    "disputed",
+                    "refunded",
+                    "partially_refunded"
+                ].includes(order.order_status)
             ) {
-                throw new Error("PAYOUT_ORDER_NOT_ELIGIBLE");
+                const error = new Error("PAYOUT_ORDER_NOT_ELIGIBLE");
+                error.code = "PAYOUT_ORDER_NOT_ELIGIBLE";
+                throw error;
             }
 
-            // A commission must have a delivered or confirmed item.
-            const [deliveries] = await conn.execute(
-                `SELECT id, status
-                 FROM marketplace_deliveries
-                 WHERE order_item_id = ?
-                 LIMIT 1
-                 FOR UPDATE`,
-                [commission.order_item_id]
+            const orderItem = orderItemMap.get(
+                Number(commission.order_item_id)
             );
 
             if (
-                !deliveries.length ||
-                !["delivered", "confirmed"].includes(deliveries[0].status)
+                !orderItem ||
+                Number(orderItem.order_id) !== Number(commission.order_id)
             ) {
-                throw new Error("PAYOUT_DELIVERY_NOT_COMPLETED");
+                const error = new Error("PAYOUT_COMMISSION_RELATION_INVALID");
+                error.code = "PAYOUT_COMMISSION_RELATION_INVALID";
+                throw error;
             }
         }
 
-        // Any active commission hold blocks payout.
+        /*
+         * Bước 6: Khóa tất cả Delivery theo ID tăng dần.
+         */
+        const [deliveries] = await conn.execute(
+            `SELECT id, order_item_id, status
+             FROM marketplace_deliveries
+             WHERE order_item_id IN (${itemPlaceholders})
+             ORDER BY id ASC
+             FOR UPDATE`,
+            orderItemIds
+        );
+
+        const deliveryMap = new Map(
+            deliveries.map(row => [Number(row.order_item_id), row])
+        );
+
+        for (const commission of commissions) {
+            const delivery = deliveryMap.get(
+                Number(commission.order_item_id)
+            );
+
+            if (
+                !delivery ||
+                !["delivered", "confirmed"].includes(delivery.status)
+            ) {
+                const error = new Error("PAYOUT_DELIVERY_NOT_COMPLETED");
+                error.code = "PAYOUT_DELIVERY_NOT_COMPLETED";
+                throw error;
+            }
+        }
+
+        /*
+         * Bước 7: Khóa toàn bộ Commission Hold đang active.
+         */
         const [holds] = await conn.execute(
-            `SELECT commission_id
+            `SELECT id, commission_id
              FROM marketplace_commission_holds
              WHERE commission_id IN (${placeholders})
                AND status = 'active'
-             LIMIT 1
+             ORDER BY id ASC
              FOR UPDATE`,
             commissionIds
         );
 
         if (holds.length) {
-            throw new Error("PAYOUT_COMMISSION_ON_HOLD");
+            const error = new Error("PAYOUT_COMMISSION_ON_HOLD");
+            error.code = "PAYOUT_COMMISSION_ON_HOLD";
+            throw error;
         }
 
-        // A ticket can cover either one order item or the whole order.
-        // Only tickets belonging to this Seller block this payout.
+        /*
+         * Bước 8: Khóa tất cả Ticket đang active liên quan.
+         * Bao gồm Ticket cấp Order (order_item_id IS NULL)
+         * và Ticket cấp từng Order Item.
+         */
         const [tickets] = await conn.execute(
             `SELECT t.id
              FROM marketplace_support_tickets t
-             INNER JOIN marketplace_commissions c
-                ON c.order_id = t.order_id
+             WHERE t.seller_user_id = ?
+               AND t.status IN (${ACTIVE_TICKET_STATUSES.map(() => "?").join(",")})
+               AND t.order_id IN (${orderPlaceholders})
                AND (
                     t.order_item_id IS NULL
-                    OR t.order_item_id = c.order_item_id
+                    OR t.order_item_id IN (${itemPlaceholders})
                )
-             WHERE c.id IN (${placeholders})
-               AND t.seller_user_id = ?
-               AND t.status IN (${ACTIVE_TICKET_STATUSES.map(() => "?").join(",")})
-             LIMIT 1
+             ORDER BY t.id ASC
              FOR UPDATE`,
-            [...commissionIds, userId, ...ACTIVE_TICKET_STATUSES]
+            [
+                userId,
+                ...ACTIVE_TICKET_STATUSES,
+                ...orderIds,
+                ...orderItemIds
+            ]
         );
 
         if (tickets.length) {
-            throw new Error("PAYOUT_COMMISSION_HAS_ACTIVE_TICKET");
+            const error = new Error("PAYOUT_COMMISSION_HAS_ACTIVE_TICKET");
+            error.code = "PAYOUT_COMMISSION_HAS_ACTIVE_TICKET";
+            throw error;
         }
 
-        // Prevent a commission from belonging to another active payout.
+        /*
+         * Bước 9: Kiểm tra Payout Item thuộc các Payout đang hoạt động.
+         */
         const [existingItems] = await conn.execute(
-            `SELECT pi.commission_id
+            `SELECT
+                pi.id,
+                pi.commission_id,
+                pr.id AS payout_request_id
              FROM marketplace_payout_items pi
              INNER JOIN marketplace_payout_requests pr
                 ON pr.id = pi.payout_request_id
              WHERE pi.commission_id IN (${placeholders})
                AND pr.status IN (${ACTIVE_PAYOUT_STATUSES.map(() => "?").join(",")})
-             LIMIT 1
+             ORDER BY pi.id ASC
              FOR UPDATE`,
             [...commissionIds, ...ACTIVE_PAYOUT_STATUSES]
         );
 
         if (existingItems.length) {
-            throw new Error("PAYOUT_COMMISSION_ALREADY_REQUESTED");
+            const error = new Error("PAYOUT_COMMISSION_ALREADY_REQUESTED");
+            error.code = "PAYOUT_COMMISSION_ALREADY_REQUESTED";
+            throw error;
         }
 
+        /*
+         * Bước 10: Tạo Payout Request và Payout Items.
+         */
         const totalAmount = formatAmount(totalCents);
         const requestCode = generateRequestCode();
 
-        // Snapshot is immutable for this payout request.
+        // Snapshot ngân hàng bất biến theo từng yêu cầu Payout.
         const bankSnapshot = {
             bankAccountId: bank.id,
             bankName: bank.bank_name,
@@ -639,7 +828,9 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
             );
 
             if (updateResult.affectedRows !== 1) {
-                throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
+                const error = new Error("PAYOUT_COMMISSION_STATE_CHANGED");
+                error.code = "PAYOUT_COMMISSION_STATE_CHANGED";
+                throw error;
             }
         }
 
@@ -702,11 +893,20 @@ async function createPayoutRequest(userId, data = {}, audit = {}) {
         };
     } catch (error) {
         if (transactionStarted) {
-            await conn.rollback();
+            try {
+                await conn.rollback();
+            } catch (rollbackError) {
+                console.error(
+                    "[MarketplacePayout] Rollback failed:",
+                    rollbackError
+                );
+            }
         }
 
         if (error.code === "ER_DUP_ENTRY") {
-            throw new Error("PAYOUT_REQUEST_DUPLICATE");
+            const duplicateError = new Error("PAYOUT_REQUEST_DUPLICATE");
+            duplicateError.code = "PAYOUT_REQUEST_DUPLICATE";
+            throw duplicateError;
         }
 
         throw error;

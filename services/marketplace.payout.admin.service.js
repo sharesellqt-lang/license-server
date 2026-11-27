@@ -100,7 +100,8 @@ async function getPayoutForUpdate(conn, payoutId) {
     return rows[0];
 }
 
-async function getPayoutItemsForUpdate(conn, payoutId) {
+
+async function getPayoutItems(conn, payoutId, lock = false) {
     const [rows] = await conn.execute(
         `SELECT
             pi.id,
@@ -108,43 +109,331 @@ async function getPayoutItemsForUpdate(conn, payoutId) {
             pi.commission_id,
             pi.amount,
             pi.currency,
-            pi.status,
-            c.id AS matched_commission_id,
-            c.seller_id,
-            c.seller_user_id,
-            c.order_id,
-            c.order_item_id,
-            c.seller_amount,
-            c.paid_amount,
-            c.reversed_amount,
-            c.eligible_at,
-            c.status AS commission_status
+            pi.status
          FROM marketplace_payout_items pi
-         LEFT JOIN marketplace_commissions c
-            ON c.id = pi.commission_id
          WHERE pi.payout_request_id = ?
          ORDER BY pi.id ASC
-         FOR UPDATE`,
+         ${lock ? "FOR UPDATE" : ""}`,
         [payoutId]
     );
 
-    if (!rows.length) throw new Error("PAYOUT_ITEMS_NOT_FOUND");
-
-    if (rows.some(item => !item.matched_commission_id)) {
-        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    if (!rows.length) {
+        throw new Error("PAYOUT_ITEMS_NOT_FOUND");
     }
 
     return rows;
 }
 
-function assertPayoutItemOwnership(payout, items) {
+function assertPayoutItemOwnership(payout, items, commissions) {
+    const commissionMap = new Map(
+        commissions.map(row => [Number(row.id), row])
+    );
+
     for (const item of items) {
+        const commission = commissionMap.get(Number(item.commission_id));
+
         if (
-            Number(item.seller_id) !== Number(payout.seller_id) ||
-            Number(item.seller_user_id) !== Number(payout.seller_user_id)
+            !commission ||
+            Number(commission.seller_id) !== Number(payout.seller_id) ||
+            Number(commission.seller_user_id) !== Number(payout.seller_user_id)
         ) {
             throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
         }
+    }
+
+    return commissionMap;
+}
+
+async function lockPayoutContext(conn, payoutId) {
+    // Đọc ban đầu không khóa để xác định các bản ghi liên quan.
+    const [payoutRows] = await conn.execute(
+        `SELECT *
+         FROM marketplace_payout_requests
+         WHERE id = ?
+         LIMIT 1`,
+        [payoutId]
+    );
+
+    if (!payoutRows.length) {
+        throw new Error("PAYOUT_REQUEST_NOT_FOUND");
+    }
+
+    const initialPayout = payoutRows[0];
+
+    const items = await getPayoutItems(conn, payoutId, false);
+
+    const commissionIds = [
+        ...new Set(items.map(item => Number(item.commission_id)))
+    ].sort((a, b) => a - b);
+
+    if (
+        !commissionIds.length ||
+        commissionIds.some(id => !Number.isSafeInteger(id) || id <= 0)
+    ) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    const placeholders = commissionIds.map(() => "?").join(",");
+
+    // Đọc quan hệ Commission không khóa.
+    const [refs] = await conn.execute(
+        `SELECT id, order_id, order_item_id
+         FROM marketplace_commissions
+         WHERE id IN (${placeholders})
+         ORDER BY id ASC`,
+        commissionIds
+    );
+
+    if (refs.length !== commissionIds.length) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    const orderIds = [
+        ...new Set(refs.map(row => Number(row.order_id)))
+    ].sort((a, b) => a - b);
+
+    const orderItemIds = [
+        ...new Set(refs.map(row => Number(row.order_item_id)))
+    ].sort((a, b) => a - b);
+
+    if (
+        orderIds.some(id => !Number.isSafeInteger(id) || id <= 0) ||
+        orderItemIds.some(id => !Number.isSafeInteger(id) || id <= 0)
+    ) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    // 1. Lock Order.
+    const orderPlaceholders = orderIds.map(() => "?").join(",");
+
+    const [orders] = await conn.execute(
+        `SELECT id, payment_status, order_status
+         FROM marketplace_orders
+         WHERE id IN (${orderPlaceholders})
+         ORDER BY id ASC
+         FOR UPDATE`,
+        orderIds
+    );
+
+    if (orders.length !== orderIds.length) {
+        throw new Error("PAYOUT_ORDER_NOT_FOUND");
+    }
+
+    const orderMap = new Map(
+        orders.map(row => [Number(row.id), row])
+    );
+
+    // 2. Lock Order Item.
+    const itemPlaceholders = orderItemIds.map(() => "?").join(",");
+
+    const [orderItems] = await conn.execute(
+        `SELECT id, order_id
+         FROM marketplace_order_items
+         WHERE id IN (${itemPlaceholders})
+         ORDER BY id ASC
+         FOR UPDATE`,
+        orderItemIds
+    );
+
+    if (orderItems.length !== orderItemIds.length) {
+        throw new Error("PAYOUT_ORDER_ITEM_NOT_FOUND");
+    }
+
+    const orderItemMap = new Map(
+        orderItems.map(row => [Number(row.id), row])
+    );
+
+    for (const ref of refs) {
+        const orderItem = orderItemMap.get(Number(ref.order_item_id));
+
+        if (
+            !orderItem ||
+            Number(orderItem.order_id) !== Number(ref.order_id)
+        ) {
+            throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+        }
+    }
+
+    // 3. Lock Commission.
+    const [commissions] = await conn.execute(
+        `SELECT *
+         FROM marketplace_commissions
+         WHERE id IN (${placeholders})
+         ORDER BY id ASC
+         FOR UPDATE`,
+        commissionIds
+    );
+
+    if (commissions.length !== commissionIds.length) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    const commissionMap = new Map(
+        commissions.map(row => [Number(row.id), row])
+    );
+
+    // Xác minh quan hệ không thay đổi trong lúc khóa.
+    for (const ref of refs) {
+        const commission = commissionMap.get(Number(ref.id));
+
+        if (
+            !commission ||
+            Number(commission.order_id) !== Number(ref.order_id) ||
+            Number(commission.order_item_id) !== Number(ref.order_item_id) ||
+            Number(commission.seller_id) !== Number(initialPayout.seller_id) ||
+            Number(commission.seller_user_id) !== Number(initialPayout.seller_user_id)
+        ) {
+            throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+        }
+    }
+
+    // 4. Lock Delivery.
+    const [deliveries] = await conn.execute(
+        `SELECT id, order_item_id, status
+         FROM marketplace_deliveries
+         WHERE order_item_id IN (${itemPlaceholders})
+         ORDER BY id ASC
+         FOR UPDATE`,
+        orderItemIds
+    );
+
+    const deliveryMap = new Map();
+
+    for (const delivery of deliveries) {
+        const key = Number(delivery.order_item_id);
+
+        // Nếu DB có nhiều Delivery cho một Order Item,
+        // không tự ý chọn bản ghi bất kỳ.
+        if (deliveryMap.has(key)) {
+            throw new Error("PAYOUT_DELIVERY_INTEGRITY_ERROR");
+        }
+
+        deliveryMap.set(key, delivery);
+    }
+
+    // 5. Lock tất cả Commission Hold active.
+    const [holds] = await conn.execute(
+        `SELECT id, commission_id, hold_type, reference_type, reference_id
+         FROM marketplace_commission_holds
+         WHERE commission_id IN (${placeholders})
+           AND status = 'active'
+         ORDER BY id ASC
+         FOR UPDATE`,
+        commissionIds
+    );
+
+    // 6. Lock Ticket active thuộc các Order liên quan.
+    const [tickets] = await conn.execute(
+        `SELECT id, order_id, order_item_id, seller_user_id, status
+         FROM marketplace_support_tickets
+         WHERE seller_user_id = ?
+           AND order_id IN (${orderPlaceholders})
+           AND status IN (${ACTIVE_TICKET_STATUSES.map(() => "?").join(",")})
+           AND (
+                order_item_id IS NULL
+                OR order_item_id IN (${itemPlaceholders})
+           )
+         ORDER BY id ASC
+         FOR UPDATE`,
+        [
+            initialPayout.seller_user_id,
+            ...orderIds,
+            ...ACTIVE_TICKET_STATUSES,
+            ...orderItemIds
+        ]
+    );
+
+    // 7. Cuối cùng mới khóa Payout Request.
+    const payout = await getPayoutForUpdate(conn, payoutId);
+
+    if (
+        Number(payout.seller_id) !== Number(initialPayout.seller_id) ||
+        Number(payout.seller_user_id) !== Number(initialPayout.seller_user_id)
+    ) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    // 8. Khóa Payout Items.
+    const lockedItems = await getPayoutItems(conn, payoutId, true);
+
+    if (
+        lockedItems.length !== items.length ||
+        lockedItems.some((item, index) =>
+            Number(item.id) !== Number(items[index].id) ||
+            Number(item.commission_id) !== Number(items[index].commission_id)
+        )
+    ) {
+        throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+    }
+
+    return {
+        payout,
+        items: lockedItems,
+        commissions,
+        commissionMap,
+        orders,
+        orderMap,
+        orderItems,
+        orderItemMap,
+        deliveries,
+        deliveryMap,
+        holds,
+        tickets
+    };
+}
+
+function assertPayoutFinancialEligibility(context) {
+    for (const commission of context.commissions) {
+        const order = context.orderMap.get(Number(commission.order_id));
+
+        if (
+            !order ||
+            order.payment_status !== "paid" ||
+            [
+                "cancelled",
+                "disputed",
+                "refunded",
+                "partially_refunded"
+            ].includes(order.order_status)
+        ) {
+            throw new Error("PAYOUT_ORDER_NOT_ELIGIBLE");
+        }
+
+        const delivery = context.deliveryMap.get(
+            Number(commission.order_item_id)
+        );
+
+        if (
+            !delivery ||
+            !["delivered", "confirmed"].includes(delivery.status)
+        ) {
+            throw new Error("PAYOUT_DELIVERY_NOT_COMPLETED");
+        }
+
+        if (commission.status !== "payout_requested") {
+            throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
+        }
+    }
+
+    if (context.holds.length) {
+        throw new Error("PAYOUT_COMMISSION_ON_HOLD");
+    }
+
+    if (context.tickets.length) {
+        throw new Error("PAYOUT_COMMISSION_HAS_ACTIVE_TICKET");
+    }
+}
+
+async function safeRollback(conn, transactionStarted) {
+    if (!transactionStarted) return;
+
+    try {
+        await conn.rollback();
+    } catch (rollbackError) {
+        console.error(
+            "[MarketplacePayoutAdmin] Rollback failed:",
+            rollbackError
+        );
     }
 }
 
@@ -481,6 +770,7 @@ async function reviewPayout(payoutId, adminUserId, data = {}, audit = {}) {
     }
 }
 
+
 async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
@@ -493,20 +783,28 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
         await conn.beginTransaction();
         transactionStarted = true;
 
-        const payout = await getPayoutForUpdate(conn, payoutId);
+        // Lock theo thứ tự:
+        // Order -> Order Item -> Commission -> Delivery
+        // -> Commission Hold -> Support Ticket
+        // -> Payout Request -> Payout Items.
+        const context = await lockPayoutContext(conn, payoutId);
+        const { payout, items, commissions } = context;
 
         if (payout.status !== "under_review") {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
-        const items = await getPayoutItemsForUpdate(conn, payoutId);
-        assertPayoutItemOwnership(payout, items);
+        assertPayoutItemOwnership(
+            payout,
+            items,
+            commissions
+        );
+
+        // Không duyệt nếu Order, Payment, Delivery,
+        // Commission Hold hoặc Support Ticket không hợp lệ.
+        assertPayoutFinancialEligibility(context);
 
         for (const item of items) {
-            if (item.commission_status !== "payout_requested") {
-                throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
-            }
-
             if (item.status !== "requested") {
                 throw new Error("PAYOUT_ITEM_STATE_CHANGED");
             }
@@ -520,7 +818,11 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
                  reviewed_at = NOW()
              WHERE id = ?
                AND status = 'under_review'`,
-            [adminNote || payout.admin_note, adminUserId, payoutId]
+            [
+                adminNote || payout.admin_note,
+                adminUserId,
+                payoutId
+            ]
         );
 
         if (payoutUpdate.affectedRows !== 1) {
@@ -545,7 +847,11 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
             amount: payout.total_amount,
             currency: payout.currency,
             note: adminNote || "Payout request approved",
-            metadata: { previousStatus: "under_review", newStatus: "approved" },
+            metadata: {
+                previousStatus: "under_review",
+                newStatus: "approved",
+                commissionCount: commissions.length
+            },
             adminUserId
         });
 
@@ -554,70 +860,76 @@ async function approvePayout(payoutId, adminUserId, data = {}, audit = {}) {
             payout,
             adminUserId,
             "marketplace.payout.approved",
-            { status: "under_review" },
-            { status: "approved", adminNote },
+            {
+                status: "under_review"
+            },
+            {
+                status: "approved",
+                adminNote
+            },
             audit
         );
 
         await conn.commit();
         transactionStarted = false;
 
-        return { id: payoutId, status: "approved" };
+        return {
+            id: payoutId,
+            status: "approved"
+        };
     } catch (error) {
-        if (transactionStarted) await conn.rollback();
+        await safeRollback(conn, transactionStarted);
+        transactionStarted = false;
         throw error;
     } finally {
         conn.release();
     }
 }
 
-async function restoreCommissionAfterRejection(conn, commission) {
-    const [orders] = await conn.execute(
-        `SELECT payment_status, order_status
-         FROM marketplace_orders
-         WHERE id = ?
-         LIMIT 1
-         FOR UPDATE`,
-        [commission.order_id]
-    );
 
-    if (!orders.length) throw new Error("PAYOUT_ORDER_NOT_FOUND");
 
-    const order = orders[0];
+async function restoreCommissionAfterRejection(conn, commission, context) {
+    const commissionId = Number(commission.id);
+    const order = context.orderMap.get(Number(commission.order_id));
+
+    if (!order) {
+        throw new Error("PAYOUT_ORDER_NOT_FOUND");
+    }
+
+    // Commission đã được một luồng khác chuyển sang on_hold.
+    // Không tự ý ghi đè trạng thái này khi Admin từ chối Payout.
+    if (commission.status === "on_hold") {
+        return {
+            commissionId,
+            status: "on_hold",
+            reason: "existing_commission_hold"
+        };
+    }
+
+    if (commission.status !== "payout_requested") {
+        throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
+    }
 
     const orderIsRisky =
         order.payment_status !== "paid" ||
-        ["cancelled", "disputed", "refunded", "partially_refunded"]
-            .includes(order.order_status);
+        [
+            "cancelled",
+            "disputed",
+            "refunded",
+            "partially_refunded"
+        ].includes(order.order_status);
 
-    const [holds] = await conn.execute(
-        `SELECT id
-         FROM marketplace_commission_holds
-         WHERE commission_id = ?
-           AND status = 'active'
-         LIMIT 1
-         FOR UPDATE`,
-        [commission.commission_id]
+    const hasActiveHold = context.holds.some(
+        hold => Number(hold.commission_id) === commissionId
     );
 
-    const [tickets] = await conn.execute(
-        `SELECT id
-         FROM marketplace_support_tickets
-         WHERE order_id = ?
-           AND seller_user_id = ?
-           AND (
-                order_item_id IS NULL
-                OR order_item_id = ?
-           )
-           AND status IN (${ACTIVE_TICKET_STATUSES.map(() => "?").join(",")})
-         LIMIT 1
-         FOR UPDATE`,
-        [
-            commission.order_id,
-            commission.seller_user_id,
-            commission.order_item_id,
-            ...ACTIVE_TICKET_STATUSES
-        ]
+    const hasActiveTicket = context.tickets.some(ticket =>
+        Number(ticket.order_id) === Number(commission.order_id) &&
+        Number(ticket.seller_user_id) === Number(commission.seller_user_id) &&
+        (
+            ticket.order_item_id == null ||
+            Number(ticket.order_item_id) === Number(commission.order_item_id)
+        )
     );
 
     let nextStatus = "available";
@@ -626,44 +938,50 @@ async function restoreCommissionAfterRejection(conn, commission) {
     if (orderIsRisky) {
         nextStatus = "on_hold";
         reason = "order_not_eligible";
-    } else if (holds.length) {
+    } else if (hasActiveHold) {
         nextStatus = "on_hold";
         reason = "active_commission_hold";
-    } else if (tickets.length) {
+    } else if (hasActiveTicket) {
         nextStatus = "on_hold";
         reason = "active_support_ticket";
-    } else if (
-        !commission.eligible_at ||
-        new Date(commission.eligible_at).getTime() > Date.now()
-    ) {
-        nextStatus = "pending_protection";
-        reason = "protection_not_completed";
+    } else {
+        const eligibleAt = commission.eligible_at
+            ? new Date(commission.eligible_at).getTime()
+            : NaN;
+
+        if (!Number.isFinite(eligibleAt) || eligibleAt > Date.now()) {
+            nextStatus = "pending_protection";
+            reason = "protection_not_completed";
+        }
     }
 
-    const [updateResult] = await conn.execute(
+    const [result] = await conn.execute(
         `UPDATE marketplace_commissions
          SET status = ?
          WHERE id = ?
            AND status = 'payout_requested'`,
-        [nextStatus, commission.commission_id]
+        [nextStatus, commissionId]
     );
 
-    if (updateResult.affectedRows !== 1) {
+    if (result.affectedRows !== 1) {
         throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
     }
 
     return {
-        commissionId: commission.commission_id,
+        commissionId,
         status: nextStatus,
         reason
     };
 }
+
+
 
 async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     const rejectionReason = cleanText(data.rejectionReason, 2000);
+    const adminNote = cleanText(data.adminNote, 2000);
 
     if (!rejectionReason) {
         throw new Error("PAYOUT_REJECTION_REASON_REQUIRED");
@@ -676,19 +994,43 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
         await conn.beginTransaction();
         transactionStarted = true;
 
-        const payout = await getPayoutForUpdate(conn, payoutId);
+        // Lock theo thứ tự chung:
+        // Order -> Order Item -> Commission -> Delivery
+        // -> Hold -> Ticket -> Payout -> Payout Items.
+        const context = await lockPayoutContext(conn, payoutId);
+        const { payout, items, commissions } = context;
 
         if (!["pending", "under_review", "approved"].includes(payout.status)) {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
-        const items = await getPayoutItemsForUpdate(conn, payoutId);
-        assertPayoutItemOwnership(payout, items);
+        assertPayoutItemOwnership(
+            payout,
+            items,
+            commissions
+        );
+
+        const commissionMap = new Map(
+            commissions.map(commission => [
+                Number(commission.id),
+                commission
+            ])
+        );
 
         const restoredCommissions = [];
 
         for (const item of items) {
-            if (item.commission_status !== "payout_requested") {
+            const commission = commissionMap.get(
+                Number(item.commission_id)
+            );
+
+            if (!commission) {
+                throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
+            }
+
+            if (
+                !["payout_requested", "on_hold"].includes(commission.status)
+            ) {
                 throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
             }
 
@@ -697,7 +1039,11 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
             }
 
             restoredCommissions.push(
-                await restoreCommissionAfterRejection(conn, item)
+                await restoreCommissionAfterRejection(
+                    conn,
+                    commission,
+                    context
+                )
             );
         }
 
@@ -712,7 +1058,7 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
                AND status IN ('pending', 'under_review', 'approved')`,
             [
                 rejectionReason,
-                cleanText(data.adminNote, 2000) || null,
+                adminNote || null,
                 adminUserId,
                 payoutId
             ]
@@ -753,10 +1099,13 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
             payout,
             adminUserId,
             "marketplace.payout.rejected",
-            { status: payout.status },
+            {
+                status: payout.status
+            },
             {
                 status: "rejected",
                 rejectionReason,
+                adminNote,
                 commissions: restoredCommissions
             },
             audit
@@ -771,12 +1120,14 @@ async function rejectPayout(payoutId, adminUserId, data = {}, audit = {}) {
             commissions: restoredCommissions
         };
     } catch (error) {
-        if (transactionStarted) await conn.rollback();
+        await safeRollback(conn, transactionStarted);
+        transactionStarted = false;
         throw error;
     } finally {
         conn.release();
     }
 }
+
 
 async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
@@ -790,20 +1141,26 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
         await conn.beginTransaction();
         transactionStarted = true;
 
-        const payout = await getPayoutForUpdate(conn, payoutId);
+        // Khóa dữ liệu theo thứ tự thống nhất toàn Marketplace.
+        const context = await lockPayoutContext(conn, payoutId);
+        const { payout, items, commissions } = context;
 
         if (payout.status !== "approved") {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
-        const items = await getPayoutItemsForUpdate(conn, payoutId);
-        assertPayoutItemOwnership(payout, items);
+        assertPayoutItemOwnership(
+            payout,
+            items,
+            commissions
+        );
+
+        // Kiểm tra lại Order, Payment, Delivery,
+        // Commission Hold và Support Ticket.
+        assertPayoutFinancialEligibility(context);
 
         for (const item of items) {
-            if (
-                item.commission_status !== "payout_requested" ||
-                item.status !== "approved"
-            ) {
+            if (item.status !== "approved") {
                 throw new Error("PAYOUT_ITEM_STATE_CHANGED");
             }
         }
@@ -814,7 +1171,10 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
                  admin_note = COALESCE(?, admin_note)
              WHERE id = ?
                AND status = 'approved'`,
-            [adminNote || null, payoutId]
+            [
+                adminNote || null,
+                payoutId
+            ]
         );
 
         if (result.affectedRows !== 1) {
@@ -827,7 +1187,11 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
             amount: payout.total_amount,
             currency: payout.currency,
             note: adminNote || "Payout transfer is processing",
-            metadata: { previousStatus: "approved", newStatus: "processing" },
+            metadata: {
+                previousStatus: "approved",
+                newStatus: "processing",
+                commissionCount: commissions.length
+            },
             adminUserId
         });
 
@@ -836,22 +1200,32 @@ async function markPayoutProcessing(payoutId, adminUserId, data = {}, audit = {}
             payout,
             adminUserId,
             "marketplace.payout.processing",
-            { status: "approved" },
-            { status: "processing", adminNote },
+            {
+                status: "approved"
+            },
+            {
+                status: "processing",
+                adminNote
+            },
             audit
         );
 
         await conn.commit();
         transactionStarted = false;
 
-        return { id: payoutId, status: "processing" };
+        return {
+            id: payoutId,
+            status: "processing"
+        };
     } catch (error) {
-        if (transactionStarted) await conn.rollback();
+        await safeRollback(conn, transactionStarted);
+        transactionStarted = false;
         throw error;
     } finally {
         conn.release();
     }
 }
+
 
 async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
@@ -863,6 +1237,26 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
 
     if (!transactionReference) {
         throw new Error("PAYOUT_TRANSACTION_REFERENCE_REQUIRED");
+    }
+
+    // Chuyển DECIMAL thành cent bằng BigInt để tránh sai số float.
+    function toCents(value) {
+        const text = String(value ?? "").trim();
+
+        if (!/^\d{1,13}(?:\.\d{1,2})?$/.test(text)) {
+            throw new Error("INVALID_PAYOUT_AMOUNT");
+        }
+
+        const [whole, fraction = ""] = text.split(".");
+        const cents =
+            BigInt(whole) * 100n +
+            BigInt(fraction.padEnd(2, "0"));
+
+        if (cents <= 0n || cents > BigInt(Number.MAX_SAFE_INTEGER)) {
+            throw new Error("INVALID_PAYOUT_AMOUNT");
+        }
+
+        return cents;
     }
 
     const conn = await db.getConnection();
@@ -877,6 +1271,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
         .slice(0, 40)}`;
 
     try {
+        // Serialize các yêu cầu sử dụng cùng transaction reference.
         const [lockRows] = await conn.execute(
             "SELECT GET_LOCK(?, 10) AS acquired",
             [lockName]
@@ -891,15 +1286,25 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
         await conn.beginTransaction();
         transactionStarted = true;
 
-        const payout = await getPayoutForUpdate(conn, payoutId);
+        // Lock Order -> Order Item -> Commission -> Delivery
+        // -> Hold -> Ticket -> Payout -> Payout Item.
+        const context = await lockPayoutContext(conn, payoutId);
+        const { payout, items, commissions } = context;
 
         if (payout.status !== "processing") {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
+        assertPayoutItemOwnership(
+            payout,
+            items,
+            commissions
+        );
+
         const effectiveProofStorageKey =
             proofStorageKey || payout.payment_proof_key || null;
 
+        // Kiểm tra trùng mã giao dịch.
         const [duplicateRows] = await conn.execute(
             `SELECT id
              FROM marketplace_payout_requests
@@ -914,16 +1319,21 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             throw new Error("PAYOUT_TRANSACTION_REFERENCE_DUPLICATE");
         }
 
-        const items = await getPayoutItemsForUpdate(conn, payoutId);
-        assertPayoutItemOwnership(payout, items);
+        if (!items.length) {
+            throw new Error("PAYOUT_ITEMS_NOT_FOUND");
+        }
 
-        let itemTotalCents = 0;
+        const commissionMap = new Map(
+            commissions.map(commission => [
+                Number(commission.id),
+                commission
+            ])
+        );
+
+        let itemTotalCents = 0n;
 
         for (const item of items) {
-            if (
-                item.commission_status !== "payout_requested" ||
-                item.status !== "approved"
-            ) {
+            if (item.status !== "approved") {
                 throw new Error("PAYOUT_ITEM_STATE_CHANGED");
             }
 
@@ -931,50 +1341,106 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
                 throw new Error("PAYOUT_ITEMS_INTEGRITY_ERROR");
             }
 
-            const amount = Math.round(Number(item.amount) * 100);
+            const commission = commissionMap.get(
+                Number(item.commission_id)
+            );
 
-            if (!Number.isSafeInteger(amount) || amount <= 0) {
-                throw new Error("INVALID_PAYOUT_AMOUNT");
+            if (
+                !commission ||
+                !["payout_requested", "on_hold"].includes(commission.status)
+            ) {
+                throw new Error("PAYOUT_COMMISSION_STATE_CHANGED");
             }
 
-            itemTotalCents += amount;
+            itemTotalCents += toCents(item.amount);
 
-            if (!Number.isSafeInteger(itemTotalCents)) {
+            if (itemTotalCents > BigInt(Number.MAX_SAFE_INTEGER)) {
                 throw new Error("INVALID_PAYOUT_AMOUNT");
             }
         }
 
-        const payoutTotalCents = Math.round(Number(payout.total_amount) * 100);
+        const payoutTotalCents = toCents(payout.total_amount);
 
-        if (
-            !Number.isSafeInteger(payoutTotalCents) ||
-            payoutTotalCents <= 0 ||
-            itemTotalCents !== payoutTotalCents
-        ) {
+        if (itemTotalCents !== payoutTotalCents) {
             throw new Error("PAYOUT_TOTAL_MISMATCH");
         }
 
+        // Xác định các điều kiện khiến Commission phải tiếp tục bị giữ.
+        // Không chặn việc ghi nhận tiền nếu Finance đã thực sự chuyển khoản.
         for (const item of items) {
+            const commission = commissionMap.get(
+                Number(item.commission_id)
+            );
+
+            const order = context.orderMap.get(
+                Number(commission.order_id)
+            );
+
+            if (!order) {
+                throw new Error("PAYOUT_ORDER_NOT_FOUND");
+            }
+
+            const orderIsRisky =
+                order.payment_status !== "paid" ||
+                [
+                    "cancelled",
+                    "disputed",
+                    "refunded",
+                    "partially_refunded"
+                ].includes(order.order_status);
+
+            const hasActiveHold = context.holds.some(
+                hold =>
+                    Number(hold.commission_id) === Number(commission.id)
+            );
+
+            const hasActiveTicket = context.tickets.some(ticket =>
+                Number(ticket.order_id) === Number(commission.order_id) &&
+                Number(ticket.seller_user_id) === Number(commission.seller_user_id) &&
+                (
+                    ticket.order_item_id == null ||
+                    Number(ticket.order_item_id) === Number(commission.order_item_id)
+                )
+            );
+
+            const delivery = context.deliveryMap.get(
+                Number(commission.order_item_id)
+            );
+
+            const deliveryIncomplete =
+                !delivery ||
+                !["delivered", "confirmed"].includes(delivery.status);
+
+            const mustRemainOnHold =
+                commission.status === "on_hold" ||
+                orderIsRisky ||
+                hasActiveHold ||
+                hasActiveTicket ||
+                deliveryIncomplete;
+
             const [commissionUpdate] = await conn.execute(
                 `UPDATE marketplace_commissions
-                 SET status = CASE
-                        WHEN reversed_amount >= seller_amount
-                            THEN 'reversed'
-                        WHEN reversed_amount > 0
-                            THEN 'partially_reversed'
-                        WHEN paid_amount + ? >= seller_amount
-                            THEN 'paid'
-                        ELSE 'available'
+                 SET paid_amount = paid_amount + ?,
+                     status = CASE
+                         WHEN reversed_amount >= seller_amount
+                             THEN 'reversed'
+                         WHEN reversed_amount > 0
+                             THEN 'partially_reversed'
+                         WHEN paid_amount + ? >= seller_amount
+                             THEN 'paid'
+                         WHEN ? = 1
+                             THEN 'on_hold'
+                         ELSE 'available'
                      END,
-                     paid_amount = paid_amount + ?,
                      paid_at = NOW()
                  WHERE id = ?
-                   AND status = 'payout_requested'
+                   AND status IN ('payout_requested', 'on_hold')
                    AND paid_amount + ? + reversed_amount <= seller_amount`,
                 [
                     item.amount,
                     item.amount,
-                    item.commission_id,
+                    mustRemainOnHold ? 1 : 0,
+                    commission.id,
                     item.amount
                 ]
             );
@@ -984,6 +1450,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             }
         }
 
+        // Đánh dấu tất cả Payout Items đã thanh toán.
         const [itemUpdate] = await conn.execute(
             `UPDATE marketplace_payout_items
              SET status = 'paid'
@@ -996,6 +1463,7 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             throw new Error("PAYOUT_ITEM_UPDATE_CONFLICT");
         }
 
+        // Cập nhật Payout Request.
         const [payoutUpdate] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET status = 'paid',
@@ -1031,7 +1499,8 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             metadata: {
                 previousStatus: "processing",
                 newStatus: "paid",
-                commissionCount: items.length
+                commissionCount: items.length,
+                transactionReference
             },
             adminUserId
         });
@@ -1041,7 +1510,9 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             payout,
             adminUserId,
             "marketplace.payout.paid",
-            { status: "processing" },
+            {
+                status: "processing"
+            },
             {
                 status: "paid",
                 transactionReference,
@@ -1061,22 +1532,30 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
             paidAt: new Date()
         };
     } catch (error) {
-        if (transactionStarted) {
-            await conn.rollback();
-            transactionStarted = false;
-        }
+        await safeRollback(conn, transactionStarted);
+        transactionStarted = false;
 
         if (error.code === "ER_DUP_ENTRY") {
-            throw new Error("PAYOUT_TRANSACTION_REFERENCE_DUPLICATE");
+            const duplicateError = new Error(
+                "PAYOUT_TRANSACTION_REFERENCE_DUPLICATE"
+            );
+            duplicateError.code = "PAYOUT_TRANSACTION_REFERENCE_DUPLICATE";
+            throw duplicateError;
         }
 
         throw error;
     } finally {
         if (namedLockAcquired) {
             try {
-                await conn.execute("SELECT RELEASE_LOCK(?)", [lockName]);
+                await conn.execute(
+                    "SELECT RELEASE_LOCK(?)",
+                    [lockName]
+                );
             } catch (error) {
-                console.error("[PAYOUT LOCK RELEASE ERROR]", error);
+                console.error(
+                    "[PAYOUT LOCK RELEASE ERROR]",
+                    error
+                );
             }
         }
 
@@ -1084,18 +1563,31 @@ async function markPayoutPaid(payoutId, adminUserId, data = {}, audit = {}) {
     }
 }
 
+
+
 async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}, audit = {}) {
     payoutId = positiveId(payoutId, "INVALID_PAYOUT_ID");
     adminUserId = positiveId(adminUserId, "INVALID_ADMIN_USER_ID");
 
     proofStorageKey = cleanText(proofStorageKey, 500);
 
-    if (!proofStorageKey) throw new Error("PAYOUT_PROOF_REQUIRED");
+    if (!proofStorageKey) {
+        throw new Error("PAYOUT_PROOF_REQUIRED");
+    }
 
     const note = cleanText(data.note, 2000);
     const originalName = cleanText(data.originalName, 255);
     const mimeType = cleanText(data.mimeType, 100);
     const fileSize = Number(data.fileSize);
+
+    if (
+        data.fileSize !== undefined &&
+        data.fileSize !== null &&
+        data.fileSize !== "" &&
+        (!Number.isSafeInteger(fileSize) || fileSize < 0)
+    ) {
+        throw new Error("PAYOUT_PROOF_INVALID_FILE_SIZE");
+    }
 
     const proofMetadata = {
         originalName: originalName || null,
@@ -1114,17 +1606,28 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
 
         const payout = await getPayoutForUpdate(conn, payoutId);
 
-        if (!["approved", "processing", "paid"].includes(payout.status)) {
+        // Chứng từ thanh toán chỉ được thêm hoặc thay đổi
+        // trước khi Payout chuyển sang paid.
+        if (!["approved", "processing"].includes(payout.status)) {
             throw new Error("PAYOUT_INVALID_STATUS_TRANSITION");
         }
 
-        await conn.execute(
+        const [result] = await conn.execute(
             `UPDATE marketplace_payout_requests
              SET payment_proof_key = ?,
                  admin_note = COALESCE(?, admin_note)
-             WHERE id = ?`,
-            [proofStorageKey, note || null, payoutId]
+             WHERE id = ?
+               AND status IN ('approved', 'processing')`,
+            [
+                proofStorageKey,
+                note || null,
+                payoutId
+            ]
         );
+
+        if (result.affectedRows !== 1) {
+            throw new Error("PAYOUT_STATUS_CHANGED");
+        }
 
         await addTransaction(conn, {
             payoutId,
@@ -1135,6 +1638,7 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
             note: note || "Payment proof uploaded",
             metadata: {
                 payoutStatus: payout.status,
+                previousProofKey: payout.payment_proof_key || null,
                 ...proofMetadata
             },
             adminUserId
@@ -1145,9 +1649,12 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
             payout,
             adminUserId,
             "marketplace.payout.proof_added",
-            { paymentProofKey: payout.payment_proof_key || null },
+            {
+                paymentProofKey: payout.payment_proof_key || null
+            },
             {
                 paymentProofKey: proofStorageKey,
+                payoutStatus: payout.status,
                 ...proofMetadata
             },
             audit
@@ -1161,12 +1668,14 @@ async function addPaymentProof(payoutId, adminUserId, proofStorageKey, data = {}
             paymentProofKey: proofStorageKey
         };
     } catch (error) {
-        if (transactionStarted) await conn.rollback();
+        await safeRollback(conn, transactionStarted);
+        transactionStarted = false;
         throw error;
     } finally {
         conn.release();
     }
 }
+
 
 module.exports = {
     getPayoutList,

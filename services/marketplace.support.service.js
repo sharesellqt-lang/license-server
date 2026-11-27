@@ -78,6 +78,25 @@ async function createBuyerTicket(userId, orderItemId, data = {}) {
             fail("ORDER_NOT_PAID");
         }
 
+        const [activeTickets] = await conn.execute(
+            `SELECT id
+             FROM marketplace_support_tickets
+             WHERE order_item_id = ?
+               AND status IN (
+                   'open',
+                   'waiting_seller',
+                   'waiting_buyer',
+                   'under_review'
+               )
+             LIMIT 1
+             FOR UPDATE`,
+            [orderItemId]
+        );
+
+        if (activeTickets.length) {
+            fail("ACTIVE_TICKET_EXISTS");
+        }
+
         const [commissions] = await conn.execute(
             `SELECT id, status
              FROM marketplace_commissions
@@ -164,8 +183,16 @@ async function createBuyerTicket(userId, orderItemId, data = {}) {
             status: "open",
             commissionHeld
         };
-    } catch (error) {
-        await conn.rollback();
+       } catch (error) {
+        try {
+            await conn.rollback();
+        } catch (rollbackError) {
+            console.error(
+                "[MarketplaceSupport] Rollback failed:",
+                rollbackError
+            );
+        }
+
         throw error;
     } finally {
         conn.release();

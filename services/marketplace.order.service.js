@@ -852,13 +852,18 @@ async function getSellerOrderDetail(sellerUserId, orderId) {
             [orderId, sellerId]
         );
 
+            const sellerTotalCents = items.reduce((sum, item) => {
+            const value = String(item.line_total || "0.00");
+            const [whole, fraction = ""] = value.split(".");
+            return sum +
+                BigInt(whole || "0") * 100n +
+                BigInt(fraction.padEnd(2, "0").slice(0, 2));
+        }, 0n);
+
         return {
             ...orders[0],
             items,
-            seller_total: items.reduce(
-                (sum, item) => sum + Number(item.line_total || 0),
-                0
-            ).toFixed(2)
+            seller_total: money(sellerTotalCents)
         };
     } finally {
         conn.release();

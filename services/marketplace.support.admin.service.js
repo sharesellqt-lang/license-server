@@ -418,8 +418,16 @@ async function updateTicketStatus(ticketId, actorUserId, data, auditInfo = {}) {
             holdReleased,
             activeHoldCount
         };
-    } catch (error) {
-        await conn.rollback();
+        } catch (error) {
+        try {
+            await conn.rollback();
+        } catch (rollbackError) {
+            console.error(
+                "[MarketplaceSupportAdmin] Rollback failed:",
+                rollbackError
+            );
+        }
+
         throw error;
     } finally {
         conn.release();
