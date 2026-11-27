@@ -738,6 +738,7 @@ async function saveDeliveryVersion(
 }
 
 
+
 async function getSellerDeliveries(userId, params = {}) {
     userId = validId(userId);
 
@@ -751,19 +752,42 @@ async function getSellerDeliveries(userId, params = {}) {
     const limit = Number.isSafeInteger(rawLimit) && rawLimit > 0
         ? Math.min(100, rawLimit)
         : 20;
+
     const offset = (page - 1) * limit;
 
-    const conditions = ["oi.seller_user_id = ?"];
+    const conditions = [
+        "oi.seller_user_id = ?",
+        `(
+            d.id IS NOT NULL
+            OR (
+                o.payment_status = 'paid'
+                AND o.order_status NOT IN (
+                    'cancelled',
+                    'disputed',
+                    'refunded'
+                )
+            )
+            OR EXISTS (
+                SELECT 1
+                FROM marketplace_delivery_authorizations da
+                WHERE da.order_item_id = oi.id
+                  AND da.status = 'authorized'
+            )
+        )`
+    ];
+
     const values = [userId];
 
-    if (params.status) {
-        if (!DELIVERY_STATUSES.includes(params.status)) {
-            fail("INVALID_DELIVERY_STATUS");
-        }
+    if (params.status === "pending") {
+    conditions.push("d.id IS NULL");
+        } else if (params.status) {
+            if (!DELIVERY_STATUSES.includes(params.status)) {
+                fail("INVALID_DELIVERY_STATUS");
+            }
 
-        conditions.push("d.status = ?");
-        values.push(params.status);
-    }
+            conditions.push("d.status = ?");
+            values.push(params.status);
+        }
 
     if (params.search) {
         const search = String(params.search).trim().slice(0, 100);
@@ -772,10 +796,14 @@ async function getSellerDeliveries(userId, params = {}) {
             conditions.push(
                 `(o.order_code LIKE ?
                   OR oi.product_title LIKE ?
-                  OR CAST(d.id AS CHAR) LIKE ?)`
+                  OR CAST(COALESCE(d.id, oi.id) AS CHAR) LIKE ?)`
             );
 
-            values.push(`%${search}%`, `%${search}%`, `%${search}%`);
+            values.push(
+                `%${search}%`,
+                `%${search}%`,
+                `%${search}%`
+            );
         }
     }
 
@@ -785,11 +813,11 @@ async function getSellerDeliveries(userId, params = {}) {
     try {
         const [[count]] = await conn.execute(
             `SELECT COUNT(*) AS total
-             FROM marketplace_deliveries d
-             INNER JOIN marketplace_order_items oi
-                ON oi.id = d.order_item_id
+             FROM marketplace_order_items oi
              INNER JOIN marketplace_orders o
                 ON o.id = oi.order_id
+             LEFT JOIN marketplace_deliveries d
+                ON d.order_item_id = oi.id
              WHERE ${where}`,
             values
         );
@@ -797,25 +825,46 @@ async function getSellerDeliveries(userId, params = {}) {
         const [items] = await conn.execute(
             `SELECT
                 d.id AS delivery_id,
-                d.order_item_id,
-                d.status,
+                oi.id AS order_item_id,
+                oi.order_id,
+                oi.product_id,
+                oi.product_title,
+                oi.product_type,
+                oi.product_version,
+                oi.quantity,
+                oi.unit_price,
+                oi.line_total,
+                o.order_code,
+                o.buyer_user_id,
+                o.payment_status,
+                o.order_status,
+                o.currency,
+                COALESCE(d.status, 'pending') AS status,
                 d.delivered_at,
                 d.buyer_confirmed_at,
                 d.buyer_confirmation_deadline_at,
+                d.protection_started_at,
                 d.protection_ends_at,
-                oi.order_id,
-                oi.product_title,
-                oi.product_type,
-                oi.quantity,
-                o.order_code,
-                o.buyer_user_id
-             FROM marketplace_deliveries d
-             INNER JOIN marketplace_order_items oi
-                ON oi.id = d.order_item_id
+                d.protection_days,
+                EXISTS (
+                    SELECT 1
+                    FROM marketplace_delivery_authorizations da
+                    WHERE da.order_item_id = oi.id
+                      AND da.status = 'authorized'
+                ) AS has_delivery_authorization
+             FROM marketplace_order_items oi
              INNER JOIN marketplace_orders o
                 ON o.id = oi.order_id
+             LEFT JOIN marketplace_deliveries d
+                ON d.order_item_id = oi.id
              WHERE ${where}
-             ORDER BY d.updated_at DESC, d.id DESC
+             ORDER BY
+                CASE
+                    WHEN d.id IS NULL THEN 0
+                    ELSE 1
+                END ASC,
+                COALESCE(d.updated_at, oi.id) DESC,
+                oi.id DESC
              LIMIT ? OFFSET ?`,
             [...values, limit, offset]
         );
@@ -833,6 +882,7 @@ async function getSellerDeliveries(userId, params = {}) {
         conn.release();
     }
 }
+
 
 async function getSellerDeliveryDetail(userId, deliveryId) {
     userId = validId(userId);
