@@ -12,8 +12,14 @@ const MIME_TYPES = {
     ".pdf": "application/pdf"
 };
 
+const UUID_FILENAME =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i;
+
 async function sendReceiptFile(res, storageKey) {
-    if (!storageKey || typeof storageKey !== "string") {
+    if (
+        !storageKey ||
+        typeof storageKey !== "string"
+    ) {
         return res.status(404).json({
             success: false,
             message: "Không tìm thấy biên lai."
@@ -22,9 +28,10 @@ async function sendReceiptFile(res, storageKey) {
 
     const filename = path.basename(storageKey);
 
+    // Chỉ chấp nhận tên file UUID hợp lệ, không chứa đường dẫn.
     if (
         filename !== storageKey ||
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|pdf)$/i.test(filename)
+        !UUID_FILENAME.test(filename)
     ) {
         return res.status(404).json({
             success: false,
@@ -55,12 +62,26 @@ async function sendReceiptFile(res, storageKey) {
         }
 
         const ext = path.extname(filename).toLowerCase();
+        const mimeType = MIME_TYPES[ext];
 
-        res.setHeader("Content-Type", MIME_TYPES[ext]);
+        if (!mimeType) {
+            return res.status(404).json({
+                success: false,
+                message: "Định dạng biên lai không hợp lệ."
+            });
+        }
+
+        res.setHeader("Content-Type", mimeType);
         res.setHeader("Content-Length", stat.size);
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        res.setHeader(
+            "Content-Disposition",
+            `inline; filename="${filename}"`
+        );
         res.setHeader("X-Content-Type-Options", "nosniff");
-        res.setHeader("Cache-Control", "private, no-store, max-age=0");
+        res.setHeader(
+            "Cache-Control",
+            "private, no-store, max-age=0"
+        );
         res.setHeader("Pragma", "no-cache");
 
         const stream = fs.createReadStream(filePath);

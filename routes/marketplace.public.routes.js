@@ -11,14 +11,14 @@ const router = express.Router();
 function handlePublicError(res, error) {
     const code = error.message || "MARKETPLACE_OPERATION_FAILED";
 
-    const errorMap = {
-        INVALID_PRODUCT_ID: 400,
-        PRODUCT_NOT_FOUND: 404,
-        PRODUCT_DEMO_NOT_FOUND: 404,
-        PRIVATE_FILE_NOT_FOUND: 404,
-        PRODUCT_FILE_NOT_FOUND: 404
-        
-    };
+const errorMap = {
+    INVALID_PRODUCT_ID: 400,
+    PRODUCT_NOT_FOUND: 404,
+    PRODUCT_DEMO_NOT_FOUND: 404,
+    PRIVATE_FILE_NOT_FOUND: 404,
+    PRODUCT_FILE_NOT_FOUND: 404,
+    PRODUCT_FILE_NOT_SCANNED_CLEAN: 409
+};
 
     const status = errorMap[code] || 500;
 
@@ -64,10 +64,9 @@ router.get("/products/:id/thumbnail", async (req, res) => {
             req.params.id
         );
 
-        await privateFileService.sendPrivateFile(res, file, {
-            download: false,
-            publicCache: true
-        });
+await privateFileService.sendPrivateFile(res, file, {
+    download: false
+});
     } catch (error) {
         if (res.headersSent) return res.destroy();
         return handlePublicError(res, error);

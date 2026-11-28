@@ -259,83 +259,101 @@ async function getSellerDeliveryVersionFile(
 }
 
 
+
 async function sendPrivateFile(res, file, options = {}) {
     if (!file || !file.storage_key) {
         fail("PRIVATE_FILE_NOT_FOUND");
+    }
+
+    // FAIL-CLOSED: chỉ cho phép gửi file đã được Scanner xác nhận clean.
+    // Không có bản ghi scan cũng phải từ chối.
+    const [scanRows] = await db.execute(
+        `SELECT scan_status
+         FROM marketplace_file_scans
+         WHERE storage_key = ?
+         LIMIT 1`,
+        [file.storage_key]
+    );
+
+    if (
+        !scanRows.length ||
+        scanRows[0].scan_status !== "clean"
+    ) {
+        fail("PRODUCT_FILE_NOT_SCANNED_CLEAN");
     }
 
     let object;
 
     try {
         object = await storageService.getObjectStream(file.storage_key);
-    } catch (error) {
+    } catch (err) {
         if (
-            error.code === "ENOENT" ||
-            error.code === "NoSuchKey" ||
-            error.code === "NotFound" ||
-            error.name === "NoSuchKey" ||
-            error.$metadata?.httpStatusCode === 404
+            err.code === "ENOENT" ||
+            err.code === "NoSuchKey" ||
+            err.code === "NOT_FOUND" ||
+            err.statusCode === 404
         ) {
             fail("PRIVATE_FILE_NOT_FOUND");
         }
 
-        throw error;
+        throw err;
     }
 
     if (!object || !object.body) {
         fail("PRIVATE_FILE_NOT_FOUND");
     }
 
-    const mimeType = String(
-        file.mime_type || object.contentType || "application/octet-stream"
-    );
+    const contentType =
+        file.mime_type ||
+        object.contentType ||
+        "application/octet-stream";
 
     const safeName = String(file.original_name || "download")
-        .replace(/[\r\n"]/g, "_")
+        .replace(/[\r\n"]/g, "")
         .slice(0, 200);
 
-    const disposition = options.download ? "attachment" : "inline";
+    const disposition = options.download
+        ? "attachment"
+        : "inline";
 
     const headers = {
-        "Content-Type": mimeType,
+        "Content-Type": contentType,
         "Content-Disposition":
-            `${disposition}; filename="${encodeURIComponent(safeName)}"`,
-        "X-Content-Type-Options": "nosniff"
+            `${disposition}; filename="${safeName}"`,
+        "X-Content-Type-Options": "nosniff",
+
+        // Không cache file Marketplace, kể cả thumbnail công khai.
+        // Tránh trình duyệt tiếp tục giữ nội dung nếu file bị phát hiện
+        // nhiễm mã độc trong lần quét sau.
+        "Cache-Control": "private, no-store, no-cache, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0"
     };
 
-    const contentLength = Number(
-        object.contentLength ?? file.file_size
-    );
+    const contentLength =
+        object.contentLength || file.file_size;
 
-    if (Number.isSafeInteger(contentLength) && contentLength >= 0) {
-        headers["Content-Length"] = contentLength;
-    }
-
-    if (options.publicCache === true) {
-        headers["Cache-Control"] =
-            "public, max-age=300, stale-while-revalidate=3600";
-    } else {
-        headers["Cache-Control"] =
-            "private, no-store, no-cache, must-revalidate";
-        headers["Pragma"] = "no-cache";
-        headers["Expires"] = "0";
+    if (
+        contentLength !== undefined &&
+        contentLength !== null &&
+        Number.isFinite(Number(contentLength)) &&
+        Number(contentLength) >= 0
+    ) {
+        headers["Content-Length"] = String(contentLength);
     }
 
     res.set(headers);
 
     try {
         await pipeline(object.body, res);
-    } catch (error) {
-        if (res.destroyed || res.writableEnded) {
-            return;
+    } catch (err) {
+        console.error("MARKETPLACE PRIVATE FILE STREAM ERROR:", err);
+
+        if (!res.headersSent) {
+            throw err;
         }
 
-        if (res.headersSent) {
-            res.destroy(error);
-            return;
-        }
-
-        throw error;
+        res.destroy(err);
     }
 }
 

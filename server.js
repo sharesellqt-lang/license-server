@@ -74,6 +74,8 @@ app.use("/api/airdrop", airdropRoutes);
 app.use("/api/rewards", require("./routes/rewards.routes"));
 app.use("/api/contributor", require("./routes/contributor.routes"));
 app.use("/api/contributor/admin",require("./routes/contributor.admin.routes"));
+// MARKETPLACE SCANNER
+app.use("/api/marketplace/scanner",require("./routes/marketplace.scanner.routes"));
 app.use("/api/marketplace", require("./routes/marketplace.public.routes"));
 app.use("/api/marketplace", require("./routes/marketplace.routes"));
 app.use("/api/marketplace/admin", require("./routes/marketplace.admin.routes"));

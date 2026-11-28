@@ -6,7 +6,14 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { TextDecoder } = require("util");
-const { uploadDir, allowedTypes } = require("../middleware/marketplace.product.upload");
+
+const {
+    uploadDir,
+    allowedTypes
+} = require("../middleware/marketplace.product.upload");
+
+const storageService = require("./marketplace.storage.service");
+const scannerService = require("./marketplace.scanner.service");
 const { writeAudit } = require("./contributor.audit.service");
 
 const FILE_ROLES = [
@@ -40,8 +47,35 @@ function fail(code) {
 
 function validId(value) {
     const id = Number(value);
-    if (!Number.isSafeInteger(id) || id <= 0) fail("INVALID_PRODUCT_ID");
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        fail("INVALID_PRODUCT_ID");
+    }
+
     return id;
+}
+
+function getOriginalName(file, fallback = "file") {
+    return path.basename(
+        String(file?.originalname || fallback)
+    ).slice(0, 255);
+}
+
+function getStorageKey(file) {
+    const filename = String(file?.filename || "");
+
+    // Multer hiện tạo UUID + extension, không cho phép path.
+    if (
+        !filename ||
+        path.basename(filename) !== filename ||
+        filename.includes("/") ||
+        filename.includes("\\") ||
+        filename.includes("\0")
+    ) {
+        fail("INVALID_PRODUCT_STORAGE_FILENAME");
+    }
+
+    return `products/${filename}`;
 }
 
 async function removeFile(filename) {
@@ -65,13 +99,58 @@ async function removeFile(filename) {
     } catch (error) {
         if (error.code !== "ENOENT") {
             console.error(
-                "MARKETPLACE FILE CLEANUP ERROR:",
+                "MARKETPLACE TEMP FILE CLEANUP ERROR:",
                 error.message
             );
         }
     }
 }
 
+async function cleanupStorageObject(storageKey) {
+    if (!storageKey) return;
+
+    try {
+        await storageService.deleteObject(storageKey);
+    } catch (error) {
+        console.error(
+            "MARKETPLACE STORAGE CLEANUP ERROR:",
+            storageKey,
+            error.message
+        );
+    }
+}
+
+async function hashFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(filePath);
+        const digest = crypto.createHash("sha256");
+
+        stream.on("data", chunk => digest.update(chunk));
+        stream.on("error", reject);
+        stream.on("end", () => resolve(digest.digest("hex")));
+    });
+}
+
+async function uploadProductObject(file, storageKey, hash) {
+    if (!file?.path || !file.size) {
+        fail("PRODUCT_FILE_REQUIRED");
+    }
+
+    await storageService.uploadObject({
+        key: storageKey,
+        body: fs.createReadStream(file.path),
+        contentType: file.mimetype || "application/octet-stream",
+        contentLength: file.size,
+        metadata: {
+            sha256: hash
+        }
+    });
+
+    return {
+        storageKey,
+        fileHash: hash
+    };
+}
 
 async function validateSignature(file) {
     if (!file?.path || !file?.mimetype || !file.size) {
@@ -84,7 +163,10 @@ async function validateSignature(file) {
             offset: 0
         },
         "image/png": {
-            bytes: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+            bytes: [
+                0x89, 0x50, 0x4E, 0x47,
+                0x0D, 0x0A, 0x1A, 0x0A
+            ],
             offset: 0
         },
         "application/pdf": {
@@ -111,7 +193,12 @@ async function validateSignature(file) {
 
             try {
                 const buffer = Buffer.alloc(12);
-                const { bytesRead } = await handle.read(buffer, 0, 12, 0);
+                const { bytesRead } = await handle.read(
+                    buffer,
+                    0,
+                    12,
+                    0
+                );
 
                 return bytesRead === 12 &&
                     buffer.toString("ascii", 0, 4) === "RIFF" &&
@@ -122,7 +209,10 @@ async function validateSignature(file) {
         }
 
         if (file.mimetype === "text/plain") {
-            const decoder = new TextDecoder("utf-8", { fatal: true });
+            const decoder = new TextDecoder("utf-8", {
+                fatal: true
+            });
+
             const stream = fs.createReadStream(file.path);
 
             try {
@@ -170,6 +260,7 @@ async function validateSignature(file) {
             "MARKETPLACE FILE SIGNATURE ERROR:",
             error.message
         );
+
         return false;
     }
 }
@@ -187,12 +278,19 @@ async function validateThumbnail(file) {
 
     const valid = await validateSignature(file);
 
-    if (!valid) fail("PRODUCT_FILE_SIGNATURE_INVALID");
+    if (!valid) {
+        fail("PRODUCT_FILE_SIGNATURE_INVALID");
+    }
 
     return true;
 }
 
-async function getSellerAndProduct(conn, userId, productId, lock = false) {
+async function getSellerAndProduct(
+    conn,
+    userId,
+    productId,
+    lock = false
+) {
     const [sellers] = await conn.execute(
         `SELECT id, status
          FROM marketplace_sellers
@@ -203,7 +301,9 @@ async function getSellerAndProduct(conn, userId, productId, lock = false) {
     );
 
     if (!sellers.length) fail("SELLER_NOT_FOUND");
-    if (sellers[0].status !== "active") fail("SELLER_NOT_ACTIVE");
+    if (sellers[0].status !== "active") {
+        fail("SELLER_NOT_ACTIVE");
+    }
 
     const [products] = await conn.execute(
         `SELECT id, seller_id, status
@@ -222,29 +322,94 @@ async function getSellerAndProduct(conn, userId, productId, lock = false) {
     };
 }
 
-async function attachProductFile(userId, productId, file, fileRole, audit = {}) {
+async function insertFileAndScan(
+    conn,
+    {
+        productId,
+        fileRole,
+        originalName,
+        storageKey,
+        mimeType,
+        fileSize,
+        fileHash,
+        userId
+    }
+) {
+    const [result] = await conn.execute(
+        `INSERT INTO marketplace_product_files (
+            product_id,
+            file_role,
+            original_name,
+            storage_key,
+            mime_type,
+            file_size,
+            file_hash,
+            uploaded_by_user_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            productId,
+            fileRole,
+            originalName,
+            storageKey,
+            mimeType,
+            fileSize,
+            fileHash,
+            userId
+        ]
+    );
+
+    // Scan record + job phải nằm trong cùng transaction
+    // với metadata của file.
+    await scannerService.enqueueScan(
+        conn,
+        storageKey,
+        1
+    );
+
+    return result;
+}
+
+async function attachProductFile(
+    userId,
+    productId,
+    file,
+    fileRole,
+    audit = {}
+) {
     productId = validId(productId);
 
     if (!file) fail("PRODUCT_FILE_REQUIRED");
-    if (!FILE_ROLES.includes(fileRole)) fail("INVALID_PRODUCT_FILE_ROLE");
-    if (!allowedTypes[file.mimetype]) fail("INVALID_PRODUCT_FILE_TYPE");
+    if (!FILE_ROLES.includes(fileRole)) {
+        fail("INVALID_PRODUCT_FILE_ROLE");
+    }
+    if (!allowedTypes[file.mimetype]) {
+        fail("INVALID_PRODUCT_FILE_TYPE");
+    }
 
     let conn;
     let committed = false;
+    let storageKey = null;
+    let uploadAttempted = false;
 
     try {
         const valid = await validateSignature(file);
 
-        if (!valid) fail("PRODUCT_FILE_SIGNATURE_INVALID");
+        if (!valid) {
+            fail("PRODUCT_FILE_SIGNATURE_INVALID");
+        }
 
-        const hash = await new Promise((resolve, reject) => {
-            const stream = fs.createReadStream(file.path);
-            const digest = crypto.createHash("sha256");
+        const hash = await hashFile(file.path);
+        storageKey = getStorageKey(file);
 
-            stream.on("data", chunk => digest.update(chunk));
-            stream.on("error", reject);
-            stream.on("end", () => resolve(digest.digest("hex")));
-        });
+        // Upload object trước khi tạo metadata.
+        // Nếu DB transaction thất bại sẽ xóa object này.
+        uploadAttempted = true;
+
+        await uploadProductObject(
+            file,
+            storageKey,
+            hash
+        );
 
         conn = await db.getConnection();
         await conn.beginTransaction();
@@ -260,32 +425,18 @@ async function attachProductFile(userId, productId, file, fileRole, audit = {}) 
             fail("PRODUCT_FILES_NOT_EDITABLE");
         }
 
-        const originalName = path.basename(
-            String(file.originalname || "file")
-        ).slice(0, 255);
+        const originalName = getOriginalName(file);
 
-        const [result] = await conn.execute(
-            `INSERT INTO marketplace_product_files (
-                product_id,
-                file_role,
-                original_name,
-                storage_key,
-                mime_type,
-                file_size,
-                file_hash,
-                uploaded_by_user_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                productId,
-                fileRole,
-                originalName,
-                file.filename,
-                file.mimetype,
-                file.size,
-                hash,
-                userId
-            ]
-        );
+        const result = await insertFileAndScan(conn, {
+            productId,
+            fileRole,
+            originalName,
+            storageKey,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            fileHash: hash,
+            userId
+        });
 
         await writeAudit(conn, {
             actorUserId: userId,
@@ -297,7 +448,8 @@ async function attachProductFile(userId, productId, file, fileRole, audit = {}) 
                 fileRole,
                 originalName,
                 fileSize: file.size,
-                fileHash: hash
+                fileHash: hash,
+                scanStatus: "pending"
             },
             ipAddress: audit.ipAddress || null,
             userAgent: audit.userAgent || null
@@ -313,7 +465,8 @@ async function attachProductFile(userId, productId, file, fileRole, audit = {}) 
             originalName,
             mimeType: file.mimetype,
             fileSize: file.size,
-            fileHash: hash
+            fileHash: hash,
+            scanStatus: "pending"
         };
     } catch (error) {
         if (conn && !committed) {
@@ -321,34 +474,47 @@ async function attachProductFile(userId, productId, file, fileRole, audit = {}) 
                 await conn.rollback();
             } catch (_) {}
         }
+
         throw error;
     } finally {
         if (conn) conn.release();
-        if (!committed) await removeFile(file.filename);
+
+        if (uploadAttempted && !committed) {
+            await cleanupStorageObject(storageKey);
+        }
+
+        await removeFile(file?.filename);
     }
 }
 
-async function replaceProductThumbnail(userId, productId, file, audit = {}) {
+async function replaceProductThumbnail(
+    userId,
+    productId,
+    file,
+    audit = {}
+) {
     productId = validId(productId);
 
     if (!file) fail("PRODUCT_FILE_REQUIRED");
 
     let conn;
     let committed = false;
-    let oldStorageKeys = [];
-    let result;
+    let storageKey = null;
+    let uploadAttempted = false;
 
     try {
         await validateThumbnail(file);
 
-        const hash = await new Promise((resolve, reject) => {
-            const stream = fs.createReadStream(file.path);
-            const digest = crypto.createHash("sha256");
+        const hash = await hashFile(file.path);
+        storageKey = getStorageKey(file);
 
-            stream.on("data", chunk => digest.update(chunk));
-            stream.on("error", reject);
-            stream.on("end", () => resolve(digest.digest("hex")));
-        });
+        uploadAttempted = true;
+
+        await uploadProductObject(
+            file,
+            storageKey,
+            hash
+        );
 
         conn = await db.getConnection();
         await conn.beginTransaction();
@@ -365,7 +531,7 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
         }
 
         const [oldFiles] = await conn.execute(
-            `SELECT id, storage_key
+            `SELECT id
              FROM marketplace_product_files
              WHERE product_id = ?
                AND file_role = 'thumbnail'
@@ -375,45 +541,31 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
             [productId]
         );
 
-        oldStorageKeys = oldFiles.map(item => item.storage_key);
-
-        const originalName = path.basename(
-            String(file.originalname || "thumbnail")
-        ).slice(0, 255);
-
-        const [insertResult] = await conn.execute(
-            `INSERT INTO marketplace_product_files (
-                product_id,
-                file_role,
-                original_name,
-                storage_key,
-                mime_type,
-                file_size,
-                file_hash,
-                uploaded_by_user_id
-            ) VALUES (?, 'thumbnail', ?, ?, ?, ?, ?, ?)`,
-            [
-                productId,
-                originalName,
-                file.filename,
-                file.mimetype,
-                file.size,
-                hash,
-                userId
-            ]
+        const originalName = getOriginalName(
+            file,
+            "thumbnail"
         );
 
-        if (oldFiles.length) {
-            await conn.execute(
-                `UPDATE marketplace_product_files
-                 SET is_active = 0
-                 WHERE product_id = ?
-                   AND file_role = 'thumbnail'
-                   AND is_active = 1
-                   AND id <> ?`,
-                [productId, insertResult.insertId]
-            );
-        }
+        const insertResult = await insertFileAndScan(conn, {
+            productId,
+            fileRole: "thumbnail",
+            originalName,
+            storageKey,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            fileHash: hash,
+            userId
+        });
+
+        await conn.execute(
+            `UPDATE marketplace_product_files
+             SET is_active = 0
+             WHERE product_id = ?
+               AND file_role = 'thumbnail'
+               AND is_active = 1
+               AND id <> ?`,
+            [productId, insertResult.insertId]
+        );
 
         await writeAudit(conn, {
             actorUserId: userId,
@@ -429,7 +581,8 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
                 originalName,
                 mimeType: file.mimetype,
                 fileSize: file.size,
-                fileHash: hash
+                fileHash: hash,
+                scanStatus: "pending"
             },
             ipAddress: audit.ipAddress || null,
             userAgent: audit.userAgent || null
@@ -438,7 +591,7 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
         await conn.commit();
         committed = true;
 
-        result = {
+        return {
             id: insertResult.insertId,
             productId,
             fileRole: "thumbnail",
@@ -446,15 +599,9 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
             mimeType: file.mimetype,
             fileSize: file.size,
             fileHash: hash,
+            scanStatus: "pending",
             thumbnailUrl: `/api/marketplace/products/${productId}/thumbnail`
         };
-
-        // Chỉ dọn file cũ sau khi transaction đã commit.
-        for (const storageKey of oldStorageKeys) {
-            await removeFile(storageKey);
-        }
-
-        return result;
     } catch (error) {
         if (conn && !committed) {
             try {
@@ -466,17 +613,23 @@ async function replaceProductThumbnail(userId, productId, file, audit = {}) {
     } finally {
         if (conn) conn.release();
 
-        if (!committed) {
-            await removeFile(file.filename);
+        if (uploadAttempted && !committed) {
+            await cleanupStorageObject(storageKey);
         }
+
+        await removeFile(file?.filename);
     }
 }
-async function deleteProductThumbnail(userId, productId, audit = {}) {
+
+async function deleteProductThumbnail(
+    userId,
+    productId,
+    audit = {}
+) {
     productId = validId(productId);
 
     let conn;
     let committed = false;
-    let storageKeys = [];
     let deletedIds = [];
 
     try {
@@ -495,7 +648,7 @@ async function deleteProductThumbnail(userId, productId, audit = {}) {
         }
 
         const [files] = await conn.execute(
-            `SELECT id, storage_key
+            `SELECT id
              FROM marketplace_product_files
              WHERE product_id = ?
                AND file_role = 'thumbnail'
@@ -509,7 +662,6 @@ async function deleteProductThumbnail(userId, productId, audit = {}) {
             fail("PRODUCT_THUMBNAIL_NOT_FOUND");
         }
 
-        storageKeys = files.map(file => file.storage_key);
         deletedIds = files.map(file => file.id);
 
         await conn.execute(
@@ -537,10 +689,8 @@ async function deleteProductThumbnail(userId, productId, audit = {}) {
         await conn.commit();
         committed = true;
 
-        for (const storageKey of storageKeys) {
-            await removeFile(storageKey);
-        }
-
+        // Không xóa object vật lý:
+        // thumbnail có thể đang được delivery/version tham chiếu.
         return {
             productId,
             deleted: true
@@ -557,21 +707,41 @@ async function deleteProductThumbnail(userId, productId, audit = {}) {
         if (conn) conn.release();
     }
 }
+
 async function getMyProductFiles(userId, productId) {
     productId = validId(productId);
 
     const conn = await db.getConnection();
 
     try {
-        await getSellerAndProduct(conn, userId, productId);
+        await getSellerAndProduct(
+            conn,
+            userId,
+            productId
+        );
 
         const [rows] = await conn.execute(
-            `SELECT id, product_id, file_role, original_name,
-                    mime_type, file_size, file_hash, version,
-                    is_active, created_at
-             FROM marketplace_product_files
-             WHERE product_id = ?
-             ORDER BY id DESC`,
+            `SELECT
+                f.id,
+                f.product_id,
+                f.file_role,
+                f.original_name,
+                f.mime_type,
+                f.file_size,
+                f.file_hash,
+                f.version,
+                f.is_active,
+                f.created_at,
+                COALESCE(s.scan_status, 'pending') AS scan_status,
+                s.scanned_at,
+                s.scan_engine,
+                s.scan_signature_version,
+                s.last_error_code
+             FROM marketplace_product_files f
+             LEFT JOIN marketplace_file_scans s
+               ON s.storage_key = f.storage_key
+             WHERE f.product_id = ?
+             ORDER BY f.id DESC`,
             [productId]
         );
 
@@ -581,12 +751,17 @@ async function getMyProductFiles(userId, productId) {
     }
 }
 
-async function deleteProductFile(userId, productId, fileId, audit = {}) {
+async function deleteProductFile(
+    userId,
+    productId,
+    fileId,
+    audit = {}
+) {
     productId = validId(productId);
     fileId = validId(fileId);
 
     let conn;
-    let storageKey = null;
+    let committed = false;
 
     try {
         conn = await db.getConnection();
@@ -604,15 +779,18 @@ async function deleteProductFile(userId, productId, fileId, audit = {}) {
         }
 
         const [files] = await conn.execute(
-            `SELECT id, storage_key, file_role
+            `SELECT id, storage_key, file_role, is_active
              FROM marketplace_product_files
-             WHERE id = ? AND product_id = ?
+             WHERE id = ?
+               AND product_id = ?
              LIMIT 1
              FOR UPDATE`,
             [fileId, productId]
         );
 
-        if (!files.length) fail("PRODUCT_FILE_NOT_FOUND");
+        if (!files.length) {
+            fail("PRODUCT_FILE_NOT_FOUND");
+        }
 
         const file = files[0];
 
@@ -620,22 +798,55 @@ async function deleteProductFile(userId, productId, fileId, audit = {}) {
             fail("USE_PRODUCT_THUMBNAIL_ENDPOINT");
         }
 
-        // A demo cannot keep referencing a deleted file.
+        if (!file.is_active) {
+            fail("PRODUCT_FILE_ALREADY_INACTIVE");
+        }
+
         const [demos] = await conn.execute(
             `SELECT id
              FROM marketplace_product_demos
              WHERE file_id = ?
-             LIMIT 1`,
+             LIMIT 1
+             FOR UPDATE`,
             [fileId]
         );
 
-        if (demos.length) fail("PRODUCT_FILE_IN_USE_BY_DEMO");
+        if (demos.length) {
+            fail("PRODUCT_FILE_IN_USE_BY_DEMO");
+        }
 
-        storageKey = file.storage_key;
+        const [deliveries] = await conn.execute(
+            `SELECT id
+             FROM marketplace_delivery_files
+             WHERE product_file_id = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [fileId]
+        );
 
+        if (deliveries.length) {
+            fail("PRODUCT_FILE_IN_USE_BY_DELIVERY");
+        }
+
+        const [versions] = await conn.execute(
+            `SELECT id
+             FROM marketplace_delivery_version_files
+             WHERE storage_key = ?
+             LIMIT 1
+             FOR UPDATE`,
+            [file.storage_key]
+        );
+
+        if (versions.length) {
+            fail("PRODUCT_FILE_IN_USE_BY_DELIVERY");
+        }
+
+        // Soft deactivate để giữ lịch sử và tránh xóa nhầm object.
         await conn.execute(
-            `DELETE FROM marketplace_product_files
-             WHERE id = ? AND product_id = ?`,
+            `UPDATE marketplace_product_files
+             SET is_active = 0
+             WHERE id = ?
+               AND product_id = ?`,
             [fileId, productId]
         );
 
@@ -646,37 +857,58 @@ async function deleteProductFile(userId, productId, fileId, audit = {}) {
             entityId: String(fileId),
             oldData: {
                 productId,
-                fileRole: file.file_role
+                fileRole: file.file_role,
+                storageKey: file.storage_key
+            },
+            newData: {
+                isActive: false
             },
             ipAddress: audit.ipAddress || null,
             userAgent: audit.userAgent || null
         });
 
         await conn.commit();
+        committed = true;
 
-        await removeFile(storageKey);
-
-        return { id: fileId, deleted: true };
+        return {
+            id: fileId,
+            deleted: true,
+            storageRetained: true
+        };
     } catch (error) {
-        if (conn) {
+        if (conn && !committed) {
             try {
                 await conn.rollback();
             } catch (_) {}
         }
+
         throw error;
     } finally {
         if (conn) conn.release();
     }
 }
 
-
-async function saveProductDemo(userId, productId, data, demoId = null, audit = {}) {
+async function saveProductDemo(
+    userId,
+    productId,
+    data,
+    demoId = null,
+    audit = {}
+) {
     productId = validId(productId);
-    if (demoId !== null) demoId = validId(demoId);
+
+    if (demoId !== null) {
+        demoId = validId(demoId);
+    }
 
     const isUpdate = demoId !== null;
     const type = String(data.demoType || "").trim();
-    const allowedDemoTypes = ["image", "video", "url", "file"];
+    const allowedDemoTypes = [
+        "image",
+        "video",
+        "url",
+        "file"
+    ];
 
     if (!allowedDemoTypes.includes(type)) {
         fail("INVALID_DEMO_TYPE");
@@ -706,7 +938,10 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
                 fail("INVALID_DEMO_URL");
             }
         } catch (error) {
-            if (error.code === "INVALID_DEMO_URL") throw error;
+            if (error.code === "INVALID_DEMO_URL") {
+                throw error;
+            }
+
             fail("INVALID_DEMO_URL");
         }
     } else {
@@ -714,6 +949,7 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
     }
 
     let conn;
+    let committed = false;
 
     try {
         conn = await db.getConnection();
@@ -730,14 +966,19 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
             fail("PRODUCT_DEMOS_NOT_EDITABLE");
         }
 
-        // Validate and lock the referenced file in the same transaction.
         if (fileId !== null) {
             const [files] = await conn.execute(
-                `SELECT id, mime_type, file_role
-                 FROM marketplace_product_files
-                 WHERE id = ?
-                   AND product_id = ?
-                   AND is_active = 1
+                `SELECT
+                    f.id,
+                    f.mime_type,
+                    f.file_role,
+                    s.scan_status
+                 FROM marketplace_product_files f
+                 LEFT JOIN marketplace_file_scans s
+                   ON s.storage_key = f.storage_key
+                 WHERE f.id = ?
+                   AND f.product_id = ?
+                   AND f.is_active = 1
                  LIMIT 1
                  FOR UPDATE`,
                 [fileId, productId]
@@ -748,7 +989,15 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
             }
 
             const file = files[0];
-            const mime = String(file.mime_type || "").toLowerCase();
+
+            // Fail closed: không có scan record cũng không được dùng.
+            if (file.scan_status !== "clean") {
+                fail("PRODUCT_FILE_NOT_SCANNED_CLEAN");
+            }
+
+            const mime = String(
+                file.mime_type || ""
+            ).toLowerCase();
 
             if (type === "image") {
                 if (
@@ -765,7 +1014,11 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
                     fail("DEMO_FILE_TYPE_MISMATCH");
                 }
             } else if (type === "file") {
-                if (!["preview", "documentation"].includes(file.file_role)) {
+                if (
+                    !["preview", "documentation"].includes(
+                        file.file_role
+                    )
+                ) {
                     fail("DEMO_FILE_TYPE_MISMATCH");
                 }
             }
@@ -780,7 +1033,8 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
             const [existing] = await conn.execute(
                 `SELECT id
                  FROM marketplace_product_demos
-                 WHERE id = ? AND product_id = ?
+                 WHERE id = ?
+                   AND product_id = ?
                  LIMIT 1
                  FOR UPDATE`,
                 [demoId, productId]
@@ -798,7 +1052,8 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
                      demo_url = ?,
                      file_id = ?,
                      sort_order = ?
-                 WHERE id = ? AND product_id = ?`,
+                 WHERE id = ?
+                   AND product_id = ?`,
                 [
                     type,
                     title || null,
@@ -854,6 +1109,7 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
         });
 
         await conn.commit();
+        committed = true;
 
         return {
             id: demoId,
@@ -866,7 +1122,7 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
             sortOrder
         };
     } catch (error) {
-        if (conn) {
+        if (conn && !committed) {
             try {
                 await conn.rollback();
             } catch (_) {}
@@ -878,23 +1134,39 @@ async function saveProductDemo(userId, productId, data, demoId = null, audit = {
     }
 }
 
-
 async function getMyProductDemos(userId, productId) {
     productId = validId(productId);
 
     const conn = await db.getConnection();
 
     try {
-        await getSellerAndProduct(conn, userId, productId);
+        await getSellerAndProduct(
+            conn,
+            userId,
+            productId
+        );
 
         const [rows] = await conn.execute(
-            `SELECT d.id, d.product_id, d.demo_type, d.title,
-                    d.description, d.demo_url, d.file_id,
-                    d.sort_order, d.is_active, d.created_at,
-                    f.original_name, f.mime_type, f.file_size
+            `SELECT
+                d.id,
+                d.product_id,
+                d.demo_type,
+                d.title,
+                d.description,
+                d.demo_url,
+                d.file_id,
+                d.sort_order,
+                d.is_active,
+                d.created_at,
+                f.original_name,
+                f.mime_type,
+                f.file_size,
+                COALESCE(s.scan_status, 'pending') AS scan_status
              FROM marketplace_product_demos d
              LEFT JOIN marketplace_product_files f
                ON f.id = d.file_id
+             LEFT JOIN marketplace_file_scans s
+               ON s.storage_key = f.storage_key
              WHERE d.product_id = ?
              ORDER BY d.sort_order ASC, d.id ASC`,
             [productId]
@@ -906,11 +1178,17 @@ async function getMyProductDemos(userId, productId) {
     }
 }
 
-async function deleteProductDemo(userId, productId, demoId, audit = {}) {
+async function deleteProductDemo(
+    userId,
+    productId,
+    demoId,
+    audit = {}
+) {
     productId = validId(productId);
     demoId = validId(demoId);
 
     let conn;
+    let committed = false;
 
     try {
         conn = await db.getConnection();
@@ -929,31 +1207,41 @@ async function deleteProductDemo(userId, productId, demoId, audit = {}) {
 
         const [result] = await conn.execute(
             `DELETE FROM marketplace_product_demos
-             WHERE id = ? AND product_id = ?`,
+             WHERE id = ?
+               AND product_id = ?`,
             [demoId, productId]
         );
 
-        if (!result.affectedRows) fail("PRODUCT_DEMO_NOT_FOUND");
+        if (!result.affectedRows) {
+            fail("PRODUCT_DEMO_NOT_FOUND");
+        }
 
         await writeAudit(conn, {
             actorUserId: userId,
             action: "marketplace.product.demo_deleted",
             entityType: "marketplace_product_demo",
             entityId: String(demoId),
-            oldData: { productId },
+            oldData: {
+                productId
+            },
             ipAddress: audit.ipAddress || null,
             userAgent: audit.userAgent || null
         });
 
         await conn.commit();
+        committed = true;
 
-        return { id: demoId, deleted: true };
+        return {
+            id: demoId,
+            deleted: true
+        };
     } catch (error) {
-        if (conn) {
+        if (conn && !committed) {
             try {
                 await conn.rollback();
             } catch (_) {}
         }
+
         throw error;
     } finally {
         if (conn) conn.release();
