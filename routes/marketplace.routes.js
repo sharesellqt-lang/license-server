@@ -981,8 +981,10 @@ router.get(
                 req.params.fileId
             );
 
+            const isThumbnail = file.file_role === "thumbnail";
+
             await privateFileService.sendPrivateFile(res, file, {
-                download: true
+                download: !isThumbnail
             });
         } catch (error) {
             if (res.headersSent) return res.destroy();
@@ -990,8 +992,6 @@ router.get(
         }
     }
 );
-
-
 
 // Buyer tải file đã được gắn với lần giao hàng của chính mình.
 router.get(
