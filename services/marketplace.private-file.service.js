@@ -1,9 +1,8 @@
 "use strict";
 
-const fs = require("fs");
-const path = require("path");
 const db = require("../db");
-const { uploadDir } = require("../middleware/marketplace.product.upload");
+const storageService = require("./marketplace.storage.service");
+const { pipeline } = require("stream/promises");
 
 function fail(code) {
     const error = new Error(code);
@@ -17,26 +16,7 @@ function validId(value, code = "INVALID_FILE_ID") {
     return id;
 }
 
-function resolvePrivateFile(storageKey) {
-    if (!storageKey || typeof storageKey !== "string") {
-        fail("PRIVATE_FILE_NOT_FOUND");
-    }
 
-    const safeName = path.basename(storageKey);
-
-    if (safeName !== storageKey) {
-        fail("PRIVATE_FILE_NOT_FOUND");
-    }
-
-    const baseDir = path.resolve(uploadDir);
-    const filePath = path.resolve(baseDir, safeName);
-
-    if (!filePath.startsWith(baseDir + path.sep)) {
-        fail("PRIVATE_FILE_NOT_FOUND");
-    }
-
-    return filePath;
-}
 
 // Seller: chỉ được truy cập file thuộc sản phẩm của chính mình.
 async function getSellerProductFile(userId, productId, fileId) {
@@ -278,21 +258,38 @@ async function getSellerDeliveryVersionFile(
     return rows[0];
 }
 
-async function sendPrivateFile(res, file, options = {}) {
-    const filePath = resolvePrivateFile(file.storage_key);
 
-    let stat;
+async function sendPrivateFile(res, file, options = {}) {
+    if (!file || !file.storage_key) {
+        fail("PRIVATE_FILE_NOT_FOUND");
+    }
+
+    let object;
 
     try {
-        stat = await fs.promises.stat(filePath);
+        object = await storageService.getObjectStream(file.storage_key);
     } catch (error) {
-        if (error.code === "ENOENT") fail("PRIVATE_FILE_NOT_FOUND");
+        if (
+            error.code === "ENOENT" ||
+            error.code === "NoSuchKey" ||
+            error.code === "NotFound" ||
+            error.name === "NoSuchKey" ||
+            error.$metadata?.httpStatusCode === 404
+        ) {
+            fail("PRIVATE_FILE_NOT_FOUND");
+        }
+
         throw error;
     }
 
-    if (!stat.isFile()) fail("PRIVATE_FILE_NOT_FOUND");
+    if (!object || !object.body) {
+        fail("PRIVATE_FILE_NOT_FOUND");
+    }
 
-    const mimeType = String(file.mime_type || "application/octet-stream");
+    const mimeType = String(
+        file.mime_type || object.contentType || "application/octet-stream"
+    );
+
     const safeName = String(file.original_name || "download")
         .replace(/[\r\n"]/g, "_")
         .slice(0, 200);
@@ -301,36 +298,45 @@ async function sendPrivateFile(res, file, options = {}) {
 
     const headers = {
         "Content-Type": mimeType,
-        "Content-Length": stat.size,
         "Content-Disposition":
             `${disposition}; filename="${encodeURIComponent(safeName)}"`,
         "X-Content-Type-Options": "nosniff"
     };
 
+    const contentLength = Number(
+        object.contentLength ?? file.file_size
+    );
+
+    if (Number.isSafeInteger(contentLength) && contentLength >= 0) {
+        headers["Content-Length"] = contentLength;
+    }
+
     if (options.publicCache === true) {
-        headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=3600";
+        headers["Cache-Control"] =
+            "public, max-age=300, stale-while-revalidate=3600";
     } else {
-        headers["Cache-Control"] = "private, no-store, no-cache, must-revalidate";
+        headers["Cache-Control"] =
+            "private, no-store, no-cache, must-revalidate";
         headers["Pragma"] = "no-cache";
         headers["Expires"] = "0";
     }
 
     res.set(headers);
 
-    return new Promise((resolve, reject) => {
-        const stream = fs.createReadStream(filePath);
+    try {
+        await pipeline(object.body, res);
+    } catch (error) {
+        if (res.destroyed || res.writableEnded) {
+            return;
+        }
 
-        stream.on("error", reject);
-        res.on("finish", resolve);
-        res.on("close", () => {
-            if (!res.writableFinished) {
-                stream.destroy();
-                resolve();
-            }
-        });
+        if (res.headersSent) {
+            res.destroy(error);
+            return;
+        }
 
-        stream.pipe(res);
-    });
+        throw error;
+    }
 }
 
 
