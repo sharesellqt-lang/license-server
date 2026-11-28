@@ -39,11 +39,12 @@ async function getSellerDashboard(userId) {
         db.execute(
             `SELECT
                 COUNT(*) AS total_products,
-                SUM(status = 'published') AS active_products,
-                SUM(status IN ('pending_review', 'under_review')) AS pending_products,
-                SUM(status IN ('revision_required', 'rejected')) AS products_need_revision
-             FROM marketplace_products
-             WHERE seller_id = ?`,
+                COALESCE(SUM(status = 'published'), 0) AS active_products,
+                COALESCE(SUM(status = 'paused'), 0) AS paused_products,
+                COALESCE(SUM(status IN ('pending_review', 'under_review')), 0) AS pending_products,
+                COALESCE(SUM(status IN ('revision_required', 'rejected')), 0) AS products_need_revision
+            FROM marketplace_products
+            WHERE seller_id = ?`,
             [sellerId]
         ),
 
@@ -206,7 +207,8 @@ async function getSellerDashboard(userId) {
             pendingProtection: number(commissions.pending_protection),
             availableCommission: number(commissions.available_commission),
             pendingPayout: number(payouts.pending_payout),
-            totalPaid: number(commissions.total_paid)
+            totalPaid: number(commissions.total_paid),
+            pausedProducts: number(products.paused_products),
         },
         tasks: {
             productsNeedRevision: number(products.products_need_revision),

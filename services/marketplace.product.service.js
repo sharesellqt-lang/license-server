@@ -18,7 +18,8 @@ const PRODUCT_TYPES = [
 const EDITABLE_STATUSES = [
     "draft",
     "revision_required",
-    "rejected"
+    "rejected",
+    "paused"
 ];
 
 function fail(code) {
@@ -544,6 +545,66 @@ async function submitProduct(userId, productId, audit = {}) {
 }
 
 // ========================================
+// SELLER: PAUSE PUBLISHED PRODUCT
+// ========================================
+
+async function pauseProduct(userId, productId, audit = {}) {
+    let conn;
+
+    try {
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+
+        const seller = await getActiveSeller(conn, userId, true);
+        const product = await getOwnedProduct(
+            conn,
+            productId,
+            seller.id,
+            true
+        );
+
+        if (product.status !== "published") {
+            fail("PRODUCT_CANNOT_BE_PAUSED");
+        }
+
+        const [result] = await conn.execute(
+            `UPDATE marketplace_products
+            SET status = 'paused',
+                updated_at = NOW()
+            WHERE id = ? AND status = 'published'`,
+            [productId]
+        );
+
+        if (result.affectedRows !== 1) {
+            fail("PRODUCT_CANNOT_BE_PAUSED");
+        }
+
+        await writeProductAudit(
+            conn,
+            userId,
+            "marketplace.product.paused",
+            productId,
+            { status: "published" },
+            { status: "paused" },
+            audit
+        );
+
+        await conn.commit();
+
+        return {
+            id: product.id,
+            previousStatus: "published",
+            status: "paused"
+        };
+
+    } catch (error) {
+        if (conn) await conn.rollback();
+        throw error;
+    } finally {
+        if (conn) conn.release();
+    }
+}
+// ========================================
 // SELLER: ARCHIVE PRODUCT
 // ========================================
 
@@ -889,6 +950,7 @@ module.exports = {
     getMyProductDetail,
     updateProduct,
     submitProduct,
+    pauseProduct,
     archiveProduct,
     getAdminProducts,
     getAdminProductDetail,

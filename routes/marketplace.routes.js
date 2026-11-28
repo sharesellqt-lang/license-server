@@ -129,6 +129,7 @@ function handleError(res, error) {
         PRODUCT_NOT_EDITABLE: 409,
         PRODUCT_CANNOT_BE_SUBMITTED: 409,
         PRODUCT_CANNOT_BE_ARCHIVED: 409,
+        PRODUCT_CANNOT_BE_PAUSED: 409,
         INVALID_PRODUCT_ID: 400,
         PRODUCT_FILE_REQUIRED: 400,
         INVALID_PRODUCT_FILE_ROLE: 400,
@@ -700,6 +701,28 @@ router.put("/seller/products/:id", canEditProduct, async (req, res) => {
     }
 });
 
+// Seller tạm ngừng bán sản phẩm đang được xuất bản.
+router.post(
+    "/seller/products/:id/pause",
+    canEditProduct,
+    async (req, res) => {
+        try {
+            const result = await productService.pauseProduct(
+                req.user.id,
+                req.params.id,
+                getAuditInfo(req)
+            );
+
+            return res.json({
+                success: true,
+                message: "Đã tạm ngừng bán sản phẩm",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
 router.post("/seller/products/:id/submit", canSubmitProduct, async (req, res) => {
     try {
         const result = await productService.submitProduct(

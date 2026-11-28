@@ -106,23 +106,27 @@ async function getPublicDemoFile(productId, demoId) {
     demoId = validId(demoId);
 
     const [rows] = await db.execute(
-        `SELECT f.id, f.original_name, f.storage_key,
-                f.mime_type, f.file_size, f.file_role
-         FROM marketplace_product_demos d
-         INNER JOIN marketplace_products p ON p.id = d.product_id
-         INNER JOIN marketplace_product_files f ON f.id = d.file_id
-         WHERE d.id = ?
-           AND d.product_id = ?
-           AND d.is_active = 1
-           AND d.file_id IS NOT NULL
-           AND p.status = 'published'
-           AND f.is_active = 1
-           AND f.file_role = 'preview'
-           AND d.demo_type IN ('image', 'file')
-         LIMIT 1`,
-        [demoId, productId]
-    );
-
+    `SELECT f.id, f.original_name, f.storage_key,
+            f.mime_type, f.file_size, f.file_role
+     FROM marketplace_product_demos d
+     INNER JOIN marketplace_products p
+        ON p.id = d.product_id
+     INNER JOIN marketplace_sellers s
+        ON s.id = p.seller_id
+     INNER JOIN marketplace_product_files f
+        ON f.id = d.file_id
+     WHERE d.id = ?
+       AND d.product_id = ?
+       AND d.is_active = 1
+       AND d.file_id IS NOT NULL
+       AND p.status = 'published'
+       AND s.status = 'active'
+       AND f.is_active = 1
+       AND f.file_role = 'preview'
+       AND d.demo_type IN ('image', 'file')
+     LIMIT 1`,
+    [demoId, productId]
+);
     if (!rows.length) fail("PRIVATE_FILE_NOT_FOUND");
 
     return rows[0];

@@ -28,7 +28,8 @@ const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024;
 const EDITABLE_STATUSES = [
     "draft",
     "revision_required",
-    "rejected"
+    "rejected",
+    "paused"
 ];
 
 function fail(code) {
