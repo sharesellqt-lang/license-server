@@ -1040,6 +1040,67 @@ router.post(
 );
 
 // ========================================
+// BUYER: SUPPORT TICKETS
+// ========================================
+
+// Buyer lấy danh sách yêu cầu hỗ trợ.
+router.get("/buyer/support-tickets", async (req, res) => {
+    try {
+        const result = await supportService.getBuyerTickets(
+            req.user.id,
+            req.query
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Buyer xem chi tiết ticket và lịch sử trao đổi.
+router.get("/buyer/support-tickets/:ticketId", async (req, res) => {
+    try {
+        const result = await supportService.getBuyerTicketDetail(
+            req.user.id,
+            req.params.ticketId
+        );
+
+        return res.json({
+            success: true,
+            data: result
+        });
+    } catch (error) {
+        return handleError(res, error);
+    }
+});
+
+// Buyer gửi phản hồi trong ticket.
+router.post(
+    "/buyer/support-tickets/:ticketId/messages",
+    async (req, res) => {
+        try {
+            const result = await supportService.createBuyerMessage(
+                req.user.id,
+                req.params.ticketId,
+                {
+                    message: req.body.message
+                }
+            );
+
+            return res.status(201).json({
+                success: true,
+                message: "SUPPORT_MESSAGE_CREATED",
+                data: result
+            });
+        } catch (error) {
+            return handleError(res, error);
+        }
+    }
+);
+// ========================================
 // BUYER: CHECKOUT
 // ========================================
 

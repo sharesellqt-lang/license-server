@@ -231,8 +231,10 @@ function sellerTicketFilters(params = {}) {
         const statuses = String(params.status)
             .split(",")
             .map(s => s.trim())
-            .filter(s => SELLER_ACTIVE_TICKET_STATUSES.includes(s) ||
-                         SELLER_TERMINAL_TICKET_STATUSES.includes(s));
+            .filter(s =>
+                SELLER_ACTIVE_TICKET_STATUSES.includes(s) ||
+                SELLER_TERMINAL_TICKET_STATUSES.includes(s)
+            );
 
         if (statuses.length) {
             conditions.push(`t.status IN (${statuses.map(() => "?").join(",")})`);
@@ -241,18 +243,24 @@ function sellerTicketFilters(params = {}) {
     }
 
     if (params.category) {
-        conditions.push("t.category = ?");
-        values.push(String(params.category).trim());
+        const category = String(params.category).trim();
+
+        if (ALLOWED_CATEGORIES.includes(category)) {
+            conditions.push("t.category = ?");
+            values.push(category);
+        }
     }
 
     if (params.search) {
         const keyword = `%${String(params.search).trim()}%`;
+
         conditions.push(`(
             t.ticket_code LIKE ?
             OR t.subject LIKE ?
             OR oi.product_title LIKE ?
             OR o.order_code LIKE ?
         )`);
+
         values.push(keyword, keyword, keyword, keyword);
     }
 
@@ -261,7 +269,6 @@ function sellerTicketFilters(params = {}) {
         values
     };
 }
-
 async function getSellerTickets(userId, params = {}) {
     if (!validId(userId)) fail("INVALID_ID");
 
@@ -665,13 +672,23 @@ async function getBuyerTickets(userId, params = {}) {
 }
 
 async function getBuyerTicketDetail(userId, ticketId) {
-    if (!validId(userId) || !validId(ticketId)) {
-        fail("INVALID_ID");
-    }
+    userId = validId(userId);
+    ticketId = validId(ticketId);
 
     const [rows] = await db.execute(
         `SELECT
-            t.*,
+            t.id,
+            t.ticket_code,
+            t.order_id,
+            t.order_item_id,
+            t.buyer_user_id,
+            t.seller_user_id,
+            t.category,
+            t.subject,
+            t.description,
+            t.status,
+            t.created_at,
+            t.updated_at,
             oi.product_id,
             oi.product_title,
             oi.product_version,
@@ -682,15 +699,19 @@ async function getBuyerTicketDetail(userId, ticketId) {
             o.payment_status,
             o.order_status
          FROM marketplace_support_tickets t
-         LEFT JOIN marketplace_order_items oi ON oi.id = t.order_item_id
-         LEFT JOIN marketplace_orders o ON o.id = t.order_id
+         LEFT JOIN marketplace_order_items oi
+            ON oi.id = t.order_item_id
+         LEFT JOIN marketplace_orders o
+            ON o.id = t.order_id
          WHERE t.id = ?
            AND t.buyer_user_id = ?
          LIMIT 1`,
         [ticketId, userId]
     );
 
-    if (!rows.length) fail("SUPPORT_TICKET_NOT_FOUND");
+    if (!rows.length) {
+        fail("SUPPORT_TICKET_NOT_FOUND");
+    }
 
     const [messages] = await db.execute(
         `SELECT
